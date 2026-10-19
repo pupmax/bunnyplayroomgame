@@ -12,9 +12,10 @@ for p in "${parts[@]}"; do
     root) for f in $(ls -A "$PAGES"); do [[ $f =~ $KEEP ]] || rm -rf "$PAGES/$f"; done
           cp -r "$SRC/dist/." "$PAGES/"; touch "$PAGES/.nojekyll";;
     ruby|test|linye) rm -rf "$PAGES/$p"; cp -r "$SRC/dist-$p" "$PAGES/$p";;
-    source) rm -rf "$PAGES/source"; mkdir -p "$PAGES/source"
+    source) if [ "$(cd "$PAGES" && pwd)/source" = "$SRC" ]; then echo "'source' must be run from a separate working copy, not from the repo's own source/ (it would delete itself)"; exit 1; fi
+          rm -rf "$PAGES/source"; mkdir -p "$PAGES/source"
           cp -r "$SRC/src" "$SRC/tests" "$PAGES/source/"
-          for f in "$SRC"/*.ts "$SRC"/*.json "$SRC"/*.html "$SRC"/*.sh "$SRC"/README.md; do [ -f "$f" ] && cp "$f" "$PAGES/source/"; done
+          for f in "$SRC"/*.ts "$SRC"/*.json "$SRC"/*.html "$SRC"/*.sh "$SRC"/README.md "$SRC"/.gitignore; do [ -f "$f" ] && cp "$f" "$PAGES/source/"; done
           find "$PAGES/source" \( -name node_modules -o -name 'dist*' -o -name screenshots -o -name mockups -o -iname '*backup*' -o -name '.env*' \
             -o -iname '*token*' -o -name '*.pem' -o -name '*.key' -o -name .npmrc \) -prune -exec rm -rf {} +
           if grep -rIlE 'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|gho_[A-Za-z0-9]{20,}|x-access-token:[A-Za-z0-9]' "$PAGES/source"; then

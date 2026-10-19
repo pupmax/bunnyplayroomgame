@@ -103,7 +103,7 @@ export class ShadowScene extends Phaser.Scene {
     const px = this.pup.x, py = this.pup.y;
     this.dropTagBubble(); // back-to-back catches: the last 'Gotcha' bubble must not sit on top of the new SQUASHED!/PLOP! stamp
     if (this.sq.start(() => { this.tagBub = this.talk(360, 560, this.catchLine(), 22, 1100); if (s.tags >= NEED) this.finish(true); else this.roam(); })) {
-      this.ring(px, py, 0xd9c8ff); floatText(this, Phaser.Math.Clamp(px, 120, 600), py - 300, `+${pts}${s.combo > 1 ? '  CHAIN!' : ''}`, '#ffdf6b', 34); return;
+      this.ring(px, py, 0xd9c8ff); const sp = this.sq.scoreAt() ?? { x: Phaser.Math.Clamp(px, 120, 600), y: py - 300 }; floatText(this, sp.x, sp.y, `+${pts}${s.combo > 1 ? '  CHAIN!' : ''}`, '#ffdf6b', 34); return;
     }
     // fallback while the catch art is still baking: the original quick tag
     impact(this, this.pup.x, this.pup.y - 100, pick(['TAG!', 'POOF!', 'BOOP!']), pts, s.combo > 1 ? 'CHAIN!' : '', s.combo > 1);

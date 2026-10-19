@@ -308,6 +308,14 @@ export class SquashCatch {
     this.update(0);
     this.timer = S.time.delayedCall(HOLD, () => this.toBoing());
   }
+  /** Where the '+600' score popup should start for the current catch so it never sits on the stamp words (call right after start()).
+   *  The stamp is centred at (bx, gy-385): SQUASHED!/PLOP! (+ burst) span about +-60 px around it, BOING/BOING! span -10..+120.
+   *  The popup starts above that and floats further up (floatText rises 90 px), so it stays clear for its whole life. */
+  scoreAt(): { x: number; y: number } | null {
+    if (!this.phase) return null;
+    const bx = Phaser.Math.Clamp(this.ox + L(175), 230, 490), by = this.gy - 385;
+    return this.variant === 'B' ? { x: Phaser.Math.Clamp(bx - 40, 120, 600), y: by - 85 } : { x: Phaser.Math.Clamp(bx, 120, 600), y: by - 130 };
+  }
   /** A tap during the hold skips to the boing (after MIN_SKIP ms of hold). Returns true if it skipped. */
   skip(): boolean {
     if (this.phase !== 'hold' || this.scene.time.now - this.holdAt < MIN_SKIP) return false;

@@ -28,10 +28,10 @@ export class HubScene extends Phaser.Scene {
   create(): void {
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x2a070d, 0x1a0a0e);
     // Rolling input guard: a player hammering HALL/CONTINUE keeps tapping after the Hall appears. Stay deaf for 350 ms, and every
-    // press during the guard pushes it out another 300 ms (cap 1.6 s), so input only comes back once the taps stop. Then a door
+    // press during the guard pushes it out another 300 ms (cap 2.5 s: QC r22 saw a 20-tap burst over 1.8 s still land on Football with 1.6 s), so input only comes back once the taps stop. Then a door
     // only opens on a FRESH press that started on that same door (see pressed), never on a release left over from the burst.
     this.input.enabled = false; const token = {}; (this as any).__inTok = token; this.pressed = -1;
-    const t0 = performance.now(); let until = t0 + 350; const MAXG = t0 + 1600;
+    const t0 = performance.now(); let until = t0 + 350; const MAXG = t0 + 2500;
     const onDown = () => { until = Math.min(MAXG, Math.max(until, performance.now() + 300)); };
     const evs = ['pointerdown', 'touchstart', 'mousedown'] as const; const cv = this.game.canvas;
     evs.forEach(e => cv.addEventListener(e, onDown, { passive: true }));

@@ -1,5 +1,6 @@
-// Shadow catch bubbles: pool is exactly the 6 approved lines, never the same twice in a row,, and bubbles up to ~32 chars stay fully on screen at the edges.
+// Shadow catch bubbles: pool is exactly the shadowCatch lines in src/lines.ts, never the same twice in a row,, and bubbles up to ~32 chars stay fully on screen at the edges.
 import { chromium, devices } from 'playwright';
+import { readFileSync } from 'fs';
 const URL = process.env.URL || 'http://localhost:4201/';
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ ...devices['iPhone 15 Pro Max'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 2 })).newPage(); const errs = [];
@@ -8,14 +9,18 @@ await p.goto(URL); await p.waitForFunction(() => (window.__game?.scene.isActive(
 await p.evaluate(() => { for (const k of ['playroom-test.tut.linye1', 'playroom-linye.tut.linye1', 'playroom.tut.linye1']) localStorage.setItem(k, '1'); const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Shadow'); });
 await p.waitForFunction(() => window.__pr?.st?.running && window.__pr.squash().ready, null, { timeout: 60000 });
 let fails = 0; const check = (n, ok, info = '') => { console.log(ok ? 'PASS' : 'FAIL', n, info); if (!ok) fails++; };
-const POOL = ['Sticky situation, Puppy!', 'Ouch! Wool cushion activated.', "Tag, you're squished!", "That's gonna leave a quill mark!", 'Who left a Puppy on the floor?', 'Fastest hedgehog in the playroom!'];
+// expected pool = whatever src/lines.ts says (shadowCatch), so the test follows edits to the lines
+const LT = readFileSync(new globalThis.URL('../src/lines.ts', import.meta.url), 'utf8');
+const POOL = Function('return ' + LT.match(/shadowCatch:\s*(\[[\s\S]*?\])/)[1])();
+if (!POOL.length || POOL.some(l => typeof l !== 'string')) throw new Error('could not read shadowCatch from src/lines.ts');
+console.log('pool from src/lines.ts', JSON.stringify(POOL));
 const LONG = [...POOL, 'Sticky situation, Puppy!', 'Ouch! Wool cushion activated.', 'WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW', 'Mmmmmm mmmmm mmmmmmm, Mmmmm-mmmm!'];
 const r = await p.evaluate(async (LONG) => { const S = window.__game.scene.getScene('Shadow'), W = 720, H = 1280, out = [];
   for (const t of LONG) for (const x of [0, 360, W]) { const c = S.talk(x, 560, t, 22, 5000); await new Promise(r => setTimeout(r, 400)); const bd = c.getBounds();
     out.push({ t: t.length, x, l: Math.round(bd.left), r: Math.round(bd.right), top: Math.round(bd.top), bot: Math.round(bd.bottom), ok: bd.left >= 0 && bd.right <= W && bd.top >= 0 && bd.bottom <= H }); c.destroy(); }
   return { W, out }; }, LONG);
 for (const o of r.out) check(`len ${o.t} at x=${o.x} on screen (W ${r.W})`, o.ok, JSON.stringify(o));
-// real catch path: the bubble after a catch comes from the 2-line pool
+// real catch path: the bubble after a catch comes from the pool
 const seen = new Set(); let prev = '';
 for (let i = 0; i < 6; i++) {
   const t = await p.evaluate(async () => { const S = window.__game.scene.getScene('Shadow'); S.tag(); while (window.__pr.squash().phase) await new Promise(r => setTimeout(r, 50)); await new Promise(r => setTimeout(r, 300));

@@ -53,21 +53,20 @@ It prints something like:
 Open `source/src/lines.ts` in any text editor (VS Code is a good free one) and find `shadowCatch`:
 ```ts
   shadowCatch: [
-    'Sticky situation, Puppy!',
-    'Ouch! Wool cushion activated.',
-    "Tag, you're squished!",
-    "That's gonna leave a quill mark!",
-    'Who left a Puppy on the floor?',
-    'Fastest hedgehog in the playroom!',
+'Prickly bum delivery, Puppy!',
+'Sit. Stay. Good boy, Puppy!',
+"Who's the boss now, Puppy?",
+'Beg for mercy, Puppy-pie!',
+'You make a comfy chair, Puppy!',
   ],
 ```
 To add a line, add a new row **inside the brackets**, in quotes, **ending with a comma**:
 ```ts
-    'Fastest hedgehog in the playroom!',
-    'Boop! Right on the nose!',
+'You make a comfy chair, Puppy!',
+'Boop! Right on the nose!',
   ],
 ```
-- If your line contains an apostrophe (`you're`, `that's`), wrap it in **double quotes**: `"Tag, you're squished!",`
+- If your line contains an apostrophe (`who's`, `you're`), wrap it in **double quotes**: `"Who's the boss now, Puppy?",`
 - Keep lines to about **32 characters** or less so the bubble fits on a phone screen.
 - The game picks a random line after each catch and never shows the same one twice in a row.
 - All the other characters' lines are in the same file (`hiveBonk`, `rubyHurt`, …).
@@ -128,8 +127,8 @@ GitHub Pages updates in about a minute. Check it worked by opening e.g. `https:/
 ## 6. Common mistakes
 
 - **Running `npm` commands in the wrong folder.** They only work inside `source/` (where `package.json` is). Error `Missing script` or `ENOENT package.json` = you are in the wrong folder; `cd source`.
-- **Missing comma or quote in `lines.ts`.** The page goes blank or `npm run dev` shows a red error. Every line needs quotes at both ends and a comma at the end.
-- **Apostrophe inside single quotes** (`'Tag, you're squished!'`) breaks the file. Use double quotes for that line.
+- **Missing comma or quote in `lines.ts`.** The page goes blank or `npm run dev` shows a red error. Every line needs quotes at both ends and a comma at the end. (Spaces at the start of a line don't matter.)
+- **Apostrophe inside single quotes** (`'Who's the boss now, Puppy?'`) breaks the file. Use double quotes for that line.
 - **Editing the built files** (repo root `assets/`, `test/assets/`…) instead of `source/src/`. Built files are overwritten on the next build; always edit `source/src/` and rebuild.
 - **Forgetting to build before copying.** Copying old `dist-*` folders publishes the old game. Rebuild first; check the build id.
 - **Copying into the wrong place**, e.g. `dist-test` into the repo root (that replaces the main game with the tester build) or deleting `source/`, `test/`, `ruby/`, `linye/` by accident. Use only the commands above. If something went wrong before you committed, `git checkout -- .` and `git clean -fd` in the repo root undo all uncommitted changes (careful: they also discard your edits that are not yet copied/committed).

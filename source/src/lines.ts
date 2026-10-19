@@ -37,12 +37,11 @@ export const LINES = {
   trashBlock: ['BOING! Off the umbrella!', 'Puppy: Umbrella mode! Ha!', 'Wait till he closes it!'],
   // Shadow Tag catch bubbles (shown after each squash catch). Add more lines here; up to ~32 characters fits on screen at any edge.
   shadowCatch: [
-    'Sticky situation, Puppy!',
-    'Ouch! Wool cushion activated.',
-    "Tag, you're squished!",
-    "That's gonna leave a quill mark!",
-    'Who left a Puppy on the floor?',
-    'Fastest hedgehog in the playroom!',
+'Prickly bum delivery, Puppy!',
+'Sit. Stay. Good boy, Puppy!',
+"Who's the boss now, Puppy?",
+'Beg for mercy, Puppy-pie!',
+'You make a comfy chair, Puppy!',
   ],
   shadowMiss: ['Too far, sweetie.', 'Puppy: Ha! I am not there!', '...hm.', 'The lantern spoiled it!'],
   lassoHit: ['YEE-HAW! Gotcha, Puppy!', 'Round-up!', 'Lasso-tastic!', 'Ride \'em, cowbunny!', 'Bunny is the boss!', 'Puppy wiggled out... after a long sulk!'],

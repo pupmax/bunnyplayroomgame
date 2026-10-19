@@ -1,0 +1,28 @@
+{
+  "name": "bunny-playroom-games",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview --host",
+    "test": "node tests/playtest.mjs",
+    "build:ruby": "vite build -c vite.ruby.config.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fontsource/fredoka": "^5.3.0",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  },
+  "type": "module",
+  "private": true
+}

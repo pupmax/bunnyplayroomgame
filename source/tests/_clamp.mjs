@@ -1,0 +1,11 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch(); const page = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })).newPage();
+await page.goto('http://localhost:4199/'); await page.evaluate(() => localStorage.setItem('playroom.beaten', '3'));
+await page.reload(); await page.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 90000 });
+await page.evaluate(() => { const g = window.__game; g.scene.getScenes(true).forEach(x => g.scene.stop(x.scene.key)); g.scene.start('Hub'); });
+await page.waitForTimeout(3000);
+const bx = await page.locator('canvas').boundingBox(); const P = (x, y) => [bx.x + x * bx.width / 720, bx.y + y * bx.height / 1280];
+const before = await page.evaluate(() => window.__game.scene.getScene('Hub').children.list.filter(o => o.depth === 790).length);
+await page.mouse.click(...P(630, 750)); await page.waitForTimeout(1200);
+const r = await page.evaluate(() => window.__game.scene.getScene('Hub').children.list.filter(o => o.depth === 790).map(o => { const b = o.getBounds(); return [Math.round(b.x), Math.round(b.right), o.list?.[1]?.text]; }));
+console.log('bubbles', before, JSON.stringify(r)); await page.screenshot({ path: 'screenshots/v6/bubble_clamp.png' }); await b.close();

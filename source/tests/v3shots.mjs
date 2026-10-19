@@ -1,0 +1,18 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch(); const errs = [];
+const page = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
+page.on('pageerror', e => errs.push(String(e)));
+await page.goto('http://localhost:4199/'); await page.evaluate(() => localStorage.setItem('playroom.tut.ruby2', '1'));
+await page.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 30000 });
+await page.evaluate(() => { window.__game.scene.getScene('Title').scene.start('Boxing'); });
+const bx = await page.locator('canvas').boundingBox(); const P = (x, y) => [bx.x + x * bx.width / 720, bx.y + y * bx.height / 1280];
+const until = (fn) => page.waitForFunction(fn, null, { timeout: 10000, polling: 16 });
+await until(() => window.__pr?.st?.running && window.__pr.st.state === 'guard'); await page.waitForTimeout(300);
+await page.screenshot({ path: 'screenshots/v3/01_puppy_guard.png' });
+await until(() => window.__pr.st.state === 'windup' && window.__pr.stT() < 0.4); await page.screenshot({ path: 'screenshots/v3/02_puppy_windup.png' });
+const s = await page.evaluate(() => window.__pr.st.side); await page.mouse.click(...P(s > 0 ? 110 : 610, 1190)); console.log('after dodge', JSON.stringify(await page.evaluate(() => window.__pr.st)));
+await until(() => window.__pr.st.state === 'punch'); await page.waitForTimeout(90); await page.screenshot({ path: 'screenshots/v3/03_puppy_punch_dodged.png' });
+await until(() => window.__pr.st.state === 'open'); await page.waitForTimeout(150);
+await page.mouse.click(...P(360, 1190)); await page.waitForTimeout(110); await page.screenshot({ path: 'screenshots/v3/04_puppy_hit_recoil.png' });
+await page.waitForTimeout(500); await page.mouse.click(...P(360, 1190)); await page.waitForTimeout(40); await page.screenshot({ path: 'screenshots/v3/05_ruby_jab.png' });
+console.log('errors', errs); await b.close();

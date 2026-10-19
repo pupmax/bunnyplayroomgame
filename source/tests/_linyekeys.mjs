@@ -1,0 +1,16 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] }); const p = await (await b.newContext({ viewport: { width: 360, height: 640 }, deviceScaleFactor: 1 })).newPage();
+await p.goto('http://localhost:4199/'); await p.waitForFunction(() => window.__game && window.__artReady && window.__game.scene.isActive('Title'), null, { timeout: 90000 });
+await p.evaluate(() => { const T = window.__game.textures; window.__keys = new Set(); const og = T.get.bind(T), of = T.getFrame.bind(T);
+  T.get = (k) => { if (typeof k === 'string') window.__keys.add(k); return og(k); }; T.getFrame = (k, f) => { if (typeof k === 'string') window.__keys.add(k); return of(k, f); };
+  localStorage.removeItem('playroom.tut.linye1'); const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Shadow'); });
+const bot = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { await p.evaluate(() => { const S = window.__game.scene.getScene('Shadow'); if (!S.st || !S.st.running) return;
+  const lit = window.__pr.lit(); let bi = -1, bd = 1e9; window.__pr.pools.forEach(([x, y], i) => { if (lit[i]) return; const d = Math.hypot(x - S.pup.x, y - S.pup.y); if (d < bd) { bd = d; bi = i; } }); if (bi >= 0 && bd < 140) S.tapAt(...window.__pr.pools[bi]); }); await p.waitForTimeout(80); } };
+await p.waitForTimeout(2500); await p.mouse.click(180, 320); await p.waitForTimeout(1500);
+await p.evaluate(() => { const G = window.__game; G.scene.pause('Shadow'); G.scene.start('Pause', { from: 'Shadow' }); }); await p.waitForTimeout(800);
+await p.evaluate(() => { const G = window.__game; G.scene.stop('Pause'); G.scene.resume('Shadow'); });
+await bot(12000); await p.evaluate(() => window.__pr.force(true)); await p.waitForTimeout(2500);
+await p.evaluate(() => { const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Shadow'); }); await p.waitForTimeout(2000);
+await p.evaluate(() => window.__pr.force(false)); await p.waitForTimeout(2500);
+console.log(JSON.stringify([...await p.evaluate(() => [...window.__keys].filter(k => !k.startsWith('__') && !k.startsWith('sqz_') && !k.startsWith('bkg_') && !k.startsWith('ab_')).sort())]));
+await b.close();

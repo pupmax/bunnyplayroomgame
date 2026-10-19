@@ -1,0 +1,12 @@
+import { webkit, devices } from 'playwright';
+const b = await webkit.launch(); const page = await (await b.newContext({ ...devices['iPhone 13'] })).newPage();
+const errs=[]; page.on('pageerror', e => errs.push(String(e)));
+await page.goto('http://localhost:4199/');
+await page.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 60000 });
+await page.waitForTimeout(1500); await page.screenshot({ path: 'screenshots/v6/mobile_iphone_title.png' });
+await page.evaluate(() => { const g = window.__game; g.scene.getScenes(true).forEach(s => g.scene.stop(s.scene.key)); g.scene.start('Hub'); });
+await page.waitForTimeout(2500); await page.screenshot({ path: 'screenshots/v6/mobile_iphone_hub.png' });
+await page.evaluate(() => { const g = window.__game; g.scene.getScenes(true).forEach(s => g.scene.stop(s.scene.key)); g.scene.start('Hive'); });
+await page.waitForTimeout(3000); await page.screenshot({ path: 'screenshots/v6/mobile_iphone_hive.png' });
+console.log('errors', errs);
+await b.close();

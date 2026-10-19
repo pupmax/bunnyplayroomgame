@@ -1,0 +1,10 @@
+import { chromium, devices } from 'playwright';
+const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await (await b.newContext({ ...devices['iPhone 15 Pro Max'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 2 })).newPage();
+await p.goto('http://localhost:4199/'); await p.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 120000 });
+await p.evaluate(() => { localStorage.setItem('playroom.tut.nana1', '1'); const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Acorn'); }); await p.waitForTimeout(2500);
+const buf = await p.evaluate(() => Array.from(window.__game.scene.getScene('Acorn').bar.commandBuffer)); (await import('fs')).writeFileSync('/tmp/abd/buf.json', JSON.stringify(buf));
+console.log(JSON.stringify(await p.evaluate(() => { const S = window.__game.scene.getScene('Acorn'); const g = S.bar; const s = g.__ab; const cam = S.cameras.main;
+  const c = g.commandBuffer; let ys = []; for (let i = 0; i < 40; i++) ys.push(+c[i].toFixed?.(1) ?? c[i]);
+  return { len: c.length, first: ys, ab: s && { box: s.box, ox: s.ox, oy: s.oy, key: s.key, w: s.img?.width, h: s.img?.height, tex: s.img && [s.img.frame.width, s.img.frame.height] }, g: [g.x, g.y, g.scaleX, g.scrollFactorY, g.depth], cam: [cam.scrollX, cam.scrollY, cam.zoom], res: window.__game.canvas.width / 720 }; })));
+await b.close();

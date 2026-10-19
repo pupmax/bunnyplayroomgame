@@ -1,0 +1,14 @@
+import { chromium, devices } from 'playwright';
+const thr = +(process.argv[2] || 4); const URL = process.env.URL || 'http://localhost:4200/';
+const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const ctx = await b.newContext({ ...devices['iPhone 15 Pro Max'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 3 });
+const p = await ctx.newPage(); await p.goto(URL); await p.evaluate(() => { for (const n of ['playroom', 'playroom-ruby']) localStorage.setItem(n + '.tut.rubybag', '1'); }); await p.reload();
+await p.waitForFunction(() => window.__game && window.__artReady, null, { timeout: 120000 });
+const cdp = await ctx.newCDPSession(p); await cdp.send('Emulation.setCPUThrottlingRate', { rate: thr });
+await p.evaluate(() => { const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Boxing'); }); await p.waitForTimeout(2500);
+const r = await p.evaluate(() => new Promise(res => { const G = window.__game, S = G.scene.getScene('Boxing'); const T = {};
+  const wrap = (obj, name, label) => { const f = obj[name].bind(obj); obj[name] = (...a) => { const t = performance.now(); const r = f(...a); (T[label] = T[label] || []).push(performance.now() - t); return r; }; };
+  wrap(S, 'update', 'update'); for (const m of ['updateBag', 'drawLimbs', 'drawHud', 'drawStage', 'drawMotion']) if (S[m]) wrap(S, m, m);
+  wrap(G.renderer, 'render', 'render'); const pre = G.renderer.preRender.bind(G.renderer);
+  let n = 0; const tick = () => { if (++n < 60) requestAnimationFrame(tick); else { const o = {}; for (const k in T) { const a = T[k].sort((x, y) => x - y); o[k] = [+a[Math.floor(a.length / 2)].toFixed(2), +a[Math.floor(a.length * 0.95)].toFixed(2)]; } res(o); } }; requestAnimationFrame(tick); }));
+console.log(JSON.stringify(r)); await b.close();

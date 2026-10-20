@@ -8,8 +8,9 @@ This `source/` folder is the whole game. The **repo root** is the live website (
 | `.../bunnyplayroomgame/test/` | tester build (all levels unlocked) | `npm run build:test` | `dist-test/` | `test/` |
 | `.../bunnyplayroomgame/ruby/` | Ruby standalone game | `npm run build:ruby` | `dist-ruby/` | `ruby/` |
 | `.../bunnyplayroomgame/linye/` | Linye vs Puppy — Shadow Tag | `npm run build:linye` | `dist-linye/` | `linye/` |
+| `.../bunnyplayroomgame/tail/` | Bunny vs Puppy — Catch Puppy by the Tail | `npm run build:tail` | `dist-tail/` | `tail/` |
 
-> **Golden rule:** never delete or overwrite the folders `source/`, `test/`, `ruby/` or `linye/` in the repo root unless that is the one you are updating.
+> **Golden rule:** never delete or overwrite the folders `source/`, `test/`, `ruby/`, `linye/` or `tail/` in the repo root unless that is the one you are updating.
 
 ---
 
@@ -44,7 +45,7 @@ It prints something like:
   ➜  Local:   http://localhost:5173/
   ➜  Network: http://192.168.1.23:5173/
 ```
-- Open the **Local** address in your browser. Pages: `/` main game, `/test.html` tester build, `/ruby.html`, `/linye.html`.
+- Open the **Local** address in your browser. Pages: `/` main game, `/test.html` tester build, `/ruby.html`, `/linye.html`, `/tail.html`.
 - **On your phone:** connect the phone to the **same Wi-Fi**, then open the **Network** address on the phone (e.g. `http://192.168.1.23:5173/linye.html`). If no Network line appears, run `npm run dev -- --host` instead. If the phone can't connect, allow Node through your computer's firewall when asked.
 - Leave it running: every time you save a file the page reloads by itself. Stop it with **Ctrl + C**.
 
@@ -82,6 +83,7 @@ npm run build:main    # main game  -> dist/
 npm run build:test    # /test/     -> dist-test/
 npm run build:ruby    # /ruby/     -> dist-ruby/
 npm run build:linye   # /linye/    -> dist-linye/
+npm run build:tail    # /tail/     -> dist-tail/
 npm run build:all     # all four
 ```
 Each build gets a build id (like `2610191455` = 26-10-19 14:55 Bangkok time) shown on the title screen and in `version.json`.
@@ -100,7 +102,7 @@ rm -rf ../test  && cp -R dist-test  ../test
 rm -rf ../ruby  && cp -R dist-ruby  ../ruby
 rm -rf ../linye && cp -R dist-linye ../linye
 ```
-(Shortcut that does the same safely: `PAGES=.. ./deploy-stage.sh test` — parts `root`, `test`, `ruby`, `linye`.)
+(Shortcut that does the same safely: `PAGES=.. ./deploy-stage.sh test` — parts `root`, `test`, `ruby`, `linye`, `tail`.)
 
 ### Windows PowerShell
 ```powershell

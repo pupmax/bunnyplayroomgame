@@ -43,6 +43,20 @@ export const LINES = {
 'Beg for mercy, Puppy-pie!',
 'You make a comfy chair, Puppy!',
   ],
+  // Tail Catch (bonus): Bunny's catch lines. Marc's taglines first; 'Come, Puppy, follow me!' plays the lead-him-by-the-tail variant.
+  tailCatch: [
+    'Gotcha!',
+    'This is mine!',
+    'Come, Puppy, follow me!',
+    'Tail secured!',
+    'Caught you, wiggle-butt!',
+    'Got your fluffy tail!',
+  ],
+  // Puppy protesting while Bunny holds his tail (comic, never heart-eyed)
+  tailProtest: ['Hey! My tail!', 'Not the tail!', 'Ow ow ow!', 'Unhand my fluff!', 'So undignified!'],
+  // Puppy dodging / escaping (mistimed grab, front grab, lost tug)
+  tailEscape: ['Nyoom!', "Can't catch me!", 'Wrong end, Bunny!', "Tail's off-limits!", 'Zoomies activated!', 'Slippery fluff!'],
+  tailStart: ['Bunny: Yee-haw! Here, Puppy Puppy!', 'Bunny: That tail is MINE today.', 'Puppy: You will never catch my tail!'],
   shadowMiss: ['Too far, sweetie.', 'Puppy: Ha! I am not there!', '...hm.', 'The lantern spoiled it!'],
   lassoHit: ['YEE-HAW! Gotcha, Puppy!', 'Round-up!', 'Lasso-tastic!', 'Ride \'em, cowbunny!', 'Bunny is the boss!', 'Puppy wiggled out... after a long sulk!'],
   lassoMiss: ['Whiff! Spin it faster!', 'Puppy: Nyeh nyeh! Missed!', 'Time that release, cowbunny!', 'The lasso caught... a chair.'],

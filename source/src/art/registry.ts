@@ -2,7 +2,7 @@
 // Textures are rendered at TEX_RES x their nominal game size so they stay crisp
 // when the camera zooms for high-DPI screens (see systems/resolution.ts).
 import Phaser from 'phaser';
-import { puppySVG, PUP_VB } from './puppy';
+import { puppySVG, PUP_VB, puppyFrames, puppyTailSVG, PUP_TAIL_VB } from './puppy';
 import { bunnySVG, BUN_VB, BunExpr, BunPose } from './bunny';
 import { sushiSVG, SUSHI } from './sushi';
 import { CAST, chibiHeadSVG, chibiFullSVG, rubyBackSVG, lassoSVG, gloveSVG } from './chibi';
@@ -25,6 +25,7 @@ const BOOT_USED_FULL = new Set(['happy', 'dizzy']), BOOT_USED_FULL_KEYS = new Se
 const BOOT_USED_BUN = new Set(['bun_full_wink', 'bun_full_laugh', 'bun_full_cool', 'bun_full_coolwink', 'bun_sip_wink', 'bun_sip_smile', 'bun_bust_wink', 'bun_bust_smile']);
 function bootDeferred(key: string): boolean {
   if (key.startsWith('full_')) return !BOOT_USED_FULL.has(key.split('_')[2]) && !BOOT_USED_FULL_KEYS.has(key);
+  if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
   if (key.startsWith('bun_rig_')) return false;
   if (/^bun_(full|wave|sip|bust)_/.test(key)) return !BOOT_USED_BUN.has(key);
   return false;
@@ -59,6 +60,11 @@ function assets(): Asset[] {
     list.push({ key: `pup_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG(frames[name], k),
       originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
   }
+  // Tail Catch bonus: tail-less Puppy frames (run cycle + reactions) and the tail as its own wagging part. Generated on demand (bootDeferred).
+  const pf = puppyFrames(), tailFrames: Record<string, any> = { stand: { face: 'normal' }, panic: pf.panic, dizzy: pf.dizzy, hearts: { face: 'hearts', earL: 10, earR: 10 } };
+  for (let i = 0; i < 6; i++) tailFrames[`run${i}`] = pf[`run${i}_normal`];
+  for (const name of Object.keys(tailFrames)) list.push({ key: `pt_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...tailFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
+  list.push({ key: 'pt_tail', nominal: PUP_SCALE, boost: 1.6, build: (k) => puppyTailSVG(k), originX: PUP_TAIL_VB.bx / PUP_TAIL_VB.w, originY: PUP_TAIL_VB.by / PUP_TAIL_VB.h });
   const exprs: BunExpr[] = ['cool', 'unimpressed', 'smile', 'wink', 'laugh', 'stern'];
   for (const e of exprs) {
     list.push({ key: `bun_bust_${e}`, nominal: BUN_SCALE * 0.6, boost: 1.4, build: (k) => bunnySVG('bust', e, k), originX: 0.5, originY: 1 });
@@ -235,4 +241,10 @@ export function artScale(key: string, mult = 1): number { return mult / (raster.
 /** Exposed for the preview page. */
 export function allAssetSVGs(): { key: string; svg: string }[] {
   return assets().map(a => ({ key: a.key, svg: a.build(a.res ? Math.min(1, a.res) : a.nominal * 1.5) }));
+}
+
+/** Generate any of `keys` that aren't textures yet (on-demand art such as the Tail Catch pt_* frames); resolves when all are ready. */
+export async function ensureArt(scene: Phaser.Scene, keys: string[]): Promise<void> {
+  if (!assetIndex) { const all = assets(); assetIndex = new Map(all.map(a => [a.key, a])); }
+  for (const k of keys) if (!scene.textures.exists(k) && assetIndex.has(k)) await loadOne(scene, assetIndex.get(k)!);
 }

@@ -17,6 +17,7 @@ export class SoloTitleScene extends Phaser.Scene {
     setupCamera(this); this.cameras.main.fadeIn(250); this.going = false;
     (window as any).__pr = { scene: 'SoloTitle' };
     if (STANDALONE === 'linye') { this.linye(); this.footer(); return; }
+    if (STANDALONE === 'tail') { this.tail(); this.footer(); return; }
     setPageBg(0x0d0618, 0x1f4fb8);
     art(this, 0, 0, 'bg_arena'); this.add.rectangle(0, 0, W, H, 0x0d0618, 0.45).setOrigin(0);
     const t1 = comic(this, W / 2, 230, 'RUBY vs PUPPY', 92, '#fff6c0', '#ffb21f', '#3a0610');
@@ -41,6 +42,30 @@ export class SoloTitleScene extends Phaser.Scene {
     makeMuteButton(this);
     this.add.text(W - 12, H - 10, 'build ' + BUILD, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }).setOrigin(1, 1).setAlpha(0.5).setDepth(1000);
     diagHotspot(this);
+  }
+  /** Tail Catch standalone: 'BUNNY vs PUPPY / CATCH PUPPY BY THE TAIL' in the playroom. */
+  private tail() {
+    setPageBg(0x2a1840, 0x7a4a2a);
+    art(this, 0, 0, 'bg_room'); this.add.rectangle(0, 0, W, H, 0x0d0618, 0.35).setOrigin(0);
+    const t1 = comic(this, W / 2, 220, 'BUNNY vs PUPPY', 88, '#fff6c0', '#ffb21f', '#3a0610');
+    const t2 = comic(this, W / 2, 330, 'CATCH PUPPY', 76, '#ffd0e0', '#ff3b6b', '#3a0610');
+    const t3 = comic(this, W / 2, 415, 'BY THE TAIL', 76, '#d8ffe0', '#2fbf5a', '#0a2a12');
+    [t1, t2, t3].forEach((t, i) => { t.setAngle(i % 2 ? 2 : -2); this.tweens.add({ targets: t, angle: i % 2 ? -2 : 2, yoyo: true, repeat: -1, duration: 1200 + i * 100, ease: 'Sine.InOut' }); });
+    this.add.ellipse(220, 1005, 220, 40, 0x000000, 0.3); this.add.ellipse(520, 985, 190, 36, 0x000000, 0.3);
+    const bun = art(this, 220, 1005, 'bun_full_wink', 1.05);
+    this.tweens.add({ targets: bun, y: bun.y - 14, yoyo: true, repeat: -1, duration: 460, ease: 'Sine.InOut' });
+    const tail = art(this, 455, 905, 'pt_tail', 1.15 * 1.7 * 0.62).setFlipX(true);
+    this.tweens.add({ targets: tail, angle: 18, yoyo: true, repeat: -1, duration: 130, ease: 'Sine.InOut' });
+    const pup = art(this, 520, 985, 'pt_panic', 1.15).setFlipX(true);
+    this.tweens.add({ targets: pup, x: pup.x + 7, yoyo: true, repeat: -1, duration: 70 });
+    txt(this, W / 2, 530, 'Puppy has the zoomies.\nWhen he stops, grab that glowing tail!', 32, '#ffffff', '#3a1408', 8).setLineSpacing(4);
+    this.time.delayedCall(500, () => say(this, 250, 690, 'Bunny: Here, Puppy Puppy!', 26, 2400));
+    this.time.delayedCall(1400, () => say(this, 500, 760, 'Puppy: Not the tail!', 24, 1800));
+    makeButton(this, W / 2, 1150, 380, 120, 'PLAY', () => {
+      if (this.going || !leaveOnce(this)) return; this.going = true;
+      try { localStorage.removeItem('playroom-tail.tut.tail1'); } catch { /* private mode */ } // tutorial every time you start from the card
+      this.cameras.main.fadeOut(200); this.time.delayedCall(220, () => this.scene.start('Tail'));
+    }, COLORS.BUTTON, 60);
   }
   /** Linye standalone: 'LINYE vs PUPPY / SHADOW TAG' in the moonlit dojo. */
   private linye() {

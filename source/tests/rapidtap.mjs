@@ -1,9 +1,9 @@
 // Rapid-tap stress (Marc: "must never hang if the player taps fast before the intro finishes").
 // Mobile touch emulation; taps every ~50 ms cycling over PUNCH / DODGE L / DODGE R / centre / card hint, from scene
 // start through intro, tutorial card and match start. Runs: first run (card), Play Again (real end-card button,
-// tapped rapidly), Play Again with the card re-armed, Menu -> back in (card re-armed). /ruby/ + every main-game level.
+// tapped rapidly), Play Again with the card re-armed, Menu -> back in (card re-armed). /ruby/, /linye/, /tail/ + every main-game level.
 import { chromium, devices } from 'playwright';
-const MAIN = process.env.MAIN || 'http://localhost:4199/', RUBY = process.env.RUBY || 'http://localhost:4200/', LINYE = process.env.LINYE || 'http://localhost:4202/';
+const MAIN = process.env.MAIN || 'http://localhost:4199/', RUBY = process.env.RUBY || 'http://localhost:4200/', LINYE = process.env.LINYE || 'http://localhost:4202/', TAIL = process.env.TAIL || 'http://localhost:4213/';
 const LEVELS = (process.env.LEVELS || 'Boxing,Football,Hive,Acorn,Dive,Pounce,Trash,Shadow,Lasso').split(',');
 const SPOTS = [[360, 1080], [110, 1080], [610, 1080], [360, 640], [360, 940], [200, 1180], [520, 800]];
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -33,7 +33,7 @@ async function session(url, standalone) {
     const end = Date.now() + 15000;
     while (Date.now() < end && await p.evaluate(() => !!window.__pr?.__old)) { await tap(...spot); await p.waitForTimeout(50); }
   };
-  for (const level of standalone ? [standalone === 'linye' ? 'Shadow' : 'Boxing'] : LEVELS) {
+  for (const level of standalone ? [standalone === 'linye' ? 'Shadow' : standalone === 'tail' ? 'Tail' : 'Boxing'] : LEVELS) {
     const BY = level === 'Lasso' ? 800 : 1010; // Lasso has its own lose card (RETRY/HALL at y=800)
     // 1) first run, card shown — taps start on the title/PLAY (ruby) or right at scene start (main)
     await clearTut(); await mark();
@@ -54,6 +54,7 @@ async function session(url, standalone) {
 }
 if (!process.env.SKIP_RUBY) await session(RUBY, 'ruby');
 if (!process.env.SKIP_LINYE) await session(LINYE, 'linye');
+if (!process.env.SKIP_TAIL) await session(TAIL, 'tail');
 if (!process.env.SKIP_MAIN) await session(MAIN, false);
 const hung = rows.filter(r => r.hung), errd = rows.filter(r => r.errors || r.err);
 console.log(`RUNS ${rows.length} TAPS ${taps} HANGS ${hung.length} ERRORS ${errd.length}`);

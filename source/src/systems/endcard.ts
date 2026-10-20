@@ -21,7 +21,7 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   const dim = scene.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setInteractive();
   const g = scene.add.graphics(); g.fillStyle(win ? 0xfff3e0 : 0xe9e0ff, 1).lineStyle(6, COLORS.INK, 1).fillRoundedRect(60, 200, W - 120, 900, 36).strokeRoundedRect(60, 200, W - 120, 900, 36); void 0;
   const t = txt(scene, W / 2, 268, win ? `${name.toUpperCase()} WINS!` : 'PUPPY GOT LUCKY!', 56, win ? '#ff5c8a' : '#6b4cc9', '#22252b', 8);
-  const hero = art(scene, 230, 770, `full_${name}_${win ? 'happy' : 'dizzy'}`, 1.05);
+  const hero = art(scene, 230, 770, name === 'Bunny' ? (win ? 'bun_full_laugh' : 'bun_full_unimpressed') : `full_${name}_${win ? 'happy' : 'dizzy'}`, 1.05);
   const pup = art(scene, 500, 760, win ? 'pup_dizzy' : 'pup_hearts', 1.2);
   if (win) pup.setAngle(-80).setY(735).setX(510);
   scene.tweens.add({ targets: win ? hero : pup, y: '-=30', yoyo: true, repeat: -1, duration: 260, ease: 'Quad.Out' });

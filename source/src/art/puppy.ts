@@ -15,7 +15,7 @@ export type PupFace = 'normal' | 'hearts' | 'dizzy' | 'panic';
 
 export interface PupPose {
   bob: number; legBack: number; legFront: number; legLift: number; armBack: number;
-  earL: number; earR: number; lean: number; face: PupFace; cup: boolean; noArm?: boolean;
+  earL: number; earR: number; lean: number; face: PupFace; cup: boolean; noArm?: boolean; noTail?: boolean;
 }
 
 export const POSE_DEFAULT: PupPose = { bob: 0, legBack: 0, legFront: 0, legLift: 0, armBack: 10, earL: 0, earR: 0, lean: 0, face: 'normal', cup: true };
@@ -127,7 +127,7 @@ export function puppySVG(pose: Partial<PupPose>, pxPerUnit: number): string {
   if (!p.noArm) s += `<g transform="translate(0 ${b}) rotate(${p.armBack} 62 156)">` +
     `<rect x="50" y="150" width="23" height="34" rx="11.5" fill="url(#furDark)" stroke="${OUT}" stroke-width="${SW}"/></g>`;
   // tail (fluffy)
-  s += `<path d="M58 ${196 + b} C42 ${196 + b} 32 ${186 + b} 33 ${172 + b} l4 3 l1 -6 C42 ${178 + b} 50 ${182 + b} 60 ${184 + b} Z" fill="#c27230" stroke="${OUT}" stroke-width="${SW2}" stroke-linejoin="round"/>`;
+  if (!p.noTail) s += `<path d="M58 ${196 + b} C42 ${196 + b} 32 ${186 + b} 33 ${172 + b} l4 3 l1 -6 C42 ${178 + b} 50 ${182 + b} 60 ${184 + b} Z" fill="#c27230" stroke="${OUT}" stroke-width="${SW2}" stroke-linejoin="round"/>`;
   s += leg(84, p.legBack, p.legLift, '#a85d24');
   s += body(b);
   s += leg(113, p.legFront, p.legLift, '#c27230');
@@ -177,4 +177,14 @@ export function puppyFrames(): Record<string, Partial<PupPose>> {
   frames['panic'] = { face: 'panic', bob: -2, legBack: -8, legFront: 10, armBack: -150, earL: 20, earR: 20 };
   frames['stand'] = { face: 'normal' };
   return frames;
+}
+
+/** Puppy's tail on its own (for the Tail Catch bonus: it wags as a separate rig part). Big fluffy tail, base on the right
+ *  (attaches at his back, he faces right), tip curling up-left with a cream tuft. viewBox 80x64, base at (74, 42). */
+export const PUP_TAIL_VB = { w: 80, h: 64, bx: 74, by: 42 };
+export function puppyTailSVG(pxPerUnit: number): string {
+  const s = `<path d="M76 48 C58 56 30 54 16 38 C8 29 7 17 13 9 l5 9 l4 -11 l4 12 C30 28 46 34 74 34 Z" fill="#c27230" stroke="${OUT}" stroke-width="${SW2}" stroke-linejoin="round"/>` +
+    `<path d="M13 9 l5 9 l4 -11 l4 12 C22 26 16 24 12 20 C9 16 10 12 13 9 Z" fill="#ffe2b8" stroke="${OUT}" stroke-width="2.4" stroke-linejoin="round"/>` +
+    `<path d="M66 40 C52 44 38 42 28 34" fill="none" stroke="#ffd7a3" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
+  return svgDoc(PUP_TAIL_VB.w, PUP_TAIL_VB.h, PUP_TAIL_VB.w * pxPerUnit, PUP_TAIL_VB.h * pxPerUnit, s, DEFS);
 }

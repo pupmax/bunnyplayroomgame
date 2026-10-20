@@ -14,7 +14,7 @@ const PINK = '#f6c4cc';
 const NOSE = '#ee98a8';
 const EYE = '#17110f';
 
-export type BunExpr = 'cool' | 'coolwink' | 'unimpressed' | 'smile' | 'wink' | 'laugh' | 'stern';
+export type BunExpr = 'cool' | 'coolwink' | 'unimpressed' | 'smile' | 'wink' | 'laugh' | 'stern' | 'sneaky';
 export type BunPose = 'full' | 'bust' | 'sip' | 'wave' | 'rig';
 
 const DEFS =
@@ -86,13 +86,24 @@ function face(expr: BunExpr): string {
       s += dot(L) + dot(R) + catMouth();
       break;
     case 'wink':
-      s += closed(L) + dot(R) + catMouth(true) + heart(206, 110, 28, '#ff3b6b', OUT, 3);
+      s += closed(L) + dot(R) + catMouth(true); // no heart from Bunny's head (Marc): hearts come from Puppy
       break;
     case 'laugh':
       s += closed(L) + closed(R) +
         `<path d="M${HX - 13} ${cy + 16} H${HX + 13} Q${HX + 12} ${cy + 36} ${HX} ${cy + 36} Q${HX - 12} ${cy + 36} ${HX - 13} ${cy + 16} Z" fill="#8a2236" stroke="${EYE}" stroke-width="3" stroke-linejoin="round"/>` +
         `<ellipse cx="${HX}" cy="${cy + 30}" rx="7.5" ry="4.5" fill="#ff8ca0"/>`;
       break;
+    case 'sneaky': {
+      // cartoon mischief: narrowed eyes, left brow low, right brow raised, lopsided smug half-grin
+      const slit = (x: number, d: number) => `<path d="M${x - 10} ${cy - 1 + d} Q${x} ${cy - 6} ${x + 10} ${cy - 1 - d} Q${x + 2} ${cy + 7} ${x - 10} ${cy - 1 + d} Z" fill="${EYE}"/>` +
+        `<path d="M${x - 12} ${cy - 3 + d} Q${x} ${cy - 9} ${x + 12} ${cy - 3 - d}" fill="none" stroke="${EYE}" stroke-width="4" stroke-linecap="round"/>`;
+      s += slit(L, 2) + slit(R, -2) +
+        `<path d="M${L - 12} ${cy - 17} Q${L} ${cy - 15} ${L + 11} ${cy - 11}" fill="none" stroke="${EYE}" stroke-width="4" stroke-linecap="round"/>` +
+        `<path d="M${R - 11} ${cy - 20} Q${R + 1} ${cy - 31} ${R + 13} ${cy - 23}" fill="none" stroke="${EYE}" stroke-width="4" stroke-linecap="round"/>` +
+        `<path d="M${HX - 11} ${cy + 20} Q${HX + 1} ${cy + 26} ${HX + 13} ${cy + 15}" fill="none" stroke="${EYE}" stroke-width="3.4" stroke-linecap="round"/>` +
+        `<path d="M${HX + 11} ${cy + 12} q3 1 3 5" fill="none" stroke="${EYE}" stroke-width="2.6" stroke-linecap="round"/>`;
+      break;
+    }
     case 'stern':
       // angry slanted eyes like the whiteboard clip
       s += `<path d="M${L - 11} ${cy - 8} L${L + 10} ${cy - 1} Q${L + 9} ${cy + 9} ${L} ${cy + 9} Q${L - 10} ${cy + 8} ${L - 11} ${cy - 8} Z" fill="${EYE}"/>` +

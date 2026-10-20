@@ -21,7 +21,7 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   const dim = scene.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setInteractive();
   const g = scene.add.graphics(); g.fillStyle(win ? 0xfff3e0 : 0xe9e0ff, 1).lineStyle(6, COLORS.INK, 1).fillRoundedRect(60, 200, W - 120, 900, 36).strokeRoundedRect(60, 200, W - 120, 900, 36); void 0;
   const t = txt(scene, W / 2, 268, win ? `${name.toUpperCase()} WINS!` : 'PUPPY GOT LUCKY!', 56, win ? '#ff5c8a' : '#6b4cc9', '#22252b', 8);
-  const hero = art(scene, 230, 770, name === 'Bunny' ? (win ? 'bun_full_laugh' : 'bun_full_unimpressed') : `full_${name}_${win ? 'happy' : 'dizzy'}`, 1.05);
+  const hero = art(scene, 230, 770, name === 'Bunny' ? (win ? 'bun_full_sneaky' : 'bun_full_unimpressed') : `full_${name}_${win ? 'happy' : 'dizzy'}`, 1.05);
   const pup = art(scene, 500, 760, win ? 'pup_dizzy' : 'pup_hearts', 1.2);
   if (win) pup.setAngle(-80).setY(735).setX(510);
   scene.tweens.add({ targets: win ? hero : pup, y: '-=30', yoyo: true, repeat: -1, duration: 260, ease: 'Quad.Out' });
@@ -29,7 +29,13 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   const sub = txt(scene, W / 2, 885, win ? pick(LINES.puppyLose) : pick(LINES.puppyWin), 24, '#7a3f8a', '#fff', 0).setWordWrapWidth(540);
   const sc = txt(scene, W / 2, 345, `${detail}\nScore ${score}${newBest ? '  ★ NEW BEST!' : ''}`, 30, '#22252b', '#fff', 0);
   c.add([dim, g, t, hero, pup, quote, sub, sc]);
-  const go = (k: string, data?: object) => { if (!leaveOnce(scene)) return; scene.cameras.main.fadeOut(200); scene.time.delayedCall(220, () => scene.scene.start(k, data)); };
+  // buttons arm only after the 300 ms fade-in PLUS a 300 ms gap with no taps (a tap burst that ended the level can't fire them); armed stays armed
+  const t0 = scene.time.now; let last = -1e9, prev = -1e9, armed = false;
+  const isArmed = () => { if (armed) return true; const n = scene.time.now, before = n - last < 250 ? prev : last; /* buttons fire on pointerup: skip this tap's own pointerdown */ if (n - t0 >= 600 && n - before >= 300) armed = true; return armed; };
+  const onDown = () => { prev = last; last = scene.time.now; };
+  scene.input.on('pointerdown', onDown); scene.events.once('shutdown', () => scene.input.off('pointerdown', onDown));
+  (window as any).__cardArmed = () => isArmed();
+  const go = (k: string, data?: object) => { if (!isArmed() || !leaveOnce(scene)) return; scene.cameras.main.fadeOut(200); scene.time.delayedCall(220, () => scene.scene.start(k, data)); };
   if (STANDALONE) {
     c.add(makeButton(scene, W / 2 - 145, 1010, 260, 110, 'PLAY AGAIN', () => go(scene.scene.key), COLORS.BUTTON, 38));
     c.add(makeButton(scene, W / 2 + 145, 1010, 260, 110, 'MENU', () => go('SoloTitle'), COLORS.BUTTON_ALT, 44));

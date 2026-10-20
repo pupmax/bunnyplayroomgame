@@ -31,7 +31,8 @@ async function session(url, standalone) {
   const endAndTap = async (spot) => { // lose the match, then hammer the end-card button until the next scene is up
     await p.evaluate(() => window.__pr.force(false)); await mark();
     const end = Date.now() + 15000;
-    while (Date.now() < end && await p.evaluate(() => !!window.__pr?.__old)) { await tap(...spot); await p.waitForTimeout(50); }
+    // burst of taps, then a short human pause: the card arms only after a 300 ms tap-free gap (the burst itself must never fire it twice)
+    let n = 0; while (Date.now() < end && await p.evaluate(() => !!window.__pr?.__old)) { await tap(...spot); await p.waitForTimeout(++n % 6 ? 50 : 450); }
   };
   for (const level of standalone ? [standalone === 'linye' ? 'Shadow' : standalone === 'tail' ? 'Tail' : 'Boxing'] : LEVELS) {
     const BY = level === 'Lasso' ? 800 : 1010; // Lasso has its own lose card (RETRY/HALL at y=800)

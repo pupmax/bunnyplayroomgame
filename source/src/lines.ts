@@ -43,14 +43,11 @@ export const LINES = {
 'Beg for mercy, Puppy-pie!',
 'You make a comfy chair, Puppy!',
   ],
-  // Tail Catch (bonus): Bunny's catch lines. Marc's taglines first; 'Come, Puppy, follow me!' plays the lead-him-by-the-tail variant.
+  // Tail Catch (bonus): Bunny's catch lines, Marc's 3 taglines only; 'Come, Puppy, follow me!' plays the lead-him-by-the-tail variant.
   tailCatch: [
     'Gotcha!',
     'This is mine!',
     'Come, Puppy, follow me!',
-    'Tail secured!',
-    'Caught you, wiggle-butt!',
-    'Got your fluffy tail!',
   ],
   // Puppy protesting while Bunny holds his tail (comic, never heart-eyed)
   tailProtest: ['Hey! My tail!', 'Not the tail!', 'Ow ow ow!', 'Unhand my fluff!', 'So undignified!'],

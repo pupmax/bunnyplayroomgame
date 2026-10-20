@@ -8,6 +8,7 @@ import { txt, comic } from '../../systems/fx';
 import { say, setPageBg } from '../../systems/kit';
 import { BUILD, diagHotspot } from '../../systems/diag';
 import { STANDALONE } from '../../standalone';
+import { TailPup } from '../../systems/tailRigs';
 
 /** Standalone title card: 'Ruby vs Puppy: Punching Bag Boxing' or 'Linye vs Puppy: Shadow Tag' + PLAY (always shows the level's tutorial from here). */
 export class SoloTitleScene extends Phaser.Scene {
@@ -46,20 +47,28 @@ export class SoloTitleScene extends Phaser.Scene {
   /** Tail Catch standalone: 'BUNNY vs PUPPY / CATCH PUPPY BY THE TAIL' in the playroom. */
   private tail() {
     setPageBg(0x2a1840, 0x7a4a2a);
-    art(this, 0, 0, 'bg_room'); this.add.rectangle(0, 0, W, H, 0x0d0618, 0.35).setOrigin(0);
-    const t1 = comic(this, W / 2, 220, 'BUNNY vs PUPPY', 88, '#fff6c0', '#ffb21f', '#3a0610');
-    const t2 = comic(this, W / 2, 330, 'CATCH PUPPY', 76, '#ffd0e0', '#ff3b6b', '#3a0610');
-    const t3 = comic(this, W / 2, 415, 'BY THE TAIL', 76, '#d8ffe0', '#2fbf5a', '#0a2a12');
-    [t1, t2, t3].forEach((t, i) => { t.setAngle(i % 2 ? 2 : -2); this.tweens.add({ targets: t, angle: i % 2 ? -2 : 2, yoyo: true, repeat: -1, duration: 1200 + i * 100, ease: 'Sine.InOut' }); });
-    this.add.ellipse(220, 1005, 220, 40, 0x000000, 0.3); this.add.ellipse(520, 985, 190, 36, 0x000000, 0.3);
+    art(this, 0, 0, 'bg_room'); this.add.rectangle(0, 0, W, H, 0x0d0618, 0.25).setOrigin(0);
+    // title panel: a dark band that also hides the room's window, so nothing shows through the title block
+    const pg = this.add.graphics();
+    pg.fillStyle(0x000000, 0.3).fillRoundedRect(30, 132, W - 60, 488, 34);
+    pg.fillStyle(0x1b0e30, 0.97).lineStyle(6, 0xffd36b, 0.9).fillRoundedRect(24, 122, W - 48, 488, 34).strokeRoundedRect(24, 122, W - 48, 488, 34);
+    // one crisp outline + ONE drop shadow (a dark copy underneath); comic()'s own canvas shadow is switched off (it ghosted on iPhone)
+    const title = (y: number, str: string, size: number, top: string, bot: string, ink: string) => {
+      const sw = Math.max(8, size * 0.16);
+      txt(this, W / 2, y + Math.round(size * 0.09), str, size, '#0a0414', '#0a0414', sw).setAlpha(0.55);
+      const t = comic(this, W / 2, y, str, size, top, bot, ink); t.setShadow(0, 0, '#000000', 0, false, false); return t;
+    };
+    title(205, 'BUNNY vs PUPPY', 80, '#fff6c0', '#ffb21f', '#3a0610');
+    title(318, 'CATCH PUPPY', 74, '#ffd0e0', '#ff3b6b', '#3a0610');
+    title(408, 'BY THE TAIL', 74, '#d8ffe0', '#2fbf5a', '#0a2a12');
+    txt(this, W / 2, 530, 'Puppy has the zoomies.\nWhen he stops, grab that glowing tail!', 30, '#ffffff', '#1b0e30', 7).setLineSpacing(4);
+    this.add.ellipse(220, 1005, 220, 40, 0x000000, 0.3);
     const bun = art(this, 220, 1005, 'bun_full_wink', 1.05);
     this.tweens.add({ targets: bun, y: bun.y - 14, yoyo: true, repeat: -1, duration: 460, ease: 'Sine.InOut' });
-    const tail = art(this, 455, 905, 'pt_tail', 1.15 * 1.7 * 0.62).setFlipX(true);
-    this.tweens.add({ targets: tail, angle: 18, yoyo: true, repeat: -1, duration: 130, ease: 'Sine.InOut' });
-    const pup = art(this, 520, 985, 'pt_panic', 1.15).setFlipX(true);
-    this.tweens.add({ targets: pup, x: pup.x + 7, yoyo: true, repeat: -1, duration: 70 });
-    txt(this, W / 2, 530, 'Puppy has the zoomies.\nWhen he stops, grab that glowing tail!', 32, '#ffffff', '#3a1408', 8).setLineSpacing(4);
-    this.time.delayedCall(500, () => say(this, 250, 690, 'Bunny: Here, Puppy Puppy!', 26, 2400));
+    // the real Tail Catch rig: tail attached at his rear and wagging (he faces Bunny, tail out on the far side)
+    const pup = new TailPup(this, 520, 990, 1.15).flip(true).setFrame('panic'); pup.wagAmp = 26; pup.wagSpd = 13;
+    this.events.on('update', (_t: number, dms: number) => { pup.update(Math.min(dms, 50) / 1000, 0, 1); pup.root.x = 520 + Math.sin(this.time.now / 70) * 3; });
+    this.time.delayedCall(500, () => say(this, 230, 700, 'Bunny: Here, Puppy Puppy!', 26, 2400));
     this.time.delayedCall(1400, () => say(this, 500, 760, 'Puppy: Not the tail!', 24, 1800));
     makeButton(this, W / 2, 1150, 380, 120, 'PLAY', () => {
       if (this.going || !leaveOnce(this)) return; this.going = true;

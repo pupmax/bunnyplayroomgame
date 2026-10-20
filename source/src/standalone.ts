@@ -13,9 +13,9 @@ export const RUBY_KEYS = ['bb_back', 'bb_front', 'bg_arena', 'bg_vignette', 'bx_
 export const LINYE_KEYS = ['bg_dojo', 'full_Linye_happy', 'full_Linye_dizzy', 'head_Linye_happy', 'head_Linye_smug', 'head_Linye_dizzy',
   'pup_dizzy', 'pup_hearts', 'pup_idle', 'pup_panic'];
 /** Texture keys the Tail Catch standalone needs (Bunny rig + tail-less Puppy run frames + his separate tail; the arena/stamp are baked by the level). */
-export const TAIL_KEYS = ['bg_room', 'bun_rig_wink', 'bun_rig_laugh', 'bun_rig_stern', 'bun_rig_unimpressed', 'bun_full_wink', 'bun_full_laugh', 'bun_full_unimpressed',
+export const TAIL_KEYS = ['bg_room', 'bun_rig_wink', 'bun_rig_laugh', 'bun_rig_stern', 'bun_rig_unimpressed', 'bun_full_wink', 'bun_full_laugh', 'bun_full_unimpressed', 'bun_rig_sneaky', 'bun_full_sneaky',
   'su_bunLeg', 'su_bunUpper', 'su_bunFore', 'su_shadow', 'su_dust', 'su_particle', 'lasso', 'pup_dizzy', 'pup_hearts', 'pup_panic',
-  'pt_stand', 'pt_panic', 'pt_dizzy', 'pt_hearts', 'pt_tail', 'pt_run0', 'pt_run1', 'pt_run2', 'pt_run3', 'pt_run4', 'pt_run5'];
+  'pt_stand', 'pt_panic', 'pt_dizzy', 'pt_tail', 'pt_run0', 'pt_run1', 'pt_run2', 'pt_run3', 'pt_run4', 'pt_run5'];
 /** Per-standalone boot settings (loader text, texture keys). */
 export const SOLO_BOOT: Record<string, { keys: string[]; loading: string; bar: number }> = {
   ruby: { keys: RUBY_KEYS, loading: 'Lacing up the gloves...', bar: 0xff5c8a },

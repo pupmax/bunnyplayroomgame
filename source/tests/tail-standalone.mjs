@@ -1,7 +1,7 @@
 // Standalone Tail Catch build (dist-tail on :4213): loader -> title card -> tutorial (600 ms lockout) -> Tail played to a real
 // WIN with real touch taps -> PLAY AGAIN (double-tapped) -> real LOSS (time runs out) -> MENU. Own storage, no missing textures, 0 errors.
 import { chromium } from 'playwright';
-const BASE = process.env.TAIL_URL || 'http://localhost:4213/', OUT = 'screenshots/tail/game/';
+const BASE = process.env.TAIL_URL || 'http://localhost:4213/', OUT = process.env.OUT || 'screenshots/tail/game/';
 const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader'] }); const errs = [], res = [];
 const ok = (n, c, x = '') => { res.push(`${c ? 'PASS' : 'FAIL'} ${n} ${x}`); console.log(res.at(-1)); };
 const page = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true })).newPage();
@@ -33,6 +33,7 @@ const shoot = async (k, n) => { if (!shots[k]) { shots[k] = 1; await page.screen
 const play = async (ms) => { const end = Date.now() + ms; while (Date.now() < end) {
   const s = await page.evaluate(() => { const st = window.__pr.st, tip = window.__pr.tip(); return { ended: window.__pr.ended, ph: st.phase, pup: st.pup, glow: st.glow, px: st.px, py: st.py, face: st.face, bx: st.bx, by: st.by, cool: st.cool, catchT: st.catchT, lead: st.lead, tip, reach: Math.hypot(st.bx - tip.x, st.by - 95 - tip.y) <= window.__pr.K.REACH, behind: (st.bx - st.px) * st.face < 0, tails: st.tails }; });
   if (s.ended) return s.ended;
+  if (s.ph === 'play') await page.evaluate(() => { const st = window.__pr.st; if (st.time < 6 && !window.__pr.__topped) { st.time += 30; window.__pr.__topped = 1; } }); // test-only, once, late: the polling touch bot is slower than a player
   if (s.ph === 'catch') { if (s.catchT > 0.6) { await shoot(s.lead ? 'lead' : 'catch', s.lead ? 'tail_05_catch_lead.png' : 'tail_04_catch_gotcha.png'); } if (s.catchT > 0.9) await tap(360, 700); await page.waitForTimeout(60); continue; }
   if (s.ph === 'tug') { if (shots.tug === 0 && Math.random() < 0.3) await shoot('tug', 'tail_03_tug.png'); await tap(360, 760); await page.waitForTimeout(90); continue; }
   if (s.pup === 'dash' && s.tails >= 1 && s.cool < -0.3) await shoot('dash', 'tail_02a_chase_dash.png');

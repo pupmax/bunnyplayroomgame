@@ -181,10 +181,4 @@ export function puppyFrames(): Record<string, Partial<PupPose>> {
 
 /** Puppy's tail on its own (for the Tail Catch bonus: it wags as a separate rig part). Big fluffy tail, base on the right
  *  (attaches at his back, he faces right), tip curling up-left with a cream tuft. viewBox 80x64, base at (74, 42). */
-export const PUP_TAIL_VB = { w: 80, h: 64, bx: 74, by: 42 };
-export function puppyTailSVG(pxPerUnit: number): string {
-  const s = `<path d="M76 48 C58 56 30 54 16 38 C8 29 7 17 13 9 l5 9 l4 -11 l4 12 C30 28 46 34 74 34 Z" fill="#c27230" stroke="${OUT}" stroke-width="${SW2}" stroke-linejoin="round"/>` +
-    `<path d="M13 9 l5 9 l4 -11 l4 12 C22 26 16 24 12 20 C9 16 10 12 13 9 Z" fill="#ffe2b8" stroke="${OUT}" stroke-width="2.4" stroke-linejoin="round"/>` +
-    `<path d="M66 40 C52 44 38 42 28 34" fill="none" stroke="#ffd7a3" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
-  return svgDoc(PUP_TAIL_VB.w, PUP_TAIL_VB.h, PUP_TAIL_VB.w * pxPerUnit, PUP_TAIL_VB.h * pxPerUnit, s, DEFS);
-}
+// Tail Catch's separate tail art lives in src/systems/tailRigs.ts (puppyTailSVG, one swappable function).

@@ -2,6 +2,7 @@
 // TailPup: tail-less Puppy frames (pt_*) + the tail (pt_tail) as its own part, so it can wag, glow and stretch in a tug.
 import Phaser from 'phaser';
 import { art, artScale, PUP_SCALE } from '../art/registry';
+import { svgDoc } from '../art/svg';
 
 export type BunPoseT = { sh: number; el: number; lean: number; kn: number; stride: number; sq: number };
 /** Arm angles: 0 = hanging down, +ve swings toward -x, -90 = pointing right, 180 = straight up. */
@@ -47,7 +48,32 @@ export class TailBunny {
   }
 }
 
-const TS = 1.7; // tail drawn big so it reads (and is tappable) on a phone
+// ---- Puppy's tail art: ONE swappable function (Marc is choosing between tail styles; drop the chosen one in here) ----
+/** viewBox, root (bx, by: hidden behind his hip) and tip (tx, ty: the grab spot). Rest pose = raised up-and-back; TAIL_FLAT lays it out flat. */
+export const PUP_TAIL_VB = { w: 100, h: 92, bx: 86, by: 74, tx: 24, ty: 26 };
+/** Style "soft C": medium-width C curve (root ~14 px, end ~10 px on screen), no taper to a point, rounded fluffy cream tip. */
+export function puppyTailSVG(pxPerUnit: number): string {
+  const OUT = '#3b1f10', FUR = '#c7772f', CREAM = '#ffe7c2';
+  const P = [[86, 74], [52, 90], [12, 70], [24, 26]]; // cubic centreline, root -> tip
+  const at = (t: number) => { const u = 1 - t; return [0, 1].map(i => u * u * u * P[0][i] + 3 * u * u * t * P[1][i] + 3 * u * t * t * P[2][i] + t * t * t * P[3][i]); };
+  const N = 24, L: number[][] = [], R: number[][] = [];
+  for (let i = 0; i <= N; i++) { const t = i / N, [x, y] = at(t), [x2, y2] = at(Math.min(1, t + 0.01)), [x1, y1] = at(Math.max(0, t - 0.01));
+    const dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1, hw = (12 - 3.5 * t) / 2; // ~12 units at the root -> ~8.5 at the end
+    L.push([x - dy / d * hw, y + dx / d * hw]); R.push([x + dy / d * hw, y - dx / d * hw]); }
+  const pts = [...L, ...R.reverse()].map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L');
+  const [tx, ty] = P[3], r = 8; // fluffy tip: a round tuft of 6 soft bumps, a bit wider than the tail end
+  let tuft = ''; for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 - 0.3, a2 = (i + 1) / 6 * Math.PI * 2 - 0.3;
+    tuft += `${i ? '' : `M${(tx + Math.cos(a) * r).toFixed(1)} ${(ty + Math.sin(a) * r).toFixed(1)} `}A${(r * 0.55).toFixed(1)} ${(r * 0.55).toFixed(1)} 0 0 1 ${(tx + Math.cos(a2) * r).toFixed(1)} ${(ty + Math.sin(a2) * r).toFixed(1)} `; }
+  const body = `<path d="M${pts} Z" fill="${FUR}" stroke="${OUT}" stroke-width="4" stroke-linejoin="round"/>` +
+    `<path d="M80 72 C60 80 36 74 28 54" fill="none" stroke="#e8a060" stroke-width="2.6" stroke-linecap="round" opacity="0.75"/>` +
+    `<path d="${tuft}Z" fill="${CREAM}" stroke="${OUT}" stroke-width="3.2" stroke-linejoin="round"/>` +
+    `<path d="M${tx - 3} ${ty - 2} q3 -2 6 0" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" opacity="0.8"/>`;
+  return svgDoc(PUP_TAIL_VB.w, PUP_TAIL_VB.h, PUP_TAIL_VB.w * pxPerUnit, PUP_TAIL_VB.h * pxPerUnit, body, '');
+}
+
+const TS = 1.3; // tail drawn big so it reads (and is tappable) on a phone
+/** tail angle that lays the (normally raised) tail out flat behind him: tug / catch / being held */
+export const TAIL_FLAT = -36;
 /** Puppy faces right (tail on his left/back). flip(true) = faces left. */
 export class TailPup {
   root: Phaser.GameObjects.Container; body: Phaser.GameObjects.Image; tail: Phaser.GameObjects.Image; inner: Phaser.GameObjects.Container;
@@ -61,12 +87,14 @@ export class TailPup {
     this.inner.add([this.tail, this.body]); this.root.add([shadow, this.inner]);
   }
   /** tail attach point (local, facing right): his back at hip height */
-  tailBase(): [number, number] { return [-50 * PUP_SCALE * this.m, -40 * PUP_SCALE * this.m]; }
+  tailBase(): [number, number] { return [-34 * PUP_SCALE * this.m, -44 * PUP_SCALE * this.m]; }
   setDepth(d: number) { this.root.setDepth(d); return this; }
   flip(left: boolean) { this.inner.setScale(left ? -1 : 1, 1); return this; }
+  /** squash/stretch the body + tail without losing the facing flip (sx > 1 = stretched along the run) */
+  squash(sx: number, sy: number) { this.inner.setScale((this.inner.scaleX < 0 ? -1 : 1) * sx, sy); return this; }
   setFrame(k: string) { this.body.setTexture('pt_' + k); return this; }
   /** world position of the tail tip (the grab spot) */
-  tipPos() { const u = PUP_SCALE * this.m * TS, a = Phaser.Math.DegToRad(this.tail.angle), dx = -58 * u * this.tailStretch, dy = -30 * u; const [bx, by] = this.tailBase();
+  tipPos() { const u = PUP_SCALE * this.m * TS, a = Phaser.Math.DegToRad(this.tail.angle), dx = (PUP_TAIL_VB.tx - PUP_TAIL_VB.bx) * u * this.tailStretch, dy = (PUP_TAIL_VB.ty - PUP_TAIL_VB.by) * u; const [bx, by] = this.tailBase();
     const lx = bx + dx * Math.cos(a) - dy * Math.sin(a), ly = by + dx * Math.sin(a) + dy * Math.cos(a);
     const pt = this.inner.getWorldTransformMatrix().transformPoint(lx, ly); return { x: pt.x, y: pt.y }; }
   update(dt: number, run = 0, wag = 1) {

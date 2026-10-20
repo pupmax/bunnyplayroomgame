@@ -2,7 +2,8 @@
 // Textures are rendered at TEX_RES x their nominal game size so they stay crisp
 // when the camera zooms for high-DPI screens (see systems/resolution.ts).
 import Phaser from 'phaser';
-import { puppySVG, PUP_VB, puppyFrames, puppyTailSVG, PUP_TAIL_VB } from './puppy';
+import {puppySVG, PUP_VB, puppyFrames } from './puppy';
+import { puppyTailSVG, PUP_TAIL_VB } from '../systems/tailRigs';
 import { bunnySVG, BUN_VB, BunExpr, BunPose } from './bunny';
 import { sushiSVG, SUSHI } from './sushi';
 import { CAST, chibiHeadSVG, chibiFullSVG, rubyBackSVG, lassoSVG, gloveSVG } from './chibi';
@@ -26,6 +27,7 @@ const BOOT_USED_BUN = new Set(['bun_full_wink', 'bun_full_laugh', 'bun_full_cool
 function bootDeferred(key: string): boolean {
   if (key.startsWith('full_')) return !BOOT_USED_FULL.has(key.split('_')[2]) && !BOOT_USED_FULL_KEYS.has(key);
   if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
+  if (key === 'bun_rig_sneaky') return true; // Tail Catch only
   if (key.startsWith('bun_rig_')) return false;
   if (/^bun_(full|wave|sip|bust)_/.test(key)) return !BOOT_USED_BUN.has(key);
   return false;
@@ -65,7 +67,7 @@ function assets(): Asset[] {
   for (let i = 0; i < 6; i++) tailFrames[`run${i}`] = pf[`run${i}_normal`];
   for (const name of Object.keys(tailFrames)) list.push({ key: `pt_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...tailFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
   list.push({ key: 'pt_tail', nominal: PUP_SCALE, boost: 1.6, build: (k) => puppyTailSVG(k), originX: PUP_TAIL_VB.bx / PUP_TAIL_VB.w, originY: PUP_TAIL_VB.by / PUP_TAIL_VB.h });
-  const exprs: BunExpr[] = ['cool', 'unimpressed', 'smile', 'wink', 'laugh', 'stern'];
+  const exprs: BunExpr[] = ['cool', 'unimpressed', 'smile', 'wink', 'laugh', 'stern', 'sneaky'];
   for (const e of exprs) {
     list.push({ key: `bun_bust_${e}`, nominal: BUN_SCALE * 0.6, boost: 1.4, build: (k) => bunnySVG('bust', e, k), originX: 0.5, originY: 1 });
     list.push({ key: `bun_sip_${e}`, nominal: BUN_SCALE, boost: 1.2, build: (k) => bunnySVG('sip', e, k), originX: 0.5, originY: BUN_VB.feetY / BUN_VB.h });

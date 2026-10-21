@@ -9,26 +9,34 @@ export type BunPoseT = { sh: number; el: number; lean: number; kn: number; strid
 export class TailBunny {
   root: Phaser.GameObjects.Container; torso: Phaser.GameObjects.Container; body: Phaser.GameObjects.Image;
   private legs: Phaser.GameObjects.Image[]; private sh: Phaser.GameObjects.Container; private el: Phaser.GameObjects.Container; private hand: Phaser.GameObjects.Container;
-  p: BunPoseT = { sh: 20, el: -10, lean: 0, kn: 6, stride: 0, sq: 0 }; private t = 0;
+  private sh2: Phaser.GameObjects.Container; private el2: Phaser.GameObjects.Container; private hand2: Phaser.GameObjects.Container;
+  p: BunPoseT & { sh2: number; el2: number } = { sh: 20, el: -10, sh2: -14, el2: 12, lean: 0, kn: 6, stride: 0, sq: 0 }; private t = 0;
   constructor(scene: Phaser.Scene, x: number, y: number, private m = 1, expr = 'wink') {
     this.root = scene.add.container(x, y);
     const shadow = scene.add.image(4, 2, 'su_shadow').setScale(artScale('su_shadow', 2.0 * m), artScale('su_shadow', 0.9 * m));
     const hipY = -38 * m;
     this.legs = [-21, 21].map(lx => art(scene, lx * m, hipY, 'su_bunLeg', m));
     this.torso = scene.add.container(0, hipY);
-    this.body = art(scene, 0, 0, 'bun_rig_' + expr, m).setOrigin(0.5, 296 / 340);
+    this.body = art(scene, 0, 0, 'bun_rig2_' + expr, m).setOrigin(0.5, 296 / 340); // rig2: no baked left sleeve, both arms are jointed
+    // back arm (her left), behind the body: swings opposite the front arm
+    this.sh2 = scene.add.container(-48 * m, -52 * m);
+    const upper2 = art(scene, 0, 0, 'su_bunUpper', m * 0.95);
+    this.el2 = scene.add.container(0, 40 * m * 0.95);
+    const fore2 = art(scene, 0, 0, 'su_bunFore', m * 0.95);
+    this.hand2 = scene.add.container(0, 44 * m * 0.95);
+    this.el2.add([fore2, this.hand2]); this.sh2.add([upper2, this.el2]);
     const coil = art(scene, -40 * m, -30 * m, 'lasso', 0.42 * m).setAngle(-20); // finale lasso, coiled on her hip
     this.sh = scene.add.container(48 * m, -52 * m);
     const upper = art(scene, 0, 0, 'su_bunUpper', m * 0.95);
     this.el = scene.add.container(0, 40 * m * 0.95);
     const fore = art(scene, 0, 0, 'su_bunFore', m * 0.95);
     this.hand = scene.add.container(0, 44 * m * 0.95);
-    this.el.add([fore, this.hand]); this.sh.add([upper, this.el]); this.torso.add([coil, this.body, this.sh]);
+    this.el.add([fore, this.hand]); this.sh.add([upper, this.el]); this.torso.add([coil, this.body, this.sh2, this.sh]); // back arm drawn over the jacket (like the baked sleeves), under the front arm
     this.root.add([shadow, ...this.legs, this.torso]);
     this.apply();
   }
   setDepth(d: number) { this.root.setDepth(d); return this; }
-  setFace(e: string) { this.body.setTexture('bun_rig_' + e); return this; }
+  setFace(e: string) { this.body.setTexture('bun_rig2_' + e); return this; }
   handPos() { const mt = this.hand.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   shoulderPos() { const mt = this.sh.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   armLen() { return (40 + 44) * 0.95 * this.m; }
@@ -38,13 +46,15 @@ export class TailBunny {
   get left() { return this.root.scaleX < 0; }
   reachTo(x: number, y: number) { const s = this.shoulderPos(), f = this.left ? -1 : 1; this.p.sh = Phaser.Math.RadToDeg(Math.atan2(-(x - s.x) * f, y - s.y)) - this.p.lean; this.p.el = 0; this.apply();
     return Math.hypot(x - s.x, y - s.y) - this.armLen(); }
-  pose(o: Partial<BunPoseT>) { Object.assign(this.p, o); this.apply(); return this; }
+  /** back arm straight at (x, y) too (two-handed tug) */
+  reachTo2(x: number, y: number) { const mt = this.sh2.getWorldTransformMatrix(), f = this.left ? -1 : 1; this.p.sh2 = Phaser.Math.RadToDeg(Math.atan2(-(x - mt.tx) * f, y - mt.ty)) - this.p.lean; this.p.el2 = 0; this.apply(); }
+  pose(o: Partial<BunPoseT & { sh2: number; el2: number }>) { Object.assign(this.p, o); this.apply(); return this; }
   update(dt: number, run = 0) { this.t += dt; this.p.stride = Math.sin(this.t * 16) * 26 * run; this.apply(); }
   apply() {
     const p = this.p, bob = Math.abs(Math.sin(this.t * 16)) * 6 * (Math.abs(p.stride) > 1 ? 1 : 0);
     this.legs[0].setAngle(p.kn + p.stride); this.legs[1].setAngle(-p.kn - p.stride);
     this.torso.setAngle(p.lean).setScale(1 - p.sq * 0.6, 1 + p.sq).setY(-38 * this.m - bob);
-    this.sh.setAngle(p.sh); this.el.setAngle(p.el);
+    this.sh.setAngle(p.sh); this.el.setAngle(p.el); this.sh2.setAngle(p.sh2); this.el2.setAngle(p.el2);
   }
 }
 

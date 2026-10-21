@@ -27,7 +27,7 @@ const BOOT_USED_BUN = new Set(['bun_full_wink', 'bun_full_laugh', 'bun_full_cool
 function bootDeferred(key: string): boolean {
   if (key.startsWith('full_')) return !BOOT_USED_FULL.has(key.split('_')[2]) && !BOOT_USED_FULL_KEYS.has(key);
   if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
-  if (key === 'bun_rig_sneaky') return true; // Tail Catch only
+  if (key === 'bun_rig_sneaky' || key.startsWith('bun_rig2_')) return true; // Tail Catch only (drawn when the level opens)
   if (key.startsWith('bun_rig_')) return false;
   if (/^bun_(full|wave|sip|bust)_/.test(key)) return !BOOT_USED_BUN.has(key);
   return false;
@@ -73,7 +73,7 @@ function assets(): Asset[] {
     list.push({ key: `bun_sip_${e}`, nominal: BUN_SCALE, boost: 1.2, build: (k) => bunnySVG('sip', e, k), originX: 0.5, originY: BUN_VB.feetY / BUN_VB.h });
   }
   const fulls: [BunPose, BunExpr][] = [];
-  for (const e of exprs) fulls.push(['full', e], ['wave', e], ['rig', e]);
+  for (const e of exprs) fulls.push(['full', e], ['wave', e], ['rig', e], ['rig2', e]);
   fulls.push(['full', 'coolwink']);
   for (const [p, e] of fulls) {
     list.push({ key: `bun_${p}_${e}`, nominal: BUN_SCALE, boost: 1.2, build: (k) => bunnySVG(p, e, k), originX: 0.5, originY: BUN_VB.feetY / BUN_VB.h });

@@ -28,12 +28,14 @@ ok('tutorial says "Tap anywhere to start", no Got it', await page.evaluate(() =>
 for (let i = 0; i < 6 && !(await page.evaluate(() => window.__pr?.st?.running)); i++) { await tap(360, 640); await gameWait(0.7); }
 ok('level running after tutorial', await page.waitForFunction(() => window.__pr?.st?.running, null, { timeout: 30000 }).then(() => true, () => false));
 // real play with touch: drag/tap Bunny to the spot behind Puppy, tap the tail when it glows, tap-tap the tug, skip catches
-const shots = { dash: 0, glow: 0, tug: 0, catch: 0, lead: 0 }; let lines = new Set();
+const shots = { dash: 0, glow: 0, tug: 0, catch: 0, lead: 0, hud: 0 }; const hudSeen = {}; let lines = new Set();
 const shoot = async (k, n) => { if (!shots[k]) { shots[k] = 1; await page.screenshot({ path: OUT + n }); } };
 const play = async (ms) => { const end = Date.now() + ms; while (Date.now() < end) {
   const s = await page.evaluate(() => { const st = window.__pr.st, tip = window.__pr.tip(); return { ended: window.__pr.ended, ph: st.phase, pup: st.pup, glow: st.glow, px: st.px, py: st.py, face: st.face, bx: st.bx, by: st.by, cool: st.cool, catchT: st.catchT, lead: st.lead, tip, reach: Math.hypot(st.bx - tip.x, st.by - 95 - tip.y) <= window.__pr.K.REACH, behind: (st.bx - st.px) * st.face < 0, tails: st.tails }; });
   if (s.ended) return s.ended;
   if (s.ph === 'play') await page.evaluate(() => { const st = window.__pr.st; if (st.time < 6 && !window.__pr.__topped) { st.time += 30; window.__pr.__topped = 1; } }); // test-only, once, late: the polling touch bot is slower than a player
+  if (s.ph === 'catch' && !hudSeen[s.tails]) { hudSeen[s.tails] = await page.evaluate(() => { const t = window.__game.scene.getScene('Tail').children.list.find(o => o.type === 'Text' && /^TAILS/.test(o.text)); return t ? t.text : ''; }); }
+  if (s.ph === 'catch' && s.tails === 1 && s.catchT > 0.7) await shoot('hud', 'tail_08_hud_after_catch.png');
   if (s.ph === 'catch') { if (s.catchT > 0.6) { await shoot(s.lead ? 'lead' : 'catch', s.lead ? 'tail_05_catch_lead.png' : 'tail_04_catch_gotcha.png'); } if (s.catchT > 0.9) await tap(360, 700); await page.waitForTimeout(60); continue; }
   if (s.ph === 'tug') { if (shots.tug === 0 && Math.random() < 0.3) await shoot('tug', 'tail_03_tug.png'); await tap(360, 760); await page.waitForTimeout(90); continue; }
   if (s.pup === 'dash' && s.tails >= 1 && s.cool < -0.3) await shoot('dash', 'tail_02a_chase_dash.png');
@@ -43,6 +45,7 @@ const play = async (ms) => { const end = Date.now() + ms; while (Date.now() < en
 } return null; };
 const r1 = await play(150000);
 ok('played to a real WIN (6 tails)', r1 === 'win', JSON.stringify(await page.evaluate(() => ({ tails: window.__pr.st?.tails, time: window.__pr.st?.time?.toFixed(1), yelps: window.__pr.st?.yelps }))));
+ok('HUD counter shows TAILS n/6 on every catch (1..6)', [1, 2, 3, 4, 5, 6].every(n => hudSeen[n] === `TAILS ${n}/6`), JSON.stringify(hudSeen));
 ok('screens: chase/glow/tug/catch', shots.glow && shots.tug && (shots.catch || shots.lead), JSON.stringify(shots));
 ok('win -> result card', await cardUp()); await gameWait(0.3); await page.screenshot({ path: OUT + 'tail_06_win.png' });
 ok('card shows PLAY AGAIN + MENU', await page.evaluate(() => { const t = window.__game.scene.getScene('Tail').children.list.flatMap(o => o.list || [o]).flatMap(o => o.list || [o]).filter(o => o.type === 'Text').map(o => o.text).join('|'); return t.includes('PLAY AGAIN') && t.includes('MENU'); }));

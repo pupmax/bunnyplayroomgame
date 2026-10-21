@@ -13,6 +13,8 @@ export class Hud {
     this.bar = scene.add.graphics().setDepth(600); this.y = y;
   }
   private y: number;
+  /** celebrate a counter change: the label pops and flashes (Tail Catch catches) */
+  pop(color = '#7dff9a') { const t = this.left; this.scene.tweens.killTweensOf(t); t.setScale(1).setColor(color); this.scene.tweens.add({ targets: t, scale: 1.5, duration: 140, yoyo: true, ease: 'Quad.Out', onComplete: () => t.setColor('#fff') }); }
   set(label: string, t: number, f: number) {
     this.left.setText(label); this.time.setText(`0:${String(Math.max(0, Math.ceil(t))).padStart(2, '0')}`).setColor(t < 10 ? '#ff6b6b' : '#fff');
     const y = this.y + 96; this.bar.clear().fillStyle(0x22252b, 1).fillRoundedRect(140, y, 440, 30, 15).fillStyle(this.col, 1).fillRoundedRect(144, y + 4, Math.max(22, 432 * Math.min(1, f)), 22, 11);

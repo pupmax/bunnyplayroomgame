@@ -15,7 +15,7 @@ const NOSE = '#ee98a8';
 const EYE = '#17110f';
 
 export type BunExpr = 'cool' | 'coolwink' | 'unimpressed' | 'smile' | 'wink' | 'laugh' | 'stern' | 'sneaky';
-export type BunPose = 'full' | 'bust' | 'sip' | 'wave' | 'rig';
+export type BunPose = 'full' | 'bust' | 'sip' | 'wave' | 'rig' | 'rig2'; // rig2 = rig without the baked left sleeve (Tail Catch: both arms jointed)
 
 const DEFS =
   radial('cream', [[0, '#ffffff'], [0.55, '#f8efe8'], [1, '#d9c8bd']], 0.36, 0.3, 0.8) +
@@ -145,7 +145,7 @@ function sleeve(x1: number, y1: number, x2: number, y2: number): string {
 
 export function bunnySVG(pose: BunPose, expr: BunExpr, pxPerUnit: number): string {
   let s = '';
-  const full = pose !== 'bust' && pose !== 'rig';
+  const full = pose !== 'bust' && pose !== 'rig' && pose !== 'rig2';
   // fluffy tail
   s += `<path d="${blobPath(62, 296, 17, 16, { tufts: [{ a: 200, s: 4, w: 14 }, { a: 240, s: 4, w: 14 }, { a: 160, s: 4, w: 14 }, { a: 120, s: 3, w: 14 }] })}" fill="url(#creamS)" stroke="${OUT}" stroke-width="${SW - 0.8}" stroke-linejoin="round"/>`;
   if (full) {
@@ -153,10 +153,10 @@ export function bunnySVG(pose: BunPose, expr: BunExpr, pxPerUnit: number): strin
       `<path d="M126 296 L126 318 Q126 332 140 332 Q156 332 156 318 L156 296 Z" fill="#141217" stroke="${OUT}" stroke-width="${SW}" stroke-linejoin="round"/>` +
       `<path d="M90 314 v8 M132 314 v8" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity="0.5"/>`;
   }
-  s += sleeve(72, 244, 58, 286);
+  if (pose !== 'rig2') s += sleeve(72, 244, 58, 286);
   s += jacketBody();
   if (pose === 'wave') s += sleeve(168, 240, 202, 198);
-  else if (pose !== 'sip' && pose !== 'rig') s += sleeve(168, 244, 182, 286);
+  else if (pose !== 'sip' && pose !== 'rig' && pose !== 'rig2') s += sleeve(168, 244, 182, 286);
   s += ears() + headShape() + face(expr);
   if (pose === 'sip') {
     s += `<path d="M124 196 L162 180" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>` +

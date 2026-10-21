@@ -20,10 +20,15 @@ const tapTip = () => p.evaluate(() => { const t = window.__pr.tip(); window.__pr
 await glowNear(); await p.waitForTimeout(400); await tapTip(); await p.waitForTimeout(40); await shot('1_grab'); await shot('1_grab_full', true);
 await p.waitForTimeout(300);
 await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(30); await shot('2_midtug'); await shot('2_midtug_full', true);
-for (let i = 0; i < 6 && await p.evaluate(() => window.__pr.st.phase) === 'tug'; i++) { await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(110); }
+for (let i = 0; i < 60 && await p.evaluate(() => window.__pr.st.phase) === 'tug'; i++) { await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(110); }
 await p.waitForTimeout(700); await shot('3_catch_full', true); await shot('3_catch');
 await p.waitForFunction(() => window.__pr.st.phase === 'play', null, { timeout: 8000 });
 await glowNear(5); await p.waitForTimeout(400); await tapTip(); await p.waitForTimeout(100);
-for (let i = 0; i < 10 && await p.evaluate(() => window.__pr.st.phase) === 'tug'; i++) { await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(110); }
-await p.waitForFunction(() => window.__pr.ended === 'win', null, { timeout: 8000 }); await p.waitForTimeout(2200); await shot('4_wincard'); await shot('4_wincard_full', true);
+for (let i = 0; i < 60 && await p.evaluate(() => window.__pr.st.phase) === 'tug'; i++) { await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(110); }
+await p.waitForFunction(() => window.__pr.ended === 'win', null, { timeout: 8000 });
+const t0 = Date.now(); const g = await p.evaluate(() => { const S = window.__game.scene.getScene('Tail'); window.__og = { max: 0, n: 0 }; const f = () => { if (!S.outro) return; const pw = S.bun.paw2Pos(), tp = S.pup.tipPos(); window.__og.max = Math.max(window.__og.max, Math.hypot(pw.x - tp.x, pw.y - tp.y)); window.__og.n++; }; S.events.on('postupdate', f); return 1; });
+await p.waitForTimeout(300); await p.screenshot({ path: OUT + '5_outro_a.png' }); console.log('outro shot a at', Date.now() - t0, 'ms');
+await p.waitForTimeout(150); await p.screenshot({ path: OUT + '5_outro_b.png' }); console.log('outro shot b at', Date.now() - t0, 'ms');
+await p.waitForFunction(() => window.__cardArmed && window.__cardArmed(), null, { timeout: 8000 }); console.log('card armed at', Date.now() - t0, 'ms', 'outro paw-tail gap', JSON.stringify(await p.evaluate(() => window.__og)));
+await p.waitForTimeout(400); await shot('4_wincard'); await shot('4_wincard_full', true);
 console.log('errors', errs.length, errs[0] || ''); await b.close();

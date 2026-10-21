@@ -49,6 +49,21 @@ export const LINES = {
     'This is mine!',
     'Come, Puppy, follow me!',
   ],
+  // ================= EDIT ME, Marc =================
+  // Tail Catch: what sneaky Bunny says while she is PULLING the tail (the tug).
+  // One line per tug, picked at random (never the same line twice in a row).
+  // Add, remove or reword lines freely: keep each one short (about 30 characters fits the bubble) and in quotes, with a comma after it.
+  tailTug: [
+    'Hehe, this tail is mine now!',
+    "Where do you think you're going?",
+    'Nope! Not letting go!',
+    'Tug tug, little Puppy!',
+    'Mine, mine, all mine!',
+    'Sneaky Bunny wins again!',
+    'Not so fast, Puppy!',
+    'Come, Puppy, follow me!',
+  ],
+  // ===================================================
   // Puppy protesting while Bunny holds his tail (comic, never heart-eyed)
   tailProtest: ['Hey! My tail!', 'Not the tail!', 'Ow ow ow!', 'Unhand my fluff!', 'So undignified!'],
   // Puppy dodging / escaping (mistimed grab, front grab, lost tug)

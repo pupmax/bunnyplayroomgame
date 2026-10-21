@@ -39,6 +39,9 @@ export class TailBunny {
   setFace(e: string) { this.body.setTexture('bun_rig2_' + e); return this; }
   /** centre of the front paw (forearm art: paw ellipse at y 48 of 66, origin 0.09) */
   pawPos() { const pt = this.el.getWorldTransformMatrix().transformPoint(0, 42 * 0.95 * this.m); return { x: pt.x, y: pt.y }; }
+  /** back arm: shoulder and paw centre (used when she walks off dragging him behind her) */
+  shoulder2Pos() { const mt = this.sh2.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
+  paw2Pos() { const pt = this.el2.getWorldTransformMatrix().transformPoint(0, 42 * 0.95 * this.m); return { x: pt.x, y: pt.y }; }
   handPos() { const mt = this.hand.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   shoulderPos() { const mt = this.sh.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   armLen() { return (40 + 44) * 0.95 * this.m; }

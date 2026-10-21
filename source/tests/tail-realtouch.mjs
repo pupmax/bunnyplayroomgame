@@ -21,8 +21,8 @@ await p.evaluate(() => { window.__game.scene.getScene('Tail').input.on('pointerd
 // paw-to-tail check: after every game update while Bunny holds the tail (tug, catch, win card), measure her paw centre vs the drawn tail end
 await p.evaluate(() => { const S = window.__game.scene.getScene('Tail'); window.__gap = { max: 0, n: 0, tug: 0, catch: 0, gripOff: 0 };
   S.events.on('postupdate', () => { const st = S.st; if (st.phase !== 'tug' && st.phase !== 'catch') return;
-    const pw = S.bun.pawPos(), tp = S.pup.tipPos(), d = Math.hypot(pw.x - tp.x, pw.y - tp.y), g = window.__gap;
-    g.max = Math.max(g.max, d); g.n++; g[st.phase]++; if (!S.grip.visible || S.grip.depth <= S.pup.root.depth) g.gripOff++; }); });
+    const pw = S.outro ? S.bun.paw2Pos() : S.bun.pawPos(), tp = S.pup.tipPos(), d = Math.hypot(pw.x - tp.x, pw.y - tp.y), g = window.__gap;
+    g.max = Math.max(g.max, d); g.n++; g[S.outro ? 'outro' : st.phase] = (g[S.outro ? 'outro' : st.phase] || 0) + 1; if (!S.grip.visible || S.grip.depth <= S.pup.root.depth) g.gripOff++; }); });
 const hud0 = await hudText(); console.log('HUD at start:', hud0); const log = []; let last = { grabs: 0, tails: 0, yelps: 0, slips: 0 }, shot = false; const t0 = Date.now(); const R = Math.random;
 while (Date.now() - t0 < SECS * 1000) {
   const s = await look(); if (!s || s.ended) break;

@@ -101,7 +101,7 @@ export type TailDrawFn = (g: Phaser.GameObjects.Graphics, s: TailDrawState, cap?
 export const drawTail: TailDrawFn = (g, s, cap) => {
   const u = s.u, OUT = 0x3b1f10, FUR = 0xc7772f, DARK = 0xa85e22, HI = 0xf0a860;
   const tn = (c: number) => s.tint === null ? c : (((((c >> 16) & 255) * ((s.tint >> 16) & 255) / 255) << 16) | ((((c >> 8) & 255) * ((s.tint >> 8) & 255) / 255) << 8) | (((c & 255) * (s.tint & 255) / 255) | 0));
-  const N = 22, L = 115 * u * s.stretch, curl = 1.8 / (s.stretch * s.stretch * s.stretch), bend = 0.9;
+  const N = 22, L = 80 * u * s.stretch, /* ~30% shorter than the first cut (115): reads as a normal dog tail next to his body */ curl = 1.8 / (s.stretch * s.stretch * s.stretch), bend = 0.9;
   const P: { x: number; y: number; h: number; r: number }[] = []; let x = 0, y = 0, h = Math.PI - 0.5;
   if (s.to) { // held: a taut, barely sagging line from his rump to her paw, then a short tuft past the paw
     const ex = s.to.x, ey = s.to.y, len = Math.max(1, Math.hypot(ex, ey)), nx = -ey / len, ny = ex / len, sg = (ny >= 0 ? 1 : -1) * Math.min(14 * u, len * 0.05);

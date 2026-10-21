@@ -19,7 +19,12 @@ const glowNear = (tails = 0) => p.evaluate((tails) => { const S = window.__game.
 const tapTip = () => p.evaluate(() => { const t = window.__pr.tip(); window.__pr.tap(t.x, t.y); });
 await glowNear(); await p.waitForTimeout(400); await tapTip(); await p.waitForTimeout(40); await shot('1_grab'); await shot('1_grab_full', true);
 await p.waitForTimeout(300);
-await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(30); await shot('2_midtug'); await shot('2_midtug_full', true);
+await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(30); await shot('2_midtug');
+// mid-tug with a tug-back shout on screen (scene paused for the slow full-res capture)
+await p.evaluate(() => { const S = window.__game.scene.getScene('Tail'); S.tugShout('Grr!'); }); await p.waitForTimeout(200); await p.evaluate(() => window.__game.scene.pause('Tail'));
+const sh = await p.evaluate(() => { const S = window.__game.scene.getScene('Tail'), t = S.children.list.find(o => o.type === 'Text' && o.text === 'Grr!'), s = S.tapTxt; if (!t || !s) return null;
+  const a = t.getBounds(), b = s.getBounds(); return { shout: [Math.round(a.top), Math.round(a.bottom)], sign: [Math.round(b.top), Math.round(b.bottom)], overlap: !(a.bottom < b.top || a.top > b.bottom || a.right < b.left || a.left > b.right) }; });
+console.log('shout vs TAP sign', JSON.stringify(sh)); await shot('2_midtug_shout'); await shot('2_midtug_full', true); await p.evaluate(() => window.__game.scene.resume('Tail'));
 for (let i = 0; i < 60 && await p.evaluate(() => window.__pr.st.phase) === 'tug'; i++) { await p.evaluate(() => window.__pr.tap(360, 800)); await p.waitForTimeout(110); }
 await p.waitForTimeout(700); await shot('3_catch_full', true); await shot('3_catch');
 await p.waitForFunction(() => window.__pr.st.phase === 'play', null, { timeout: 8000 });

@@ -93,7 +93,7 @@ export class TailScene extends Phaser.Scene {
     const dTip = D(x, y, tip.x, tip.y), segT = Phaser.Math.Clamp(((x - rm.tx) * (tip.x - rm.tx) + (y - rm.ty) * (tip.y - rm.ty)) / Math.max(1, (tip.x - rm.tx) ** 2 + (tip.y - rm.ty) ** 2), 0, 1);
     const dSeg = D(x, y, rm.tx + (tip.x - rm.tx) * segT, rm.ty + (tip.y - rm.ty) * segT);
     const inBody = ((x - s.px) / 82) ** 2 + ((y - (s.py - 105)) / 112) ** 2 < 1;
-    const onTail = y < s.py - 30 && (dTip < 60 || (dSeg < 40 && !inBody)); // the tail proper (floor taps, even right behind him, just move Bunny)
+    const onTail = y < s.py - 30 && ((dTip < 60 && (!inBody || dTip < 40)) || (dSeg < 40 && !inBody)); // shorter tail: its tip sits nearer his body, so the yelp zone never reaches into the body // the tail proper (floor taps, even right behind him, just move Bunny)
     const inReach = D(s.bx, s.by - 95, tip.x, tip.y) <= TK.REACH, behind = (s.bx - s.px) * s.face < -TK.BEHIND;
     const grab = s.glow && behind && y < s.py - 30 && (onTail || (dTip < TK.TIP_R && (!inBody || dTip < 90))); // forgiving radius around a glowing tip
     if (!inReach || (!grab && !onTail)) { this.dragOK = true; this.moveTo(x, y); return; } // body/head/floor taps: Bunny runs there
@@ -238,12 +238,19 @@ export class TailScene extends Phaser.Scene {
     const dx = s.tx - s.bx, dy = s.ty - s.by, d = Math.hypot(dx, dy), step = TK.BSPD * dt;
     if (s.cool > TK.COOL - TK.STUN && s.phase === 'play' && s.yelps > 0 && this.stunned) return;
     // smoothed run: velocity eases toward the target speed and slows on arrival (no jerks)
-    const sp = d > 2 ? TK.BSPD * Math.min(1, d / 50) : 0, wx = d > 2 ? dx / d * sp : 0, wy = d > 2 ? dy / d * sp : 0, a = Math.min(1, dt * 14);
+    const sp = d > 2 ? TK.BSPD * Math.min(1, d / 50) : 0, wx = d > 2 ? dx / d * sp : 0, wy = d > 2 ? dy / d * sp : 0, rev = wx * this.bvx + wy * this.bvy < 0, a = Math.min(1, dt * (rev ? 40 : 14)); // reversals turn on the spot (no 1-2 frame slide)
     this.bvx += (wx - this.bvx) * a; this.bvy += (wy - this.bvy) * a; void step;
     const mv = Math.hypot(this.bvx, this.bvy) * dt; if (mv > d && d > 0) { s.bx = s.tx; s.by = s.ty; } else { s.bx += this.bvx * dt; s.by += this.bvy * dt; }
   }
   private tugT = 0; private tugAge = 0; private tugBack = 0; private tugX = 0; private backT = 1;
   /** progress ceiling: rises from the grab to 100% over TUG_MIN s, so a tug lasts ~3-4 s however fast you tap (slow tappers still win, just later) */
+  /** Puppy's tug-back shout: beside his head (away from Bunny), always BELOW the TAP TAP TAP! sign (incl. its pulse), rising only 30 px */
+  private tugShout(line: string) {
+    const s = this.st, tt = this.tapTxt, signBottom = tt?.active ? tt.y + tt.height * 1.12 / 2 + 6 : 0;
+    const y = Phaser.Math.Clamp(Math.max(s.py - 150, signBottom + 30 + 18), 0, 1180), x = Phaser.Math.Clamp(s.px + s.face * 115, 90, W - 90);
+    const t = txt(this, x, y, line, 26, '#fff', '#22252b', 8).setDepth(780).setAngle(Phaser.Math.Between(-8, 8)).setScale(0.6);
+    this.tweens.add({ targets: t, scale: 1, duration: 120, ease: 'Back.Out' }); this.tweens.add({ targets: t, y: y - 30, alpha: 0, delay: 250, duration: 550, ease: 'Quad.Out', onComplete: () => t.destroy() });
+  }
   private tugCap() { return TK.TUG0 + (1 - TK.TUG0) * Math.min(1, this.tugAge / TK.TUG_MIN); } private yank = 0; private grip!: Phaser.GameObjects.Graphics; private tapTxt?: Phaser.GameObjects.Text;
   /** big pulsing TAP TAP TAP! for the whole tug, so nobody misses that the grab needs finishing */
   private tapPrompt(big: boolean) {
@@ -291,7 +298,7 @@ export class TailScene extends Phaser.Scene {
     if (this.tugT < TK.TUG_GRACE) { this.drawMeter(); return; } // a short grace so a human's reaction time doesn't lose the grab
     // drama: now and then Puppy digs in and yanks back toward him (short, visible, never a sudden loss)
     this.backT -= dt; if (this.backT <= 0) { this.backT = 0.9 + Math.random() * 0.5; if (Math.random() < 0.45) { this.tugBack = TK.TUG_BACK; this.pup.setFrame('panic'); this.cameras.main.shake(70, 0.002);
-      if (Math.random() < 0.5) floatText(this, Phaser.Math.Clamp(s.px, 150, 570), Math.max(620, s.py - 230), pick(['Grr!', 'Hnngh!', 'Mine!', 'Nope!']), '#fff', 26); } }
+      if (Math.random() < 0.5) this.tugShout(pick(['Grr!', 'Hnngh!', 'Mine!', 'Nope!'])); } }
     if (this.tugBack > 0) this.tugBack -= dt;
     s.tug -= (TK.TUG_PULL + TK.TUG_UP * s.tails + (this.tugBack > 0 ? TK.TUG_SURGE / TK.TUG_BACK : 0)) * dt;
     if (s.tug <= 0) return this.slip();
@@ -413,7 +420,7 @@ export class TailScene extends Phaser.Scene {
     const t0 = this.time.now, skip = () => { if (this.time.now - t0 >= 600) card(); };
     if (!win) { this.time.delayedCall(1100, card); return; }
     this.outro = true; this.outroT = 0; (window as any).__pr.outro = true; s.phase = 'catch'; s.lead = false;
-    if ((s.face < 0 ? W - s.bx : s.bx) < 380) { // not enough floor ahead of her: a cartoon POOF spins the pair round so the drag-off crosses the room
+    const otp = this.pup.tipPos(); if ((s.face < 0 ? W - otp.x : otp.x) < 380) { // room measured from the tail (where she will stand), not from wherever she was // not enough floor ahead of her: a cartoon POOF spins the pair round so the drag-off crosses the room
       s.face = -s.face; this.pup.flip(s.face < 0); const mx = (s.bx + s.px) / 2; for (let i = 0; i < 9; i++) this.puff(mx + (Math.random() - 0.5) * 170, s.py - 10 - Math.random() * 90, -i * 0.015); Fx.whoosh(); } this.bun.setFace('sneaky'); this.input.on('pointerdown', skip);
     this.events.once('shutdown', () => this.input.off('pointerdown', skip));
     this.outroEv = [this.time.delayedCall(700, () => this.outroLine('Come, Puppy, follow me!')),

@@ -76,8 +76,16 @@ export function diagHotspot(scene: Phaser.Scene): void {
  * At boot: fetch version.json (no-store); if the server has a NEWER build, navigate once to ?v=<build> (a new URL,
  * so the cached index.html is bypassed). Loop-safe: at most one hop per target build per tab session, never on errors.
  */
+let updWatch = false;
+/** Check version.json now, again whenever the tab comes back (iOS resumes old tabs without reloading) and every 60 s.
+ *  A newer build reloads the page the moment a safe screen (title / Hall / champion) is up, never mid-level or on a result card. */
 export function checkForUpdate(game: Phaser.Game): void {
   if (BUILD === 'dev' || !window.fetch) return;
+  if (!updWatch) { updWatch = true;
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(game); });
+    window.addEventListener('pageshow', (e) => { if ((e as PageTransitionEvent).persisted) checkForUpdate(game); });
+    window.setInterval(() => checkForUpdate(game), 60000); }
+  if (W.__updatePending) return; // a reload is already queued
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then((v: { build?: string } | null) => {
     const nb = v && typeof v.build === 'string' ? v.build : '';
     if (!/^[0-9]{10}$/.test(nb) || !(nb > BUILD)) return;

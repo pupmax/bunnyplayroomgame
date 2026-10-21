@@ -61,7 +61,7 @@ export class SoloTitleScene extends Phaser.Scene {
     title(205, 'BUNNY vs PUPPY', 80, '#fff6c0', '#ffb21f', '#3a0610');
     title(318, 'CATCH PUPPY', 74, '#ffd0e0', '#ff3b6b', '#3a0610');
     title(408, 'BY THE TAIL', 74, '#d8ffe0', '#2fbf5a', '#0a2a12');
-    txt(this, W / 2, 530, 'Puppy has the zoomies.\nWhen he stops, grab that glowing tail!', 30, '#ffffff', '#1b0e30', 7).setLineSpacing(4);
+    txt(this, W / 2, 530, 'Chase Puppy. When his tail glows,\ntap it once to grab, then tap fast\nto pull him in!', 28, '#ffffff', '#1b0e30', 7).setLineSpacing(4);
     this.add.ellipse(220, 1005, 220, 40, 0x000000, 0.3);
     const bun = art(this, 220, 1005, 'bun_full_wink', 1.05);
     this.tweens.add({ targets: bun, y: bun.y - 14, yoyo: true, repeat: -1, duration: 460, ease: 'Sine.InOut' });

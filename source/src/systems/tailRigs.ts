@@ -1,5 +1,5 @@
 // Tail Catch bonus rigs. TailBunny: finale Bunny (white bun_rig body, su_bun limbs, lasso coil on the hip) with a jointed reaching arm.
-// TailPup: tail-less Puppy frames (pt_*) + the tail (pt_tail) as its own part, so it can wag, glow and stretch in a tug.
+// TailPup: tail-less Puppy frames (pt_*) + a procedural tail (TailGfx, redrawn each frame by drawTail) so it wags by BENDING, glows and stretches in a tug.
 import Phaser from 'phaser';
 import { art, artScale, PUP_SCALE } from '../art/registry';
 import { svgDoc } from '../art/svg';
@@ -81,35 +81,73 @@ export function puppyTailSVG(pxPerUnit: number): string {
   return svgDoc(PUP_TAIL_VB.w, PUP_TAIL_VB.h, PUP_TAIL_VB.w * pxPerUnit, PUP_TAIL_VB.h * pxPerUnit, body, '');
 }
 
-const TS = 1.3; // tail drawn big so it reads (and is tappable) on a phone
+/** The procedural drawTail below replaces the pt_tail image in TailPup (puppyTailSVG / PUP_TAIL_VB stay for the registry and mockups). */
 /** tail angle that lays the (normally raised) tail out flat behind him: tug / catch / being held */
 export const TAIL_FLAT = -36;
+
+// ---------- procedural tail: ONE swappable draw function ----------
+/** Everything a tail-draw function needs. Local space: root at (0,0), Puppy faces RIGHT, so the tail grows toward -x / up. */
+export type TailDrawState = { u: number; wag: number; stretch: number; tint: number | null };
+/** Draws the whole tail into g (already cleared) and returns the tip (the grab spot) in the same local space. cap (optional, already cleared) is drawn OVER the body: use it to hide the seam at the hip. */
+export type TailDrawFn = (g: Phaser.GameObjects.Graphics, s: TailDrawState, cap?: Phaser.GameObjects.Graphics) => { x: number; y: number };
+
+/** A) Classic puppy tail: soft C-curve (dips back from the hip, then sweeps up; tip ends where the old tail tip was, so grab difficulty is unchanged), gentle taper (root ~26 px wide -> ~15 px), round tip; wag bends it from the root out. */
+export const drawTail: TailDrawFn = (g, s, cap) => {
+  const u = s.u, OUT = 0x3b1f10, FUR = 0xc7772f, DARK = 0xa85e22, HI = 0xf0a860;
+  const tn = (c: number) => s.tint === null ? c : (((((c >> 16) & 255) * ((s.tint >> 16) & 255) / 255) << 16) | ((((c >> 8) & 255) * ((s.tint >> 8) & 255) / 255) << 8) | (((c & 255) * (s.tint & 255) / 255) | 0));
+  const N = 22, L = 115 * u * s.stretch, curl = 1.8 / (s.stretch * s.stretch * s.stretch), bend = 0.9;
+  const P: { x: number; y: number; h: number; r: number }[] = []; let x = 0, y = 0, h = Math.PI - 0.5;
+  for (let i = 0; i <= N; i++) { const t = i / N; P.push({ x, y, h, r: (13 - 5.5 * Math.pow(t, 0.9)) * u });
+    h += (curl * (0.6 + 0.8 * t) + s.wag * bend * 2.2 * Math.pow(t, 1.2)) / N; x += Math.cos(h) * L / N; y += Math.sin(h) * L / N; }
+  const o = 4.2 * u;
+  g.fillStyle(tn(OUT), 1); for (const p of P) g.fillCircle(p.x, p.y, p.r + o);
+  g.fillStyle(tn(FUR), 1); for (const p of P) g.fillCircle(p.x, p.y, p.r);
+  const edge = (k: number, a: number, b: number) => P.slice(a, P.length - b).map(p => new Phaser.Math.Vector2(p.x - Math.sin(p.h) * p.r * k, p.y + Math.cos(p.h) * p.r * k));
+  g.lineStyle(5 * u, tn(DARK), 0.5).strokePoints(edge(-0.5, 2, 2)); // underside shade (smooth stroke, no beads)
+  g.lineStyle(3 * u, tn(HI), 0.85).strokePoints(edge(0.45, 3, 4)); // top highlight
+  // seam cover (drawn OVER the body): fur fills the strip where the tail leaves his hip, so the body outline doesn't cut across the root
+  if (cap) { const k = Math.max(2, Math.round(N * 20 / 115)); cap.fillStyle(tn(FUR), 1); for (let i = 1; i <= k; i++) cap.fillCircle(P[i].x, P[i].y, P[i].r * 0.98);
+    }
+  const e = P[P.length - 1]; g.fillStyle(0xffffff, 0.35).fillCircle(e.x - 1.5 * u, e.y - 1.5 * u, e.r * 0.35);
+  return { x: e.x, y: e.y };
+};
+
+/** A Graphics that behaves like the old tail Image for the scene (setTint / clearTint / setAngle) and redraws via drawTail. */
+export class TailGfx extends Phaser.GameObjects.Graphics {
+  st: TailDrawState; tip = { x: 0, y: 0 }; cap: Phaser.GameObjects.Graphics;
+  constructor(scene: Phaser.Scene, x: number, y: number, u: number) { super(scene, { x, y }); this.cap = scene.add.graphics({ x, y }); this.st = { u, wag: 0, stretch: 1, tint: null }; scene.add.existing(this); this.redraw(); }
+  redraw() { this.clear(); this.cap.clear(); this.cap.setAngle(this.angle); this.tip = drawTail(this, this.st, this.cap); return this; }
+  setAngle(degrees?: number) { super.setAngle(degrees); this.cap?.setAngle(degrees); return this; }
+  destroy(fromScene?: boolean) { this.cap?.destroy(fromScene); super.destroy(fromScene); }
+  setTint(c: number) { if (this.st.tint !== c) { this.st.tint = c; this.redraw(); } return this; }
+  clearTint() { if (this.st.tint !== null) { this.st.tint = null; this.redraw(); } return this; }
+}
+
 /** Puppy faces right (tail on his left/back). flip(true) = faces left. */
 export class TailPup {
-  root: Phaser.GameObjects.Container; body: Phaser.GameObjects.Image; tail: Phaser.GameObjects.Image; inner: Phaser.GameObjects.Container;
+  root: Phaser.GameObjects.Container; body: Phaser.GameObjects.Image; tail: TailGfx; inner: Phaser.GameObjects.Container;
   private t = 0; frame = 0; wagAmp = 22; wagSpd = 9; tailStretch = 1;
   constructor(private scene: Phaser.Scene, x: number, y: number, private m = 1) {
     this.root = scene.add.container(x, y);
     const shadow = scene.add.image(0, 4, 'su_shadow').setScale(artScale('su_shadow', 1.6 * m), artScale('su_shadow', 0.8 * m));
     this.inner = scene.add.container(0, 0);
-    this.tail = art(scene, ...this.tailBase(), 'pt_tail', m * TS);
+    this.tail = new TailGfx(scene, ...this.tailBase(), PUP_SCALE * m);
     this.body = art(scene, 0, 0, 'pt_run0', m);
-    this.inner.add([this.tail, this.body]); this.root.add([shadow, this.inner]);
+    this.inner.add([this.tail, this.body, this.tail.cap]); this.root.add([shadow, this.inner]);
   }
-  /** tail attach point (local, facing right): his back at hip height */
-  tailBase(): [number, number] { return [-34 * PUP_SCALE * this.m, -44 * PUP_SCALE * this.m]; }
+  /** tail attach point (local, facing right): tucked into his back at hip height so the root hides under the body outline */
+  tailBase(): [number, number] { return [-36 * PUP_SCALE * this.m, -40 * PUP_SCALE * this.m]; }
   setDepth(d: number) { this.root.setDepth(d); return this; }
   flip(left: boolean) { this.inner.setScale(left ? -1 : 1, 1); return this; }
   /** squash/stretch the body + tail without losing the facing flip (sx > 1 = stretched along the run) */
   squash(sx: number, sy: number) { this.inner.setScale((this.inner.scaleX < 0 ? -1 : 1) * sx, sy); return this; }
   setFrame(k: string) { this.body.setTexture('pt_' + k); return this; }
   /** world position of the tail tip (the grab spot) */
-  tipPos() { const u = PUP_SCALE * this.m * TS, a = Phaser.Math.DegToRad(this.tail.angle), dx = (PUP_TAIL_VB.tx - PUP_TAIL_VB.bx) * u * this.tailStretch, dy = (PUP_TAIL_VB.ty - PUP_TAIL_VB.by) * u; const [bx, by] = this.tailBase();
-    const lx = bx + dx * Math.cos(a) - dy * Math.sin(a), ly = by + dx * Math.sin(a) + dy * Math.cos(a);
-    const pt = this.inner.getWorldTransformMatrix().transformPoint(lx, ly); return { x: pt.x, y: pt.y }; }
+  tipPos() { const pt = this.tail.getWorldTransformMatrix().transformPoint(this.tail.tip.x, this.tail.tip.y); return { x: pt.x, y: pt.y }; }
   update(dt: number, run = 0, wag = 1) {
     this.t += dt;
     if (run > 0) { this.frame = (this.frame + dt * 14 * run) % 6; this.body.setTexture('pt_run' + Math.floor(this.frame)); }
-    this.tail.setAngle(Math.sin(this.t * this.wagSpd) * this.wagAmp * wag).setScale(artScale('pt_tail', this.m * TS) * this.tailStretch, artScale('pt_tail', this.m * TS));
+    // wag BENDS the tail (the draw fn curls it more toward the tip); the scene may still rotate the whole tail via setAngle (tug)
+    this.tail.setAngle(0); this.tail.st.wag = Math.sin(this.t * this.wagSpd) * (this.wagAmp / 22) * wag; this.tail.st.stretch = this.tailStretch; this.tail.redraw();
   }
 }

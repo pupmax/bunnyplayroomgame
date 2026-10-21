@@ -37,6 +37,8 @@ export class TailBunny {
   }
   setDepth(d: number) { this.root.setDepth(d); return this; }
   setFace(e: string) { this.body.setTexture('bun_rig2_' + e); return this; }
+  /** centre of the front paw (forearm art: paw ellipse at y 48 of 66, origin 0.09) */
+  pawPos() { const pt = this.el.getWorldTransformMatrix().transformPoint(0, 42 * 0.95 * this.m); return { x: pt.x, y: pt.y }; }
   handPos() { const mt = this.hand.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   shoulderPos() { const mt = this.sh.getWorldTransformMatrix(); return { x: mt.tx, y: mt.ty }; }
   armLen() { return (40 + 44) * 0.95 * this.m; }
@@ -87,7 +89,8 @@ export const TAIL_FLAT = -36;
 
 // ---------- procedural tail: ONE swappable draw function ----------
 /** Everything a tail-draw function needs. Local space: root at (0,0), Puppy faces RIGHT, so the tail grows toward -x / up. */
-export type TailDrawState = { u: number; wag: number; stretch: number; tint: number | null };
+export type TailDrawState = { u: number; wag: number; stretch: number; tint: number | null; to?: { x: number; y: number } | null };
+/** to: when set (being HELD) the tail runs taut from the root to that point (Bunny's paw) and the returned grab spot is exactly `to`; the tuft pokes out past it. */
 /** Draws the whole tail into g (already cleared) and returns the tip (the grab spot) in the same local space. cap (optional, already cleared) is drawn OVER the body: use it to hide the seam at the hip. */
 export type TailDrawFn = (g: Phaser.GameObjects.Graphics, s: TailDrawState, cap?: Phaser.GameObjects.Graphics) => { x: number; y: number };
 
@@ -97,6 +100,13 @@ export const drawTail: TailDrawFn = (g, s, cap) => {
   const tn = (c: number) => s.tint === null ? c : (((((c >> 16) & 255) * ((s.tint >> 16) & 255) / 255) << 16) | ((((c >> 8) & 255) * ((s.tint >> 8) & 255) / 255) << 8) | (((c & 255) * (s.tint & 255) / 255) | 0));
   const N = 22, L = 115 * u * s.stretch, curl = 1.8 / (s.stretch * s.stretch * s.stretch), bend = 0.9;
   const P: { x: number; y: number; h: number; r: number }[] = []; let x = 0, y = 0, h = Math.PI - 0.5;
+  if (s.to) { // held: a taut, barely sagging line from his rump to her paw, then a short tuft past the paw
+    const ex = s.to.x, ey = s.to.y, len = Math.max(1, Math.hypot(ex, ey)), nx = -ey / len, ny = ex / len, sg = (ny >= 0 ? 1 : -1) * Math.min(14 * u, len * 0.05);
+    const cx = ex / 2 + nx * sg, cy = ey / 2 + ny * sg, ext = 12 * u, M = N - 2;
+    for (let i = 0; i <= M; i++) { const t = i / M, a = 1 - t, dx = 2 * a * cx + 2 * t * (ex - cx), dy = 2 * a * cy + 2 * t * (ey - cy);
+      P.push({ x: 2 * a * t * cx + t * t * ex, y: 2 * a * t * cy + t * t * ey, h: Math.atan2(dy, dx), r: (13 - 5.5 * Math.pow(t * M / N, 0.9)) * u }); }
+    const he = P[M].h; for (let k = 1; k <= 2; k++) P.push({ x: ex + Math.cos(he) * ext * k / 2, y: ey + Math.sin(he) * ext * k / 2, h: he, r: (13 - 5.5 * Math.pow((M + k) / N, 0.9)) * u });
+  } else
   for (let i = 0; i <= N; i++) { const t = i / N; P.push({ x, y, h, r: (13 - 5.5 * Math.pow(t, 0.9)) * u });
     h += (curl * (0.6 + 0.8 * t) + s.wag * bend * 2.2 * Math.pow(t, 1.2)) / N; x += Math.cos(h) * L / N; y += Math.sin(h) * L / N; }
   const o = 4.2 * u;
@@ -109,7 +119,7 @@ export const drawTail: TailDrawFn = (g, s, cap) => {
   if (cap) { const k = Math.max(2, Math.round(N * 20 / 115)); cap.fillStyle(tn(FUR), 1); for (let i = 1; i <= k; i++) cap.fillCircle(P[i].x, P[i].y, P[i].r * 0.98);
     }
   const e = P[P.length - 1]; g.fillStyle(0xffffff, 0.35).fillCircle(e.x - 1.5 * u, e.y - 1.5 * u, e.r * 0.35);
-  return { x: e.x, y: e.y };
+  return s.to ? { x: s.to.x, y: s.to.y } : { x: e.x, y: e.y };
 };
 
 /** A Graphics that behaves like the old tail Image for the scene (setTint / clearTint / setAngle) and redraws via drawTail. */
@@ -142,6 +152,9 @@ export class TailPup {
   /** squash/stretch the body + tail without losing the facing flip (sx > 1 = stretched along the run) */
   squash(sx: number, sy: number) { this.inner.setScale((this.inner.scaleX < 0 ? -1 : 1) * sx, sy); return this; }
   setFrame(k: string) { this.body.setTexture('pt_' + k); return this; }
+  /** pin the tail's end to a WORLD point (Bunny's paw); call after both rigs are posed this frame */
+  holdTo(wx: number, wy: number) { const p = this.tail.getWorldTransformMatrix().applyInverse(wx, wy); this.tail.st.to = { x: p.x, y: p.y }; this.tail.redraw(); return this; }
+  letGo() { this.tail.st.to = null; return this; }
   /** world position of the tail tip (the grab spot) */
   tipPos() { const pt = this.tail.getWorldTransformMatrix().transformPoint(this.tail.tip.x, this.tail.tip.y); return { x: pt.x, y: pt.y }; }
   update(dt: number, run = 0, wag = 1) {

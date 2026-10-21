@@ -18,6 +18,11 @@ await tap(360, 1150); // PLAY
 await p.waitForFunction(() => window.__tutorialOpen === true, null, { timeout: 30000 }); await p.waitForTimeout(900); await tap(360, 640); // tutorial: tap anywhere
 await p.waitForFunction(() => window.__pr?.st?.running, null, { timeout: 30000 });
 await p.evaluate(() => { window.__game.scene.getScene('Tail').input.on('pointerdown', () => { window.__pdn = (window.__pdn || 0) + 1; }); });
+// paw-to-tail check: after every game update while Bunny holds the tail (tug, catch, win card), measure her paw centre vs the drawn tail end
+await p.evaluate(() => { const S = window.__game.scene.getScene('Tail'); window.__gap = { max: 0, n: 0, tug: 0, catch: 0, gripOff: 0 };
+  S.events.on('postupdate', () => { const st = S.st; if (st.phase !== 'tug' && st.phase !== 'catch') return;
+    const pw = S.bun.pawPos(), tp = S.pup.tipPos(), d = Math.hypot(pw.x - tp.x, pw.y - tp.y), g = window.__gap;
+    g.max = Math.max(g.max, d); g.n++; g[st.phase]++; if (!S.grip.visible || S.grip.depth <= S.pup.root.depth) g.gripOff++; }); });
 const hud0 = await hudText(); console.log('HUD at start:', hud0); const log = []; let last = { grabs: 0, tails: 0, yelps: 0, slips: 0 }, shot = false; const t0 = Date.now(); const R = Math.random;
 while (Date.now() - t0 < SECS * 1000) {
   const s = await look(); if (!s || s.ended) break;
@@ -35,8 +40,9 @@ while (Date.now() - t0 < SECS * 1000) {
   } else { await tap(s.px - s.face * 150, s.py); }
 }
 const end = await look(); console.log('END', JSON.stringify({ tails: end?.tails, grabs: end?.grabs, yelps: end?.yelps, slips: end?.slips, hud: await hudText() }), 'errors', errs.length, errs[0] || '');
-await p.screenshot({ path: OUT + 'end.png' }); await b.close();
+await p.screenshot({ path: OUT + 'end.png' }); const gap = await p.evaluate(() => window.__gap); console.log('PAW-TAIL', JSON.stringify(gap)); await b.close();
 // e2e assertion: real touch, human-paced play must move the HUD counter off 0
 const first = log.find(e => e.ev === 'tails');
-const ok = (end?.tails ?? 0) >= 1 && first && /TAILS\s*0\s*\/\s*6/.test(hud0) && /TAILS\s*[1-6]\s*\/\s*6/.test(first.hud) && errs.length === 0;
+const gapOk = gap.n > 0 && gap.max < 6 && gap.gripOff === 0; if (!gapOk) console.log('FAIL paw-to-tail gap', JSON.stringify(gap));
+const ok = gapOk && (end?.tails ?? 0) >= 1 && first && /TAILS\s*0\s*\/\s*6/.test(hud0) && /TAILS\s*[1-6]\s*\/\s*6/.test(first.hud) && errs.length === 0;
 console.log(ok ? 'PASS counter 0 -> ' + end.tails + ' (first catch HUD: ' + first.hud + ')' : 'FAIL counter stayed ' + (end?.tails ?? 0)); process.exit(ok ? 0 : 1);

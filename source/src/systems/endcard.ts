@@ -30,12 +30,14 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   const sc = txt(scene, W / 2, 345, `${detail}\nScore ${score}${newBest ? '  ★ NEW BEST!' : ''}`, 30, '#22252b', '#fff', 0);
   c.add([dim, g, t, hero, pup, quote, sub, sc]);
   // buttons arm only after the 300 ms fade-in PLUS a 300 ms gap with no taps (a tap burst that ended the level can't fire them); armed stays armed
-  const t0 = scene.time.now; let last = -1e9, prev = -1e9, armed = false;
-  const isArmed = () => { if (armed) return true; const n = scene.time.now, before = n - last < 250 ? prev : last; /* buttons fire on pointerup: skip this tap's own pointerdown */ if (n - t0 >= 600 && n - before >= 300) armed = true; return armed; };
-  const onDown = () => { prev = last; last = scene.time.now; };
+  const t0 = scene.time.now; let last = -1e9, armed = false, downOk = false;
+  // the quiet gap is measured up to each pointerdown (never across the press itself), so a deliberate press after arming fires however long it is held
+  const quiet = (n: number) => n - t0 >= 600 && n - last >= 300;
+  const isArmed = () => { if (!armed && quiet(scene.time.now)) armed = true; return armed; };
+  const onDown = () => { const n = scene.time.now; if (!armed && quiet(n)) armed = true; downOk = armed; last = n; }; // this press counts iff the card was armed when it STARTED
   scene.input.on('pointerdown', onDown); scene.events.once('shutdown', () => scene.input.off('pointerdown', onDown));
   (window as any).__cardArmed = () => isArmed();
-  const go = (k: string, data?: object) => { if (!isArmed() || !leaveOnce(scene)) return; scene.cameras.main.fadeOut(200); scene.time.delayedCall(220, () => scene.scene.start(k, data)); };
+  const go = (k: string, data?: object) => { if (!downOk || !leaveOnce(scene)) return; scene.cameras.main.fadeOut(200); scene.time.delayedCall(220, () => scene.scene.start(k, data)); };
   if (STANDALONE) {
     c.add(makeButton(scene, W / 2 - 145, 1010, 260, 110, 'PLAY AGAIN', () => go(scene.scene.key), COLORS.BUTTON, 38));
     c.add(makeButton(scene, W / 2 + 145, 1010, 260, 110, 'MENU', () => go('SoloTitle'), COLORS.BUTTON_ALT, 44));

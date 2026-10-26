@@ -14,8 +14,9 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   Fx.sting(win);
   if ((window as any).__pr) (window as any).__pr.cardShown = true; // a pending update may reload now (not mid-level)
   const newBest = win ? Storage.submitLevel(name, score) : false;
-  const firstWin = win && Storage.getBeaten() <= idx;
-  if (win) Storage.setBeaten(idx + 1);
+  const firstWin = win && Storage.getBeaten() <= idx && !(!STANDALONE && name === 'Bunny');
+  const bonus = !STANDALONE && name === 'Bunny'; // Tail Catch as the tester hall's bonus door: no hall progress, no Interlude
+  if (win && !bonus) Storage.setBeaten(idx + 1);
   (window as any).__pr = { ...(window as any).__pr, ended: win ? 'win' : 'lose', score };
   const c = scene.add.container(0, 0).setDepth(960);
   const dim = scene.add.rectangle(0, 0, W, H, 0x000000, 0.55).setOrigin(0).setInteractive();
@@ -38,7 +39,10 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   scene.input.on('pointerdown', onDown); scene.events.once('shutdown', () => scene.input.off('pointerdown', onDown));
   (window as any).__cardArmed = () => isArmed();
   const go = (k: string, data?: object) => { if (!downOk || !leaveOnce(scene)) return; scene.cameras.main.fadeOut(200); scene.time.delayedCall(220, () => scene.scene.start(k, data)); };
-  if (STANDALONE) {
+  if (bonus) {
+    c.add(makeButton(scene, W / 2 - 145, 1010, 260, 110, 'PLAY AGAIN', () => go(scene.scene.key), COLORS.BUTTON, 38));
+    c.add(makeButton(scene, W / 2 + 145, 1010, 260, 110, 'HALL', () => go('Hub'), COLORS.BUTTON_ALT, 44));
+  } else if (STANDALONE) {
     c.add(makeButton(scene, W / 2 - 145, 1010, 260, 110, 'PLAY AGAIN', () => go(scene.scene.key), COLORS.BUTTON, 38));
     c.add(makeButton(scene, W / 2 + 145, 1010, 260, 110, 'MENU', () => go('SoloTitle'), COLORS.BUTTON_ALT, 44));
   } else if (win) {

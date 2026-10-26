@@ -224,7 +224,7 @@ export class ZoeRig {
   root: Phaser.GameObjects.Container; head: Phaser.GameObjects.Image;
   private bodyC: Phaser.GameObjects.Container; private bodyG: Phaser.GameObjects.Graphics;
   private armG: Phaser.GameObjects.Graphics; private fx: Phaser.GameObjects.Graphics;
-  private hand = { x: 0, y: 0, a: 0 }; private trail: { x: number; y: number; a: number }[] = [];
+  private hand = { x: 0, y: 0, a: 0 }; private lArmG: Phaser.GameObjects.Graphics; private lHand = { x: -58, y: -88 }; private mood = 'smug'; private trail: { x: number; y: number; a: number }[] = [];
   private homeX: number; private t = 0; private swinging = false; 
   constructor(private scene: Phaser.Scene, x: number, private baseY: number, depth = 40) {
     this.homeX = x;
@@ -237,9 +237,10 @@ export class ZoeRig {
     g.fillStyle(0xf3d2a2, 1).fillEllipse(0, -64, 74, 84); // tummy
     g.fillStyle(0xf28fb0, 1).fillRoundedRect(-58, -112, 116, 22, 10).lineStyle(5, INK_C, 1).strokeRoundedRect(-58, -112, 116, 22, 10); // apron strap
     g.lineStyle(8, INK_C, 1).fillStyle(ZOE_FUR_D, 1).fillEllipse(-34, -4, 52, 28).strokeEllipse(-34, -4, 52, 28).fillEllipse(34, -4, 52, 28).strokeEllipse(34, -4, 52, 28); // feet
-    g.fillStyle(ZOE_FUR, 1).fillCircle(-58, -88, 20).strokeCircle(-58, -88, 20); // resting left paw
+    // left paw: no longer baked into bodyG (it never moved); it is a short live arm in lArmG, see drawLeft()
+    this.lArmG = scene.add.graphics();
     this.head = art(scene, 0, -230, 'head_Zoe_smug', 0.95);
-    this.bodyC.add([this.bodyG, this.head]);
+    this.bodyC.add([this.bodyG, this.lArmG, this.head]);
     this.armG = scene.add.graphics();
     this.root.add([this.bodyC, this.armG]);
     this.fx = scene.add.graphics().setDepth(depth - 1);
@@ -250,7 +251,12 @@ export class ZoeRig {
   get x() { return this.root.x; } get y() { return this.root.y; }
   private shoulder() { return { x: 50, y: -110 }; }
   private idleHand() { return { x: 112, y: -150, a: -25 }; }
-  setMood(m: 'smug' | 'happy' | 'dizzy') { this.head.setTexture(`head_Zoe_${m}`); return this; }
+  setMood(m: 'smug' | 'happy' | 'dizzy') { this.mood = m; this.head.setTexture(`head_Zoe_${m}`); return this; }
+  /** where the free (left) paw wants to be when not swinging: resting at her side with a little swing; up for a cheer; flapping when dizzy */
+  private lIdle() { const t = this.t;
+    if (this.mood === 'happy') return { x: -92 + Math.sin(t * 9) * 8, y: -190 + Math.sin(t * 18) * 10 };
+    if (this.mood === 'dizzy') return { x: -86 + Math.sin(t * 11) * 14, y: -120 + Math.cos(t * 11) * 16 };
+    return { x: -60 + Math.sin(t * 3) * 5, y: -86 + Math.sin(t * 6 + 0.8) * 3 }; }
   setTint(c: number) { this.head.setTint(c); this.bodyG.setAlpha(0.85); return this; }
   clearTint() { this.head.clearTint(); this.bodyG.setAlpha(1); return this; }
   get busy() { return this.swinging; }
@@ -267,6 +273,9 @@ export class ZoeRig {
     sc.tweens.add({ targets: this.bodyC, angle: -lean * 0.5, scaleX: 0.94, scaleY: 1.08, duration: 60, ease: 'Quad.Out' });
     sc.tweens.add({ targets: this.bodyC, angle: lean, scaleX: 1.12, scaleY: 0.88, delay: 60, duration: 70, ease: 'Quad.In' });
     sc.tweens.add({ targets: this.bodyC, angle: 0, scaleX: 1, scaleY: 1, delay: 130, duration: 120, ease: 'Back.Out' });
+    sc.tweens.killTweensOf(this.lHand); // free paw balances the swing: flings up/out on the wind-up, tucks down/back on the smash
+    sc.tweens.add({ targets: this.lHand, x: -98, y: -150, duration: 60, ease: 'Quad.Out' });
+    sc.tweens.add({ targets: this.lHand, x: -84, y: -64, delay: 60, duration: 70, ease: 'Quad.In' });
     sc.tweens.add({ targets: this.hand, x: up.x, y: up.y, a: up.a, duration: 60, ease: 'Quad.Out' });
     sc.tweens.add({ targets: this.hand, x: lx - 20, y: ly - 30, a: 10, delay: 60, duration: 70, ease: 'Quad.In', onComplete: () => { this.burst(tx, ty); onSmash?.(); } });
     sc.tweens.add({ targets: this.hand, x: lx - 10, y: ly - 14, a: 24, delay: 130, duration: 45, ease: 'Back.Out' });
@@ -285,9 +294,19 @@ export class ZoeRig {
   }
   private update(_t: number, dms: number) {
     this.t += dms / 1000;
-    if (!this.swinging) { this.bodyC.y = Math.sin(this.t * 6) * 4; this.hand.y += (this.idleHand().y + Math.sin(this.t * 6) * 4 - this.hand.y) * 0.2; }
+    if (!this.swinging) { this.bodyC.y = Math.sin(this.t * 6) * 4; this.hand.y += (this.idleHand().y + Math.sin(this.t * 6) * 4 - this.hand.y) * 0.2;
+      const li = this.lIdle(), k = 1 - Math.exp(-dms / 1000 * 10); this.lHand.x += (li.x - this.lHand.x) * k; this.lHand.y += (li.y - this.lHand.y) * k; }
     else { this.trail.push({ ...this.hand }); if (this.trail.length > 5) this.trail.shift(); }
     this.draw();
+  }
+  /** free left arm: shoulder at the body's left edge, short bent noodle to the paw (lives in bodyC so it squashes/leans with her) */
+  private drawLeft() {
+    const g = this.lArmG.clear(), sx = -46, sy = -108, h = this.lHand;
+    const mx = (sx + h.x) / 2 - 22, my = (sy + h.y) / 2 + 6;
+    const pts = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(sx, sy), new Phaser.Math.Vector2(mx, my), new Phaser.Math.Vector2(h.x, h.y)).getPoints(10);
+    g.lineStyle(28, INK_C, 1).strokePoints(pts); g.lineStyle(18, ZOE_FUR, 1).strokePoints(pts);
+    g.lineStyle(8, INK_C, 1).fillStyle(ZOE_FUR, 1).fillCircle(h.x, h.y, 20).strokeCircle(h.x, h.y, 20);
+    g.fillStyle(0xffffff, 0.3).fillCircle(h.x - 6, h.y - 7, 6);
   }
   private drawPan(g: Phaser.GameObjects.Graphics, x: number, y: number, a: number, alpha: number, ghost = false) {
     // a: degrees; pan head extends "up" along the arm direction from the paw
@@ -300,7 +319,7 @@ export class ZoeRig {
     g.fillStyle(0xffffff, 0.5 * alpha).fillEllipse(hx - 12, hy - 14, 14, 8);
   }
   private draw() {
-    const g = this.armG, f = this.fx; g.clear(); f.clear();
+    const g = this.armG, f = this.fx; g.clear(); f.clear(); this.drawLeft();
     const s = this.shoulder(), h = this.hand;
     // motion-blur arc: fading ghost pans + a white swoosh through the recent hand path
     if (this.trail.length > 1) {
@@ -354,7 +373,12 @@ export class HeroRig {
   setFlip(f: boolean) { this.flipX = f ? -1 : 1; this.root.setScale(this.m * this.flipX, this.m); return this; }
   setMood(mood: 'smug' | 'happy' | 'dizzy') { this.mood = mood; this.head.setTexture(`head_${this.name}_${mood}`); return this; }
   /** world position of a paw/foot: 'lp' 'rp' (paws) 'lf' 'rf' (feet). */
-  point(k: 'lp' | 'rp' | 'lf' | 'rf') { const p = this.pts[k] ?? { x: 0, y: 0 }; const mt = this.root.getWorldTransformMatrix(); return { x: mt.tx + p.x * this.m * this.flipX, y: mt.ty + p.y * this.m }; }
+  /** Goes through the root's full world matrix (its own scale/flip/rotation AND every parent container's), so it is right
+   *  inside a scaled or rotated container too (e.g. Midnight inside Dive's tilting bird container). For a top-level, unrotated
+   *  rig this gives exactly the old result (root x/y + local * m * flip). */
+  point(k: 'lp' | 'rp' | 'lf' | 'rf') { const p = this.pts[k] ?? { x: 0, y: 0 };
+    const mt = this.root.getWorldTransformMatrix(this.wm, this.pm); return mt.transformPoint(p.x, p.y, { x: 0, y: 0 }) as { x: number; y: number }; }
+  private wm = new Phaser.GameObjects.Components.TransformMatrix(); private pm = new Phaser.GameObjects.Components.TransformMatrix();
   /** play keyframes, then settle back to idle (unless hold=true). */
   act(keys: HeroKey[], hold = false, settle = 0.26) {
     const segs: Seg[] = keys.map(k => ({ dur: k.dur, to: k.to as Pose, ease: k.ease ?? E.Sine.InOut, onEnd: k.onEnd }));

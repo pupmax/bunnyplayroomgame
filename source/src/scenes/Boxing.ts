@@ -21,21 +21,15 @@ import { LINES, pick } from '../lines';
 const RP: Record<string, ArmPose> = { cock: { ex: 230, ey: -190, wx: 200, wy: -270, gs: 1.1 }, idle: { ex: 200, ey: -230, wx: 160, wy: -330, gs: 1 },
   jab: { ex: 90, ey: -380, wx: 20, wy: -560, gs: 0.72 }, dizzy: { ex: 210, ey: -150, wx: 270, wy: -220, gs: 0.95 },
   guard: { ex: 160, ey: -260, wx: 45, wy: -390, gs: 0.95 }, cheer: { ex: 225, ey: -360, wx: 215, wy: -505, gs: 0.92 } }; // dodge tuck, points-win arms up
-const TIME = 60, PUP_HP = 1250, RUBY_HP = 100, GREEN = 0.32, PERF = 0.08, HIT = 9, PERF_BONUS = 6, COMBO_MAX = 4, COUNTER = 12, SUPER_DMG = 24,
-  PERIOD = [1.7, 1.45, 1.2], ATK_P = [0.3, 0.42, 0.45], WIND = [1.2, 1.15, 1.05], OPEN_T = 1.7, BONK = 20, DIZZY = 1.2, COOL_HIT = 0.22, COOL_MISS = 0.45, PTS = 0.30, // time-up win: bag at 30% or less
+const TIME = 60, PUP_HP = 1250, RUBY_HP = 100, GREEN = 0.32, PERF = 0.08, HIT = 10, PERF_BONUS = 6, COMBO_MAX = 4, COUNTER = 12, SUPER_DMG = 24,
+  PERIOD = [1.7, 1.45, 1.2], ATK_P = [0.3, 0.42, 0.45], WIND = [1.2, 1.15, 1.05], OPEN_T = 1.7, BONK = 15, DIZZY = 1.2, COOL_HIT = 0.22, COOL_MISS = 0.45, PTS = 0.40, // time-up win: bag at 40% or less
   // counter-swing variety (per round): feint chance, double-swing chance after a dodge, mid-swing snap-back chance; dodge only counts in the last DODGE_WIN s
-  FEINT_P = [0.12, 0.2, 0.25], DOUBLE_P = [0.1, 0.3, 0.4], SNAP_P = [0.05, 0.12, 0.18], DODGE_WIN = 0.6, DODGE_CD = 0.75, EARLY_CD = 0.2, WIND_MIN = 0.62;
+  FEINT_P = [0.05, 0.2, 0.25], DOUBLE_P = [0.05, 0.3, 0.4], SNAP_P = [0.05, 0.12, 0.18], DODGE_WIN = 0.75, DODGE_CD = 0.75, EARLY_CD = 0.2, WIND_MIN = 0.62;
   //  AND a smaller share left than Ruby's
 const ANG = 15, PIVX = 360, PIVY = -40, LEN = 440, INK = '#2a1a14';
 type PState = 'guard' | 'windup' | 'punch' | 'open' | 'stun' | 'ko';
-const PUP_SAYS = {
-  hit: ['MY SNOOT! wheee-ouch!', 'Nice one! Do it again! …wait, no!', 'Wheee! Ten outta ten!', 'Ow! Great form though!', 'Boing! I felt that in my tail!', 'That one had SPARKLES!'],
-  perfect: ['PERFECT! I saw stars AND confetti!', 'Bullseye! Right on the BONK!', 'Wow, textbook! Ow.'],
-  incoming: ['INCOMIIING! mind the fluff!', 'Duck, Ruby, duck!', 'Here I come — sorry in advance!', 'Wheeee — look out!'],
-  bonk: ["Oopsie! Bag 1, Ruby 0! Shake it off — you're doing GREAT! ♥", 'Eep, sorry! You okay? You GOT this!', 'Boop! My bad! Go again, champ!', 'Whoops! Fluffy hug delivered!'],
-  open: ["I'm all wobbly — free hits!", 'Dizzy bag! Dizzy bag!', 'Wheee, the room is spinning!'],
-  whiff: ['Missed me! Try the green bit!', 'Swish! Wait for the green!', 'Ha! Timing, timing!'],
-};
+const PUP_SAYS = LINES.boxingPup as Record<'hit' | 'perfect' | 'incoming' | 'bonk' | 'open' | 'whiff', string[]>; // lines live in src/lines.ts (EDIT ME)
+const RUBY_SAY = { x: 190, y: 800 }; // Ruby's own bubbles sit by her, bottom-left
 
 export class BoxingScene extends Phaser.Scene {
   private ruby!: Phaser.GameObjects.Container; private rArms!: BoxerArms; private rBody!: Phaser.GameObjects.Image; private rBase = 1; private pawT = 0;
@@ -52,7 +46,7 @@ export class BoxingScene extends Phaser.Scene {
   private bulbs: { x: number; y: number; t: number }[] = []; private hitStop = 0; private ang = 0; private depthK = 1; private koMode = false; private exts = 0; private lastAtk = 0; private timerCol = ''; private lowQ = false; private perfAcc = 0; private perfN = 0; private perfT = 0; private goodWins = 0; private hudStatic?: Phaser.GameObjects.Image; private chainTS?: Phaser.GameObjects.TileSprite; private chainLen = -1; private windT = 1; private feint = false; private spd = 1; private snapArmed = true; private dcd = 0; private followUp = false; private plainAtk = false;
   constructor() { super('Boxing'); }
   create() {
-    this.begun = false;
+    this.begun = false; this.lastTalk = -9999;
     setupCamera(this); this.cameras.main.fadeIn(250);
     this.st = { pupHp: PUP_HP, rubyHp: RUBY_HP, time: TIME, meter: 0, combo: 0, score: 0, state: 'guard', side: 1, running: false, dodge: 0, hits: 0, landed: 0, dodgeDir: 0, cool: 0, round: 1, x: 0, ph: 0, dizzy: 0, perfects: 0, counters: 0, bonks: 0, atk: 0, feints: 0, doubles: 0, snaps: 0 };
     this.stT = 0; this.lastExt = -9; this.crowd = []; this.ropeWob = 0; this.bulbs = []; this.hitStop = 0; this.tweens.timeScale = 1; this.koMode = false; this.spinPh = 0; this.squish = 0; this.exts = 0; this.lastAtk = 0; this.timerCol = ''; this.chainLen = -1; this.lowQ = LOWQ; this.perfAcc = 0; this.perfN = 0; this.perfT = 0; this.goodWins = 0; this.windT = 1; this.feint = false; this.spd = 1; this.snapArmed = true; this.dcd = 0; this.followUp = false;
@@ -198,7 +192,11 @@ export class BoxingScene extends Phaser.Scene {
       g.lineStyle(7 - i, 0xffffff, 0.55 * k).beginPath(); g.arc(PIVX, PIVY, r, Math.PI / 2 - a1, Math.PI / 2 - a0 - dir * 0.03, dir < 0); g.strokePath(); }
   }
   private bagPos() { const r = Phaser.Math.DegToRad(this.ang), d = LEN + 190 * this.depthK; return { x: PIVX + Math.sin(r) * d, y: PIVY + Math.cos(r) * d }; }
-  private setFace(k: 'idle' | 'panic' | 'dizzy' | 'hearts') { this.pupImg.setTexture({ idle: 'pup_box_idle', panic: 'pup_box_panic', dizzy: 'pup_box_dizzy', hearts: 'pup_hearts' }[k]); }
+  private setFace(k: 'idle' | 'panic' | 'dizzy' | 'hearts') { this.pupImg.setTexture({ idle: 'pup_box_idle', panic: 'pup_box_panic', dizzy: 'pup_box_dizzy', hearts: 'pup_box_dizzy' }[k]); } // 'hearts' = woozy swirl eyes now (no heart eyes on Puppy); hearts/stars pop from his head instead (popHead)
+  /** little hearts + stars popping up from Puppy's head (rides in the bag container so it follows the swing) */
+  private popHead(n = 3) { for (let i = 0; i < n; i++) { const t = txt(this, (i - (n - 1) / 2) * 44, -60, i % 2 ? '★' : '♥', 32, i % 2 ? '#ffdf6b' : '#ff6b9a', '#22252b', 4).setScale(0.3);
+    this.bagC.add(t); this.tweens.add({ targets: t, scale: 1, y: -120 - (i % 2) * 16, x: t.x * 1.5, duration: 520, delay: i * 90, ease: 'Back.Out' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 650 + i * 90, duration: 300, onComplete: () => t.destroy() }); } }
   // ---------- flow ----------
   private begun = false;
   private begin() {
@@ -257,6 +255,11 @@ export class BoxingScene extends Phaser.Scene {
     for (let k = 0; k < 2; k++) { const g = art(this, this.ruby.x, this.ruby.y, 'ruby_back', 1.6).setDepth(39).setAlpha(0.35 - k * 0.12).setTint(0xffb0c8).setAngle(this.ruby.angle);
       this.tweens.add({ targets: g, alpha: 0, scaleX: g.scaleX * 1.05, delay: k * 40, duration: 220, onComplete: () => g.destroy() }); }
   }
+  /** Chatter bubble with a shared 1.2 s gap so lines never pile up (force = always show, still resets the gap). */
+  private chat(x: number, y: number, line: string, size: number, hold: number, force = false) {
+    if (!this.st.running || (!force && this.time.now - this.lastTalk < 1200)) return; this.lastTalk = this.time.now; say(this, x, y, line, size, hold);
+  }
+  private lastTalk = -9999;
   private freeze(ms: number) { this.tweens.timeScale = 0.04; this.hitStop = ms / 1000; }
   punch() {
     const s = this.st; if (s.cool > 0) return;
@@ -291,12 +294,18 @@ export class BoxingScene extends Phaser.Scene {
       if (counter) { this.stT = 0; this.setPup('stun', 1.0); }
       else if (s.state === 'guard') { s.ph += (tap.x > 0 ? 1 : -1) * 0.25; } // knock the swing on a bit
       this.hurtPup(dmg);
-      if (Math.random() < (perfect ? 0.7 : 0.3) && s.running) say(this, 560, 300, pick(perfect ? PUP_SAYS.perfect : PUP_SAYS.hit), 24, 1100);
+      const r = Math.random();
+      if (perfect) { if (r < 0.7) this.chat(560, 300, pick(PUP_SAYS.perfect), 24, 1100); }
+      else if (r < 0.25) this.chat(560, 300, pick(PUP_SAYS.hit), 24, 1100);
+      else if (r < (counter ? 0.75 : 0.37)) this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.rubyHit), 22, 1000); // Ruby talks in her own level
     } else {
       s.combo = 0; s.cool = COOL_MISS; Fx.block();
       floatText(this, hx, hy, tap.state === 'windup' ? 'too early!' : 'swish!', '#ffffff', 34);
       this.tweens.add({ targets: this.ruby, angle: side * -6, duration: 90, yoyo: true });
-      if (Math.random() < 0.25) say(this, 560, 300, pick(PUP_SAYS.whiff), 22, 1000);
+      const r = Math.random(), near = tap.state === 'guard' && Math.abs(tap.x) < GREEN * 1.35;
+      if (near && r < 0.4) this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.near), 22, 1000);
+      else if (r < 0.15) this.chat(560, 300, pick(PUP_SAYS.whiff), 22, 1000);
+      else if (r < 0.27) this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.rubyBlock), 22, 1000);
     }
   }
   /** POW burst, stars, damage pop, shake, bag squish + spin, Puppy squished dizzy face, legs flail. */
@@ -336,7 +345,7 @@ export class BoxingScene extends Phaser.Scene {
     this.rArms.to('both', RP.jab, 120, 'Quad.In', true, 80);
     this.time.delayedCall(150, () => { if (!s.running) return; const bp = this.bagPos(); s.score += 800; Fx.punch(); Fx.ouch();
       this.hitFx(bp.x, bp.y - 20, SUPER_DMG, true, 1, 'MEGA POW!'); this.cameras.main.flash(160, 255, 255, 255); this.spinPh += Math.PI * 4; this.hurtPup(SUPER_DMG);
-      if (s.running) { this.stT = 0; this.setPup('stun', 1.6); } });
+      if (s.running) { this.stT = 0; this.setPup('stun', 1.6); this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.headbutt), 24, 1100, true); } });
   }
   private hurtPup(d: number) { const s = this.st; if (!s.running) return; (window as any).__pr.lastDmg = d; s.pupHp = Math.max(0, s.pupHp - d); if (s.pupHp <= 0) this.finish(true); }
   /** Windup tell length: varies around the round's base, never below WIND_MIN so there is always a fair visible tell. */
@@ -351,8 +360,8 @@ export class BoxingScene extends Phaser.Scene {
     if (state !== 'windup') this.duckT.setVisible(false);
     if (state === 'windup') { Fx.alert(); const safe = s.side > 0 ? this.dl : this.dr; this.tweens.add({ targets: safe, scale: 1.1, yoyo: true, repeat: -1, duration: 140 });
       this.duckT.setVisible(true).setScale(0).setPosition(s.side > 0 ? 560 : 160, 280); this.tweens.add({ targets: this.duckT, scale: 1, duration: 180, ease: 'Back.Out' });
-      if (Math.random() < 0.55) say(this, s.side > 0 ? 220 : 500, 300, pick(PUP_SAYS.incoming), 24, 900); }
-    if (state === 'open' && Math.random() < 0.4) say(this, 520, 300, pick(PUP_SAYS.open), 22, 1000);
+      if (Math.random() < 0.15) this.chat(s.side > 0 ? 220 : 500, 300, pick(PUP_SAYS.incoming), 24, 900); }
+    if (state === 'open' && Math.random() < 0.4) this.chat(520, 300, pick(PUP_SAYS.open), 22, 1000);
     this.restoreFace();
   }
   private land() {
@@ -364,6 +373,7 @@ export class BoxingScene extends Phaser.Scene {
       if (!this.plainAtk && Math.random() < DOUBLE_P[s.round - 1]) { // swings straight back from the other side: dodge again!
         s.doubles++; floatText(this, W / 2, 600, 'AGAIN!', '#ffdf6b', 44); this.dcd = 0; this.startAttack(-s.side, WIND_MIN + Math.random() * 0.15, false); return; }
       floatText(this, W / 2, 600, 'DODGED! FREE HITS!', '#7dff9a', 40);
+      if (Math.random() < 0.45) this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.rubyDodge), 22, 1000, true);
       this.setPup('open', OPEN_T);
     } else {
       s.rubyHp = Math.max(0, s.rubyHp - BONK); s.combo = 0; s.bonks++; s.dizzy = DIZZY; Fx.ouch(); this.cameras.main.shake(280, 0.02); this.freeze(90);
@@ -378,9 +388,9 @@ export class BoxingScene extends Phaser.Scene {
       this.tweens.add({ targets: bx, scale: 1, duration: 120, ease: 'Back.Out' }); this.tweens.add({ targets: bx, alpha: 0, y: 740, delay: 600, duration: 260, onComplete: () => bx.destroy() });
       this.cameras.main.flash(120, 255, 80, 80); flashVignette(this, 0xff2a4a, 0.35);
       if (wrong) floatText(this, W / 2, 600, 'WRONG WAY!', '#ff3b6b');
-      this.time.delayedCall(250, () => s.running && say(this, 205, 300, pick(PUP_SAYS.bonk), 22, 1600));
+      const hurt = Math.random() < 0.4; this.time.delayedCall(250, () => s.running && this.chat(205, 300, pick(hurt ? LINES.rubyHurt : PUP_SAYS.bonk), 22, 1600, true));
       if (s.rubyHp <= 0) return this.finish(false);
-      this.setPup('guard', 0); s.ph = s.side > 0 ? Math.PI / 2 + 0.3 : -Math.PI / 2 + 0.3; this.setFace('hearts'); // swings away, Puppy all apologetic hearts
+      this.setPup('guard', 0); s.ph = s.side > 0 ? Math.PI / 2 + 0.3 : -Math.PI / 2 + 0.3; this.setFace('hearts'); this.faceLock = 0.7; this.time.delayedCall(200, () => this.popHead()); // swings away, Puppy woozy + little hearts from his head
     }
   }
   /** Adaptive quality: sustained slow frames (avg > 20 ms over 2 s while playing) turn off the extras now and drop to 1x render on the next load. */
@@ -406,7 +416,8 @@ export class BoxingScene extends Phaser.Scene {
     this.drawHud(); this.drawStage(now); const dz = s.dizzy > 0 && s.running, br = Math.sin(now / (dz ? 120 : 170));
     this.rArms.bob = br * (dz ? 9 : 5); this.rArms.draw(); // boxer bounce: body + arms breathe together (wobblier while dizzy)
     this.rBody.setY(br * 4).setScale(this.rBase * (1 - br * 0.008), this.rBase * (1 + br * 0.015)).setAngle(dz ? Math.sin(now / 210) * 4 : 0);
-    this.dizzyR.setVisible(s.dizzy > 0); this.dizzyT.setVisible(s.dizzy > 0).setScale(1 + Math.sin(now / 90) * 0.06);
+    const dzOn = s.dizzy > 0 && !this.koMode; // KO: Ruby has left the ring, her DIZZY tag + stars go with her
+    this.dizzyR.setVisible(dzOn); this.dizzyT.setVisible(dzOn).setScale(1 + Math.sin(now / 90) * 0.06);
     if (s.dizzy > 0) { this.dizzyR.list.forEach((o, i) => { const a = now / 160 + i * Math.PI * 0.4; (o as Phaser.GameObjects.Text).setPosition(Math.cos(a) * 110, Math.sin(a) * 24).setScale(0.8 + 0.25 * Math.sin(a)); }); }
     if (this.pupStars.visible) this.pupStars.list.forEach((o, i) => { const a = now / 200 + i * Math.PI / 2; (o as Phaser.GameObjects.Text).setPosition(Math.cos(a) * 100, Math.sin(a) * 22); });
     if (!s.running) return;
@@ -461,7 +472,7 @@ export class BoxingScene extends Phaser.Scene {
     // Puppy leans into the swing and pulls a face that matches the direction (only in the idle swing, not over hit/KO faces)
     this.faceLock = Math.max(0, this.faceLock - dt); this.pupImg.setAngle(Phaser.Math.Clamp(-this.angV * 0.12, -16, 16));
     if (s.state === 'guard' && s.running && s.dizzy <= 0 && this.faceLock <= 0 && !this.koMode) {
-      const want = Math.abs(s.x) < 0.45 ? 'pup_box_idle' : this.angV > 0 ? 'pup_box_panic' : 'pup_hearts';
+      const want = Math.abs(s.x) < 0.45 ? 'pup_box_idle' : this.angV > 0 ? 'pup_box_panic' : 'pup_box_dizzy'; // was pup_hearts: heart eyes AND a second baked arm popped in on every back-swing
       if (this.pupImg.texture.key !== want) this.pupImg.setTexture(want); this.pupImg.setFlipX(this.angV < 0); }
     this.drawLimbs(dt, now);
   }
@@ -560,7 +571,7 @@ export class BoxingScene extends Phaser.Scene {
     s.running = false; this.duckT.setVisible(false); this.hb.setVisible(false); this.ringG.clear();
     if (win && points) { this.setPup('stun', 99); this.rArms.to('both', RP.cheer, 200, 'Back.Out'); popBanner(this, 'WIN ON POINTS!', 400, 0x3a86ff, 900); }
     else if (win) { this.setPup('ko', 99); this.koShow(); }
-    else { this.rArms.to(0, RP.dizzy, 240, 'Back.Out'); this.rArms.to(1, RP.dizzy, 300, 'Back.Out'); popBanner(this, 'RUBY IS DIZZY...', 400, 0x6b4cc9, 900); this.setFace('hearts'); say(this, 205, 300, 'Aww! Best sparring buddy EVER! ♥', 22, 1600); }
+    else { this.rArms.to(0, RP.dizzy, 240, 'Back.Out'); this.rArms.to(1, RP.dizzy, 300, 'Back.Out'); popBanner(this, 'RUBY IS DIZZY...', 400, 0x6b4cc9, 900); this.setFace('hearts'); this.popHead(4); say(this, 205, 300, 'Aww! Best sparring buddy EVER! ♥', 22, 1600); }
     const score = win ? s.score + Math.round(s.rubyHp * 20 + s.time * 30) : s.score;
     (window as any).__pr.ended = win ? 'win' : 'lose';
     this.time.delayedCall(win && !points ? 2400 : 1300, () => { this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2); endCard(this, 'Ruby', 0, win, score, win ? (points ? `Won on points with ${s.landed} hits!` : `Bag K.O. with ${Math.ceil(s.time)}s left!`) : 'The bag swung back one time too many.', { points }); });

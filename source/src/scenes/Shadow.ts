@@ -1,5 +1,5 @@
 // Linye SHADOW TAG: tap a shadow pool to teleport into it. Arrive right next to Puppy to TAG him.
-// Puppy flees from you; drifting lanterns light up pools (can't teleport into a lit pool). 5 tags in 45s.
+// Puppy flees from you; drifting lanterns light up pools (can't teleport into a lit pool). 9 tags in 32s.
 import Phaser from 'phaser';
 import { GAME_W as W } from '../config';
 import { setupCamera, worldPoint } from '../systems/resolution';
@@ -13,7 +13,8 @@ import { Hud, impact } from '../systems/level';
 import { HeroRig, pupFlail } from '../systems/rigs';
 import { SquashCatch, SquashVariant } from '../systems/squash';
 
-const TIME = 32, NEED = 12, TAG_R = 85, WARN_T = 0.8, PHASE2 = 6, LSPD2 = 1.15, SPD_MAX = 480;
+const TIME = 32, NEED = 9, TAG_R = 100, WARN_T = 0.8, PHASE2 = 6, LSPD2 = 1.15, SPD_MAX = 480;
+const GAG_CAP = 2; // at most 2 Puppy gag bubbles per round (was ~10)
 const POOLS: [number, number][] = [[120, 720], [360, 700], [600, 730], [230, 880], [490, 880], [110, 1050], [360, 1040], [610, 1060], [240, 1200], [500, 1200]];
 
 export class ShadowScene extends Phaser.Scene {
@@ -24,7 +25,7 @@ export class ShadowScene extends Phaser.Scene {
   constructor() { super('Shadow'); }
   create() {
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x120a26, 0x1e1438);
-    this.st = { time: TIME, tags: 0, score: 0, running: false, over: false, at: 0, cool: 0, combo: 0 };
+    this.st = { time: TIME, tags: 0, score: 0, running: false, over: false, at: 0, cool: 0, combo: 0 }; this.gags = 0;
     art(this, 0, 0, 'bg_dojo'); this.lspd = 1; this.vigs = [];
     this.buildTex(); this.backdrop();
     this.pools = POOLS.map(([x, y]) => { const e = this.add.ellipse(x, y, 150, 48, 0x0d0618, 0.75).setStrokeStyle(4, 0x9a7aff, 0.6).setDepth(3);
@@ -56,7 +57,7 @@ export class ShadowScene extends Phaser.Scene {
     const s = this.st; const dt = Math.min(dms, 50) / 1000;
     for (const l of this.lanterns) { l.x += l.vx * dt * this.lspd; l.y += l.vy * dt * this.lspd; if (l.x < 80 || l.x > 640) l.vx *= -1; if (l.y < 680 || l.y > 1220) l.vy *= -1; l.o.setPosition(l.x, l.y + Math.sin(this.time.now / 300) * 6); }
     this.pools.forEach((p, i) => { const L = this.lit(i); p.setFillStyle(L ? 0x6a5a8a : 0x0d0618, L ? 0.35 : 0.75); this.vigs[i].setAlpha(Phaser.Math.Linear(this.vigs[i].alpha, L ? 0.1 : 0.85, 0.15)); });
-    this.drawCones(); this.footDust(dt);
+    this.drawCones(); this.footDust(dt); this.waddle(dt);
     if (!s.running || s.over) return;
     if (this.sq.phase) { s.cool -= dt; this.sq.update(dt); this.hud.set(`TAGS ${s.tags}/${NEED}`, s.time, s.tags / NEED); return; } // catch sequence: level timer + Puppy AI frozen
     s.time -= dt; s.cool -= dt; if (s.time <= 0) { s.time = 0; return this.finish(s.tags >= NEED); }
@@ -71,7 +72,7 @@ export class ShadowScene extends Phaser.Scene {
     const dur = Math.max(300, Phaser.Math.Distance.Between(this.pup.x, this.pup.y, tx, ty) / speed * 1000);
     this.pup.setFlipX(tx > this.pup.x).setTexture(best > 300 ? 'pup_idle' : 'pup_panic');
     this.pupTw = this.tweens.add({ targets: this.pup, x: tx, y: ty, duration: dur, ease: 'Sine.InOut', onUpdate: () => this.pup.setDepth(this.pup.y > this.linye.y ? 13 : 10), onComplete: () => {
-      if (Math.random() < 0.25) { this.pup.setTexture('pup_hearts'); if (s.running && Math.random() < 0.5) this.talk( this.pup.x, this.pup.y - 220, pick(LINES.puppyGag), 20, 900); }
+      if (Math.random() < 0.25) { this.pup.setTexture('pup_hearts'); if (s.running && this.gags < GAG_CAP && Math.random() < 0.5) { this.gags++; this.talk( this.pup.x, this.pup.y - 220, pick(LINES.puppyGag), 20, 900); } }
       this.time.delayedCall(Phaser.Math.Between(80, 350), () => this.roam()); } });
   }
   tapAt(x: number, y: number) {
@@ -121,9 +122,9 @@ export class ShadowScene extends Phaser.Scene {
     this.tweens.killTweensOf(b); this.tweens.add({ targets: b, alpha: 0, scale: 0.85, duration: 110, onComplete: () => b.destroy() });
   }
   private bubbles: { c: any; hw: number; top: number; bot: number; ty: number; tw?: Phaser.Tweens.Tween }[] = [];
-  private lastCatch = '';
+  private gags = 0;
   /** Random catch line from LINES.shadowCatch, never the same one twice in a row. */
-  private catchLine() { const pool = LINES.shadowCatch.filter(l => l !== this.lastCatch); return this.lastCatch = pick(pool.length ? pool : LINES.shadowCatch); }
+  private catchLine() { return pick(LINES.shadowCatch); } // shared shuffle-bag: all 5 of Marc's lines play before any repeats, never twice in a row
   private talk(x: number, y: number, t: string, sz?: number, ms?: number) {
     const c: any = (say as any)(this, x, y, t, sz, ms); const txt = c?.list?.find((o: any) => o.type === 'Text');
     if (!c || !txt) return c;
@@ -167,6 +168,17 @@ export class ShadowScene extends Phaser.Scene {
       const soon = this.lanterns.some(l => { const fx = l.x + l.vx * WARN_T * this.lspd, fy = l.y + l.vy * WARN_T * this.lspd; return Phaser.Math.Distance.Between(fx, fy, x, y) < 110; });
       if (soon) { const pu = 0.5 + 0.5 * Math.sin(t * 14); w.lineStyle(4, 0xffa040, 0.5 + 0.5 * pu); for (let k = 0; k < 12; k++) { const a0 = k / 12 * Math.PI * 2 + t; w.beginPath(); w.arc(x, y, 82, a0, a0 + 0.3); w.strokePath(); }
         w.fillStyle(0xffa040, 0.8).fillTriangle(x - 10, y - 46, x + 10, y - 46, x, y - 30); } });
+  }
+  /** Puppy used to glide on a bare position tween: rock him foot to foot + a little hop per step while he runs.
+   *  The hop shifts the image origin (not y/scale) so the position tween and the squash catch's scale/y are untouched. */
+  private wPh = 0; private wLx = 500; private wLy = 900; private oy0 = -1;
+  private waddle(dt: number) {
+    const p = this.pup; if (this.oy0 < 0) this.oy0 = p.originY;
+    const d = Math.hypot(p.x - this.wLx, p.y - this.wLy); this.wLx = p.x; this.wLy = p.y;
+    if (this.sq?.phase) { if (p.originY !== this.oy0) p.setOrigin(0.5, this.oy0); return; }
+    const hopPx = 12 / Math.max(1, p.height * Math.abs(p.scaleY)); // ~12 px hop in world units
+    if (this.pupTw?.isPlaying() && d > 0.5) { this.wPh += d / 30 * Math.PI; p.setAngle(Math.sin(this.wPh) * 7).setOrigin(0.5, this.oy0 + Math.abs(Math.sin(this.wPh)) * hopPx); }
+    else if (!this.tweens.getTweensOf(p).some(t => t.isPlaying() && t !== this.pupTw)) { const k = 1 - Math.exp(-dt * 16); p.setAngle(p.angle * (1 - k)).setOrigin(0.5, this.oy0 + (p.originY - this.oy0) * (1 - k)); }
   }
   private footDust(dt: number) {
     const dx = this.pup.x - this.lastPx, dy = this.pup.y - this.lastPy; this.lastPx = this.pup.x; this.lastPy = this.pup.y;

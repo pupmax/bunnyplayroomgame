@@ -129,7 +129,7 @@ export class TailScene extends Phaser.Scene {
     this.tweens.add({ targets: t, alpha: 0, delay: 700, duration: 300, onComplete: () => t.destroy() });
     this.meter.setVisible(true); this.meterTxt.forEach(o => o.setVisible(true));
     this.bunSay(); const g0 = s.grabs; // Bunny's sneaky line first; Puppy's protest only after her bubble has gone (never stacked)
-    this.time.delayedCall(2400, () => { if (this.st.phase === 'tug' && this.st.grabs === g0 && Math.random() < 0.7) this.pupSay(pick(LINES.tailProtest)); });
+    this.time.delayedCall(2400, () => { if (this.st.phase === 'tug' && this.st.grabs === g0 && Math.random() < 0.45) this.pupSay(pick(LINES.tailProtest)); });
     // grab feedback: ring burst + sparks + 'GOT IT!' right on the tail
     const tp = this.pup.tipPos(), rb = this.add.circle(tp.x, tp.y, 30).setStrokeStyle(10, 0xfff27a).setDepth(64);
     this.tweens.add({ targets: rb, scale: 3.2, alpha: 0, duration: 320, ease: 'Quad.Out', onComplete: () => rb.destroy() });
@@ -189,10 +189,10 @@ export class TailScene extends Phaser.Scene {
   /** Bunny's one outro line, riding above her head as she walks off */
   private outroLine(line: string) { const s = this.st; this.bunB?.destroy(); const b = this.bunB = bubble(this, Phaser.Math.Clamp(s.bx, 190, W - 190), Math.max(s.by - 330, 640), line, 24).setDepth(79);
     b.setScale(0.5); this.tweens.add({ targets: b, scale: 1, duration: 160, ease: 'Back.Out' }); const f = () => { if (b.active && this.outro) { b.x = Phaser.Math.Clamp(this.st.bx, 190, W - 190); if ((this.st.bx < 60 || this.st.bx > W - 60) && b.alpha === 1) this.tweens.add({ targets: b, alpha: 0, duration: 250 }); } else this.events.off('update', f); }; this.events.on('update', f); this.events.once('shutdown', () => this.events.off('update', f)); }
-  private bunB?: Phaser.GameObjects.Container; private lastTug = '';
+  private bunB?: Phaser.GameObjects.Container;
   /** one tailTug line per tug, beside Bunny's head on the side away from Puppy: clear of the tug meter (y < 580) and the TAP prompts */
   private bunSay() {
-    const s = this.st, pool = LINES.tailTug.filter(l => l !== this.lastTug), line = this.lastTug = pick(pool.length ? pool : LINES.tailTug);
+    const s = this.st, line = pick(LINES.tailTug); // shared shuffle-bag: every tug line before a repeat, never twice in a row
     this.bunB?.destroy(); const big = !!this.tapTxt?.getData('hand'); // first tug: the big STEP 2 prompt sits lower
     const b = this.bunB = bubble(this, Phaser.Math.Clamp(s.bx - s.face * 110, 190, W - 190), big ? Math.max(s.by - 215, 790) : Math.max(s.by - 330, 700), line, 22).setDepth(79);
     b.setScale(0.5); this.tweens.add({ targets: b, scale: 1, duration: 160, ease: 'Back.Out' });

@@ -108,6 +108,7 @@ export class FootballScene extends Phaser.Scene {
     const base = this.pupImg.getData('b') ?? this.pupImg.scaleX; this.pupImg.setData('b', base);
     this.tweens.add({ targets: this.pupImg, y: -14, scaleY: base * 1.06, scaleX: base * 0.95, duration: 120, yoyo: true, ease: 'Sine.Out', repeat: Math.floor(dur / 240),
       onRepeat: () => this.pupImg.setScale(base * 1.08, base * 0.9) });
+    this.tweens.add({ targets: this.pupImg, angle: { from: -6, to: 6 }, duration: 120, yoyo: true, repeat: Math.floor(dur / 240), onComplete: () => this.pupImg.setAngle(0) }); // waddle in step with the hop
   }
   private begin() {
     popBanner(this, 'BONK THE PUPPY!', 800, 0x3a86ff);
@@ -284,8 +285,10 @@ export class FootballScene extends Phaser.Scene {
   finish(win: boolean) {
     const s = this.st; if (s.over) return; s.over = true; s.ready = false; this.moveTw?.stop();
     (window as any).__pr.ended = win ? 'win' : 'lose';
-    if (win) { this.pupImg.setTexture('pup_dizzy'); this.tweens.add({ targets: this.pupImg, angle: 90, duration: 500, ease: 'Bounce.Out' }); }
-    else { this.pupImg.setTexture('pup_hearts'); }
+    this.tweens.killTweensOf(this.pupImg); this.pupImg.setY(0).setScale(this.pupImg.getData('b') ?? this.pupImg.scaleX); // stop the trot hop/waddle so he doesn't freeze mid-hop
+    if (win) { this.pupImg.setTexture('pup_dizzy'); this.tweens.add({ targets: this.pupImg, angle: 90, duration: 500, ease: 'Bounce.Out' });
+      this.gla.setMood('happy').act([{ dur: 0.16, to: { ls: -160, le: -20, rs: 160, re: 20, dy: -16, sq: 0.06 }, ease: Phaser.Math.Easing.Back.Out }, { dur: 0.14, to: { ls: -140, rs: 140, dy: -2 } }, { dur: 0.14, to: { ls: -165, rs: 165, dy: -14 } }, { dur: 0.14, to: { ls: -150, rs: 150, dy: -4 } }], true); } // Glassia cheers instead of freezing
+    else { this.pupImg.setAngle(0).setTexture('pup_hearts'); this.gla.setMood('dizzy').act([{ dur: 0.25, to: { ls: 10, le: 20, rs: -10, re: -20, lean: 6, sq: -0.04, dy: 6, tilt: 8 } }], true); } // shrug-slump
     this.time.delayedCall(900, () => endCard(this, 'Glassia', 1, win, s.score, `${s.hits} bonk${s.hits === 1 ? '' : 's'} on Puppy`));
   }
 }

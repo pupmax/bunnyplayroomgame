@@ -17,27 +17,29 @@ import { LINES, pick } from '../lines';
 import { Hud, impact } from '../systems/level';
 import { HeroRig, pupFlail } from '../systems/rigs';
 
-// Tuning (sim-checked in pups3-out/midnight/sim.mjs: avg bot ~66%)
-const TIME = 50, NEED = 7, SPEED = 280, RAMP = 0.3, MX = 190;
-const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.55;
+// Tuning (sim-checked in pups3-out/midnight/sim.mjs: avg bot ~66%; eased in audit27: NEED 7->5, CHIM_P .55->.40, chimney stun 1.0->0.7 s, -2 s->-1 s, 0.8 s immunity)
+const TIME = 50, NEED = 5, SPEED = 280, RAMP = 0.3, MX = 190;
+const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.40;
+const STUN = 0.7, BONK_S = 1, IMMUNE = 0.8; // audit27: shorter chimney stun, -1 s, then 0.8 s chimney immunity (blinking) so bonks can't chain
 const MOON_SNATCH = 35, MOON_CLOSE = 15, MOON_T = 5, HIGH_DIVE_Y = 470, CHAIN_T = 7;
 const MOON_X = 540, MOON_Y = 260;
+const HANG = { x: -4, y: 92 }; // snatched Puppy's feet sit this far below Midnight's talon grip (bird space; matches Pups 3's tuned spot at the clenched pose)
 interface Roof { x: number; w: number; top: number; chim?: number; close?: boolean; lamp?: { on: boolean; t: number; ang: number }; ant?: number; seed: number }
 interface Streak { x: number; y: number; len: number; a: number }
 interface Pigeon { img: Phaser.GameObjects.Image; x: number; y: number; hit: boolean }
 
 export class DiveScene extends Phaser.Scene {
-  st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
+  st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
   private roofs: Roof[] = []; private g!: Phaser.GameObjects.Graphics; private beams!: Phaser.GameObjects.Graphics; private fx!: Phaser.GameObjects.Graphics;
   private bird!: Phaser.GameObjects.Container; private rig!: HeroRig; private flapT = 0; private wings!: Phaser.GameObjects.Graphics; private aura!: Phaser.GameObjects.Image;
-  private pup?: { c: Phaser.GameObjects.Container; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; x: number; roof: Roof; done: boolean; hop: number; hopT: number; hopS: number };
+  private pup?: { c: Phaser.GameObjects.Container; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; x: number; roof: Roof; done: boolean; hop: number; hopT: number; hopS: number; carry?: number; cx0?: number; cy0?: number };
   private hud!: Hud; private far!: Phaser.GameObjects.TileSprite; private mid!: Phaser.GameObjects.TileSprite; private clouds: Phaser.GameObjects.Image[] = [];
   private moonGlow!: Phaser.GameObjects.Image; private meter!: Phaser.GameObjects.Graphics; private meterTxt!: Phaser.GameObjects.Text;
   private streaks: Streak[] = []; private pigeons: Pigeon[] = []; private pigT = 3; private trailT = 0; private freeze = 0; private lastSnatch = -99; private zoom0 = 1;
   constructor() { super('Dive'); }
   create() {
     setupCamera(this); this.zoom0 = this.cameras.main.zoom; this.cameras.main.fadeIn(250); setPageBg(0x0b0a24, 0x241f4a);
-    this.st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
+    this.st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
     this.makeTextures();
     art(this, 0, 0, 'bg_night'); this.pup = undefined; this.pigeons = []; this.pigT = 3; this.freeze = 0; this.lastSnatch = -99; this.streaks = [];
     this.moonGlow = this.add.image(MOON_X, MOON_Y, 'dv_glow').setDepth(1).setScale(2.2).setAlpha(0.25).setBlendMode(Phaser.BlendModes.ADD);
@@ -130,7 +132,8 @@ export class DiveScene extends Phaser.Scene {
     while (this.roofs.length && this.roofs[0].x + this.roofs[0].w < -60) this.roofs.shift();
     const last = this.roofs[this.roofs.length - 1]; if (last.x + last.w < W + 300) this.addRoof(last.x + last.w + Phaser.Math.Between(0, 60));
     // flight
-    if (s.stun > 0) { s.stun -= dt; s.vy = Math.min(s.vy + 900 * dt, 300); }
+    if (s.immune > 0) s.immune -= dt;
+    if (s.stun > 0) { s.stun -= dt; s.vy = Math.min(s.vy + 900 * dt, 300); if (s.stun <= 0) s.immune = IMMUNE; }
     else if (s.hold) s.vy = Math.max(-420, s.vy - 1500 * dt); else s.vy = Math.min(760, s.vy + 1250 * dt);
     s.y += s.vy * dt; if (s.y < 380) { s.y = 380; s.vy = 0; }
     const under = this.roofs.find(r => MX > r.x && MX < r.x + r.w); const floor = under ? under.top : H - 60;
@@ -138,7 +141,7 @@ export class DiveScene extends Phaser.Scene {
     const moonOn = s.moonT > 0; if (moonOn) { s.moonT -= dt; if (s.moonT <= 0) { s.moonT = 0; floatText(this, MX + 80, s.y - 120, 'moonlight fades…', '#c9c4ff', 26); } }
     // chimney (bonk or CLOSE call)
     for (const r of this.roofs) if (r.chim !== undefined) { const cx = r.x + r.chim;
-      if (s.stun <= 0 && MX + 40 > cx && MX - 40 < cx + 60 && s.y + 20 > r.top - 110) this.bonk(cx + 30, r.top - 110);
+      if (s.stun <= 0 && s.immune <= 0 && MX + 40 > cx && MX - 40 < cx + 60 && s.y + 20 > r.top - 110) this.bonk(cx + 30, r.top - 110);
       else if (!r.close && cx + 60 < MX - 40 && cx + 60 > MX - 60) { r.close = true; if (s.stun <= 0 && s.y + 20 > r.top - 170) this.closeCall(cx + 30, r.top - 120); } }
     // flashlights
     for (const r of this.roofs) if (r.lamp) { const L = r.lamp; L.t += dt; if (L.t > (L.on ? 1.8 : 1.4)) { L.t = 0; L.on = !L.on; } L.ang = Math.sin(this.time.now / 600 + r.x) * 0.5;
@@ -164,7 +167,7 @@ export class DiveScene extends Phaser.Scene {
   }
   private render(dt: number, live: boolean) {
     const s = this.st, now = this.time.now; const moonOn = s.moonT > 0;
-    this.bird.setPosition(MX, s.y).setAngle(Phaser.Math.Clamp(s.vy / 14, -20, 40) + (s.stun > 0 ? Math.sin(now / 40) * 20 : 0));
+    this.bird.setAlpha(s.immune > 0 ? 0.45 + 0.55 * Math.abs(Math.cos(now / 60)) : 1).setPosition(MX, s.y).setAngle(Phaser.Math.Clamp(s.vy / 14, -20, 40) + (s.stun > 0 ? Math.sin(now / 40) * 20 : 0));
     if (this.rig.mood !== (s.stun > 0 ? 'dizzy' : 'smug')) this.rig.setMood(s.stun > 0 ? 'dizzy' : 'smug');
     // limbs: arms beat with the wings; diving = arms swept back + talons thrust forward-down; stunned = floppy
     if (!this.rig.busy) { const f = Math.sin(this.flapT), dive = s.vy > 220, P = this.rig.pose as Record<string, number>;
@@ -173,6 +176,7 @@ export class DiveScene extends Phaser.Scene {
         : { ls: -95 - f * 45, le: -20 + f * 20, rs: 95 + f * 45, re: 20 - f * 20, lh: -8, lk: 45, rh: 8, rk: 45, lean: 0, sq: f * 0.03, dy: -f * 3, tilt: 0 };
       const k = 1 - Math.exp(-dt * 16), nx: Record<string, number> = {}; for (const key in T) nx[key] = P[key] + (T[key] - P[key]) * k; this.rig.setPose(nx); }
     this.aura.setAlpha(moonOn ? 0.55 + Math.sin(now / 90) * 0.2 : 0);
+    this.carryPup(now);
     // dive afterimages
     if (live) { this.trailT -= dt; if (s.vy > 350 && this.trailT <= 0) { this.trailT = 0.05;
       const gh = this.add.image(MX, s.y + 60 - 188 * 0.62, this.rig.head.texture.key).setScale(this.rig.head.scaleX * 0.62, this.rig.head.scaleY * 0.62).setDepth(28).setAlpha(0.4).setTint(moonOn ? 0xfff4c0 : 0x8a7aff).setAngle(this.bird.angle);
@@ -233,6 +237,19 @@ export class DiveScene extends Phaser.Scene {
     this.tweens.add({ targets: img, scaleY: 0.8, yoyo: true, repeat: -1, duration: 110 });
     this.pigeons.push({ img, x: W + 60, y, hit: false });
   }
+  /** Snatched Puppy rides in Midnight's talons (follows the bird up the rebound, dangling) instead of tweening to a fixed spot, then gets flung away.
+   *  The grip is the real talon point from the rig (HeroRig.point() now goes through the bird container's tilt), Puppy hangs from it. */
+  private carryPup(now: number) {
+    const p = this.pup; if (!p || !p.done || !p.carry) return; const s = this.st;
+    const lf = this.rig.point('lf'), rf = this.rig.point('rf'), gx = (lf.x + rf.x) / 2, gy = (lf.y + rf.y) / 2; // between the two clenched feet
+    // Puppy's container origin is at his feet, so he hangs HANG px below the grip (grabbed by the scruff); the hang direction only follows a
+    // little of the bird's tilt (he dangles, gravity wins), and the position is smoothed so the post-snatch tilt shake doesn't jitter him
+    const r = Phaser.Math.DegToRad(this.bird.angle * 0.3), tx = gx + HANG.x * Math.cos(r) - HANG.y * Math.sin(r), ty = gy + HANG.x * Math.sin(r) + HANG.y * Math.cos(r);
+    const k = Math.min(1, (now - p.carry) / 110), e = 1 - (1 - k) * (1 - k);
+    p.cx0! += (tx - p.cx0!) * 0.35 * e; p.cy0! += (ty - p.cy0!) * 0.35 * e; if (k < 1) { p.cx0! += (tx - p.cx0!) * e * 0.3; p.cy0! += (ty - p.cy0!) * e * 0.3; }
+    p.c.setPosition(p.cx0!, p.cy0!).setAngle(Math.sin(now / 85) * 10 * k); // legs dangle-swing under the grip
+    if (now - p.carry > 420) { p.carry = 0; this.tweens.add({ targets: p.c, x: -150, y: 380, angle: -360, duration: 600, ease: 'Quad.In', onComplete: () => { p.c.destroy(); if (this.pup === p) this.pup = undefined; s.pupT = 1.2; } }); }
+  }
   private snatch() {
     const s = this.st, p = this.pup!; p.done = true; s.catches++;
     const nowS = this.time.now / 1000; s.combo = nowS - this.lastSnatch <= CHAIN_T ? s.combo + 1 : 1; this.lastSnatch = nowS;
@@ -253,7 +270,7 @@ export class DiveScene extends Phaser.Scene {
     // talon grab: legs snap forward and clench shut around him, wings/arms flare
     this.rig.act([{ dur: 0.05, to: { lh: 80, lk: -10, rh: 95, rk: -15, ls: -130, rs: 130 } }, { dur: 0.08, to: { lh: 60, lk: 95, rh: 75, rk: 100, sq: -0.06 }, ease: Phaser.Math.Easing.Back.Out },
       { dur: 0.45, to: { lh: 55, lk: 100, rh: 70, rk: 105, ls: -110, rs: 110 } }], false, 0.25);
-    p.c.setDepth(31); this.tweens.add({ targets: p.c, x: MX + 10, y: s.y + 170, duration: 120, onComplete: () => this.tweens.add({ targets: p.c, x: -150, y: 380, angle: -360, duration: 900, ease: 'Quad.In', onComplete: () => { p.c.destroy(); this.pup = undefined; s.pupT = 1.2; } }) });
+    p.c.setDepth(31); p.carry = this.time.now; p.cx0 = p.c.x; p.cy0 = p.c.y; // carried in the talons for a beat (render() keeps him there), then flung off-screen
     s.vy = -500; say(this, 420, 520, pick(LINES.dive), 22, 1200);
     if (s.catches >= NEED) this.time.delayedCall(700, () => this.finish(true));
   }
@@ -273,8 +290,8 @@ export class DiveScene extends Phaser.Scene {
     this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' }); this.tweens.add({ targets: t, y: t.y - 110, alpha: 0, delay: 500, duration: 600, ease: 'Sine.easeIn', onComplete: () => t.destroy() });
   }
   private bonk(x: number, y: number) {
-    const s = this.st; s.stun = 1.0; s.vy = -200; s.combo = 0; s.time = Math.max(0, s.time - 2);
-    Fx.ouch(); this.cameras.main.shake(260, 0.016); flashVignette(this, 0xff3b3b, 0.55); this.penalty(2, 0); floatText(this, x, y - 40, 'BONK!', '#ffffff', 34); say(this, 420, 520, pick(LINES.diveBonk), 22, 1100);
+    const s = this.st; s.stun = STUN; s.vy = -200; s.combo = 0; s.time = Math.max(0, s.time - BONK_S);
+    Fx.ouch(); this.cameras.main.shake(260, 0.016); flashVignette(this, 0xff3b3b, 0.55); this.penalty(BONK_S, 0); floatText(this, x, y - 40, 'BONK!', '#ffffff', 34); say(this, 420, 520, pick(LINES.diveBonk), 22, 1100);
     for (let i = 0; i < 6; i++) { const br = this.add.rectangle(x, y, 16, 10, 0xa8443a).setStrokeStyle(2, 0x2a0a08).setDepth(29);
       this.tweens.add({ targets: br, x: x + Phaser.Math.Between(-120, 60), y: y + Phaser.Math.Between(60, 200), angle: Phaser.Math.Between(-360, 360), alpha: 0, duration: 700, ease: 'Quad.easeIn', onComplete: () => br.destroy() }); }
   }

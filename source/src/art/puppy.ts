@@ -68,7 +68,9 @@ function ear(side: 'L' | 'R', rot: number, b: number): string {
 const EYES: [number, number][] = [[73, 103], [127, 103]];
 
 function eyes(face: PupFace): string {
-  if (face === 'hearts') return heart(73, 103, 32, '#ff3b6b', OUT, 3) + heart(127, 103, 32, '#ff3b6b', OUT, 3);
+  // 'hearts' frame = starry-eyed / stunned (Marc: no heart eyes on Puppy; little hearts or stars may pop from his HEAD instead)
+  if (face === 'hearts') return EYES.map(([x, y]) => star(x, y, 15.5, '#ffd84d', OUT, 3) +
+    `<circle cx="${x - 3.5}" cy="${y - 5}" r="2.4" fill="#fff" opacity="0.9"/>`).join('');
   if (face === 'dizzy') return EYES.map(([x, y]) =>
     `<path d="M${x} ${y} m-1 0 a2 2 0 1 1 3 1 a5 5 0 1 1 -7 -4 a9 9 0 1 1 3 13" fill="none" stroke="${EYE}" stroke-width="3.3" stroke-linecap="round"/>`).join('');
   if (face === 'panic') return EYES.map(([x, y]) =>
@@ -92,7 +94,8 @@ function mouth(face: PupFace): string {
   if (face === 'panic') return `<ellipse cx="100" cy="133" rx="9" ry="11" fill="#5a1d14" stroke="${OUT}" stroke-width="3"/>` +
     `<ellipse cx="100" cy="138" rx="5.5" ry="4" fill="#ff7a8a"/>`;
   if (face === 'dizzy') return `<path d="M89 130 q3.5 -4 7 0 q3.5 4 7 0 q3.5 -4 7 0" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`;
-  if (face === 'hearts') return `<path d="M91 125 q4.5 8 9 1 q4.5 7 9 -1" fill="#ff7a8a" stroke="${OUT}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+  if (face === 'hearts') return `<path d="M90 126 Q100 124 110 126 Q109 141 100 141 Q91 141 90 126 Z" fill="#5a1d14" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<ellipse cx="102" cy="136.5" rx="5.5" ry="3.6" fill="#ff7a8a"/>`; // goofy stunned gape
   return `<path d="M93 124 q3.5 5 7 0.5 q3.5 4.5 7 -0.5" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`;
 }
 
@@ -135,8 +138,8 @@ export function puppySVG(pose: Partial<PupPose>, pxPerUnit: number): string {
   s += head(b);
   s += `<g transform="translate(0 ${b})">`;
   s += `<ellipse cx="100" cy="118" rx="30" ry="20" fill="url(#glow)"/>`;           // very subtle muzzle light
-  s += `<ellipse cx="58" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="${f === 'hearts' ? 1 : 0.8}"/>` +
-       `<ellipse cx="142" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="${f === 'hearts' ? 1 : 0.8}"/>`;
+  s += `<ellipse cx="58" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="0.8"/>` +
+       `<ellipse cx="142" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="0.8"/>`;
   s += brows(f) + eyes(f);
   s += `<path d="M91 112 Q100 106 109 112 Q108 120 100 121 Q92 120 91 112 Z" fill="#24130b"/>` +
        `<ellipse cx="97" cy="112" rx="2.6" ry="1.5" fill="#fff" opacity="0.7"/>`;

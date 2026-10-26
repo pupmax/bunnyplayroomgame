@@ -1,6 +1,6 @@
 // Nana ACORN BARRAGE: you are Nana on a branch. Drag to aim, release to fling acorns at Puppy below.
 // Puppy runs, hops, pops an umbrella and hides under leaves. Every 5th acorn is GOLDEN (pierces cover, 2 hits), and a
-// 3-hit STREAK also earns a golden one. 18 acorns, 45s, 10 hits wins.
+// 3-hit STREAK also earns a golden one. 24 acorns, 45s, 10 hits wins.
 // Depth: hits leave Puppy DIZZY for ~1s (no hop -> line up a follow-up); hold your aim for FOCUS (Puppy slows to half
 // speed while the focus meter lasts, hits refill it); escalating phases: 4+ hits = WIND (acorns drift, compensate),
 // 7+ hits = CARDBOARD DECOY Puppy (hitting it wastes the acorn). Tuned with pups3-out/nana/sim.mjs (~65% avg-bot wins).
@@ -28,17 +28,18 @@ export class AcornScene extends Phaser.Scene {
   private hud!: Phaser.GameObjects.Text; private timeT!: Phaser.GameObjects.Text; private bar!: Phaser.GameObjects.Graphics; private pipKey = ''; private moveTw?: Phaser.Tweens.Tween;
   private ring!: Phaser.GameObjects.Graphics; private ringT!: Phaser.GameObjects.Text; private ringShown = 0; private windG!: Phaser.GameObjects.Graphics; private windT!: Phaser.GameObjects.Text;
   private decoy?: Phaser.GameObjects.Container; private layers: { o: any; k: number; bx: number }[] = []; private parX = 0; private shine!: Phaser.GameObjects.Text;
-  private dragging = false; private dragT = 0; private slowT = 0; private wasFocus = false; private ghost?: Phaser.GameObjects.Graphics; private ghostImg?: Phaser.GameObjects.Image; private lastPup = { x: 360, y: 900 }; private pupV = { x: 0, y: 0 }; private roamId = 0; private aimPt = { x: 360, y: 900 };
+  private dragging = false; private dragT = 0; private slowT = 0; private wasFocus = false; private ghost?: Phaser.GameObjects.Graphics; private ghostImg?: Phaser.GameObjects.Image; private lastPup = { x: 360, y: 900 }; private pupV = { x: 0, y: 0 }; private roamId = 0; private wadTw?: Phaser.Tweens.Tween; private aimPt = { x: 360, y: 900 };
   constructor() { super('Acorn'); }
   create() {
     this.ghost = undefined; this.ghostImg = undefined; this.slowT = 0; this.wasFocus = false;
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x9fe0ff, 0x3a8f2a); this.tweens.timeScale = 1;
     this.st = { time: TIME, hits: 0, shots: 0, score: 0, running: false, over: false, cool: 0, umbrella: false, hiding: -1, golden: false, streak: 0, dizzy: 0, focus: FOCUS_MAX, wind: 0, phase: 1, inFlight: 0 };
-    this.layers = []; this.parX = 0; this.ringShown = 0; this.decoy = undefined; this.dragging = false;
+    this.layers = []; this.parX = 0; this.ringShown = 0; this.decoy = undefined; this.dragging = false; this.wadTw = undefined;
     art(this, 0, 0, 'bg_forest');
     this.buildForest();
     this.nana = new HeroRig(this, 'Nana', 330, 330, 0.95, { tail: true }).setDepth(30).setPose({ lh: -25, lk: 30, rh: 25, rk: -30 });
     this.held = art(this, LAUNCH.x, LAUNCH.y - 30, 'acorn', 0.8).setDepth(31); this.held.setData('s0', this.held.scaleX);
+    this.nana.held = this.held; // the ready acorn rides in Nana's throwing paw (it used to float on the branch beside her)
     this.shine = txt(this, LAUNCH.x + 22, LAUNCH.y - 60, '✨', 30).setDepth(32).setVisible(false);
     this.tweens.add({ targets: this.shine, angle: 360, scale: { from: 0.7, to: 1.3 }, yoyo: true, repeat: -1, duration: 420 });
     art(this, 650, 520, 'bun_bust_wink', 0.4).setDepth(5);
@@ -90,9 +91,9 @@ export class AcornScene extends Phaser.Scene {
       this.tweens.add({ targets: l, y: 1200, x: l.x + drift, angle: Phaser.Math.Between(-360, 360), duration: Phaser.Math.Between(3000, 4500), onComplete: () => l.destroy() }); } });
   }
   private drawAim(x: number, y: number) {
-    if (!this.st.running) return; y = Math.max(y, 560); this.aimPt = { x, y };
+    if (!this.st.running) return; y = Math.max(y, 560); this.aimPt = { x, y }; const L = this.nana.point('rp'); // preview arc starts at the paw
     const g = this.aim.clear(); const col = this.st.golden ? 0xffd21f : 0xffffff, w = this.st.wind;
-    for (let i = 1; i < 12; i++) { const t = i / 12; const px = LAUNCH.x + (x - LAUNCH.x) * t + w * t * t, py = LAUNCH.y + (y - LAUNCH.y) * t - Math.sin(t * Math.PI) * 140; g.fillStyle(0x22252b, 0.9).fillCircle(px, py, 11).fillStyle(col, 1).fillCircle(px, py, 8); }
+    for (let i = 1; i < 12; i++) { const t = i / 12; const px = L.x + (x - L.x) * t + w * t * t, py = L.y + (y - L.y) * t - Math.sin(t * Math.PI) * 140; g.fillStyle(0x22252b, 0.9).fillCircle(px, py, 11).fillStyle(col, 1).fillCircle(px, py, 8); }
     const r = this.st.golden ? GOLD_R : HIT_R;
     g.lineStyle(11, 0x22252b, 0.9).strokeCircle(x, y, r * 0.8).lineStyle(7, col, 1).strokeCircle(x, y, r * 0.8).lineBetween(x - r - 14, y, x - r + 14, y).lineBetween(x + r - 14, y, x + r + 14, y);
     if (w) g.fillStyle(0x7fd8ff, 0.8).fillCircle(x + w, y, 8); // where the wind will actually carry it
@@ -122,10 +123,12 @@ export class AcornScene extends Phaser.Scene {
       this.time.delayedCall(hideAt >= 0 ? Phaser.Math.Between(1000, 1600) : Phaser.Math.Between(700, 1700) / fast, () => id === this.roamId && this.roam());
     } });
     this.tweens.add({ targets: this.pupImg, y: -14, scaleY: b * 1.05, scaleX: b * 0.96, duration: 110, delay: 70, yoyo: true, repeat: Math.floor(dur / 220) });
+    this.wadTw?.stop(); this.wadTw = this.tweens.add({ targets: this.pupImg, angle: { from: -6, to: 6 }, duration: 110, delay: 70, yoyo: true, repeat: Math.floor(dur / 220), onComplete: () => this.pupImg.setAngle(0), onStop: () => this.pupImg.setAngle(0) }); // waddle in step with the hop
   }
   update(_t: number, dms: number) {
     const s = this.st; const dt = Math.min(dms, 250) / 1000;
     this.updateParallax(dt); this.drawRing(dt);
+    this.shine.setPosition(this.held.x + 22, this.held.y - 30); // golden sparkle stays on the acorn in her paw
     if (!s.running || s.over) return;
     s.time -= dt; s.cool -= dt; s.dizzy = Math.max(0, s.dizzy - dt);
     // FOCUS: holding the aim slows Puppy's clock while the meter lasts
@@ -184,8 +187,9 @@ export class AcornScene extends Phaser.Scene {
   fling(x: number, y: number) {
     const s = this.st; if (!s.running || s.over || s.cool > 0 || s.shots >= THROWS) { this.nana.act([], false, 0.2); return; } y = Math.max(y, 560);
     s.cool = 0.38; s.shots++; s.inFlight++; const gold = s.golden; s.golden = false;
+    const L = this.nana.point('rp'); // released from the paw (cocked behind her head), not from a fixed spot on the branch
     Fx.whoosh(); this.throwArm(x);
-    const a = art(this, LAUNCH.x, LAUNCH.y, gold ? 'gacorn' : 'acorn', gold ? 1.1 : 0.8).setDepth(45); const as = a.scaleX;
+    const a = art(this, L.x, L.y, gold ? 'gacorn' : 'acorn', gold ? 1.1 : 0.8).setDepth(45); const as = a.scaleX;
     if (s.shots % 5 === 4) this.giveGolden('5th acorn');
     this.held.setTexture(s.golden ? 'gacorn' : 'acorn').setScale(0);
     if (s.shots < THROWS) this.tweens.add({ targets: this.held, scale: this.held.getData('s0'), delay: 200, duration: 180, ease: 'Back.Out' });
@@ -198,9 +202,9 @@ export class AcornScene extends Phaser.Scene {
       const dx = gx - (x + s.wind), dy = gy - y, d = Math.hypot(dx, dy);
       if (d > r * 0.3 && d < r + ASSIST) { const k = (d - r * 0.3) / d; x += dx * k; y += dy * k; } }
     const o = { t: 0 }, w = s.wind, ex = x + w;
-    const trail = this.add.graphics().setDepth(44); let lx = LAUNCH.x, ly = LAUNCH.y;
+    const trail = this.add.graphics().setDepth(44); let lx = L.x, ly = L.y;
     this.tweens.add({ targets: o, t: 1, duration: FLIGHT, onUpdate: () => {
-      const t = o.t, px = LAUNCH.x + (x - LAUNCH.x) * t + w * t * t, py = LAUNCH.y + (y - LAUNCH.y) * t - Math.sin(t * Math.PI) * 140;
+      const t = o.t, px = L.x + (x - L.x) * t + w * t * t, py = L.y + (y - L.y) * t - Math.sin(t * Math.PI) * 140;
       trail.lineStyle(gold ? 10 : 6, gold ? 0xffd21f : 0xffffff, 0.5).lineBetween(lx, ly, px, py); lx = px; ly = py;
       const sc = 1 + Math.sin(t * Math.PI) * 0.35; a.setPosition(px, py).setAngle(t * 720).setScale(as * sc, as * sc * (t > 0.85 ? 0.85 : 1));
       if (gold && Math.random() < 0.6) sparks(this, a.x, a.y, 1);
@@ -291,7 +295,7 @@ export class AcornScene extends Phaser.Scene {
     for (let i = 0; i < THROWS; i++) { const x = 146 + i * 24.5; g.fillStyle(i < left ? (i === left - 1 && s.golden ? 0xffd21f : 0xc77a2e) : 0x553344, 1).fillEllipse(x, 497, 16, 20); if (i < left) g.fillStyle(0x6b4220, 1).fillRect(x - 8, 486, 16, 6); }
   }
   finish(win: boolean) {
-    const s = this.st; if (s.over) return; s.over = true; s.running = false; this.moveTw?.stop(); this.roamId++; this.dragging = false; this.aim.clear();
+    const s = this.st; if (s.over) return; s.over = true; s.running = false; this.moveTw?.stop(); this.wadTw?.stop(); this.roamId++; this.dragging = false; this.aim.clear();
     (window as any).__pr.ended = win ? 'win' : 'lose';
     if (win) { this.pupImg.setTexture('pup_dizzy'); this.tweens.add({ targets: this.pupImg, angle: 90, duration: 500, ease: 'Bounce.Out' }); popBanner(this, 'PUPPY IS BONKED!', 600, 0x2fbf5a, 800); this.cameras.main.shake(300, 0.015); }
     else { this.pupImg.setTexture('pup_hearts'); if (s.shots < THROWS) popBanner(this, 'TIME!', 600, 0x6b4cc9, 800); }

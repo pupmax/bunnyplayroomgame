@@ -5,8 +5,8 @@
 // misses, wobbling banana peels, squash/stars on hits, umbrella BOING + POP.
 // Depth: item variety (🐟 SPLAT dazes Puppy longer, 📦 big box = wider hit but slower fall), umbrella pops after 2 blocks,
 // CHAIN multiplier for bonks without a miss, phase 2 (2 bonks) Puppy sprints more, phase 3 (4 bonks) he sometimes
-// sidesteps a falling item. Pups' tuning kept (TIME 50, FALL 420, HIT 75); NEED 6 -> 11 because the sim
-// (pups3-out/iris/sim.mjs) had the avg bot at ~99% with 6; 11 gives ~62%.
+// sidesteps a falling item. Now: TIME 55, NEED 7, FALL 420, HIT 75, a miss costs 4 s (MISS_T, audit27: was 6) + a 1.5 s reload.
+// (Earlier sim history in pups3-out/iris/sim.mjs: NEED went 6 -> 11 -> 7.)
 import Phaser from 'phaser';
 import { GAME_W as W } from '../config';
 import { setupCamera, worldPoint } from '../systems/resolution';
@@ -20,7 +20,7 @@ import { LINES, pick } from '../lines';
 import { Hud, impact } from '../systems/level';
 import { HeroRig, pupFlail } from '../systems/rigs';
 
-const MISS_LOCK = 1.5, MISS_T = 6;
+const MISS_LOCK = 1.5, MISS_T = 4;
 const TIME = 55, NEED = 7, GROUND = 1080, LEDGE = 330, FALL = 420, HIT = 75;
 const PERF = 22, BOX_FALL = 600, BOX_HIT = 100, FISH_DAZE = 1.4, DODGE_P = 0.3, UMB_POP = 2, PEEL_T = 6;
 const ITEMS = ['🥫', '🍌', '👟', '🐟', '📦'];
@@ -88,7 +88,10 @@ export class TrashScene extends Phaser.Scene {
     s.modeT -= dt; if (s.modeT <= 0) this.newMode();
     const speed = s.mode === 'run' ? 330 : s.mode === 'walk' ? 140 : 0;
     s.px += Math.sign(s.pv) * speed * dt; if (s.px > 640) { s.px = 640; s.pv = -1; } if (s.px < 80) { s.px = 80; s.pv = 1; }
-    this.pup.setX(s.px); if (speed) this.pupImg.setFlipX(s.pv > 0).setY(-Math.abs(Math.sin(now / (s.mode === 'run' ? 50 : 90))) * 10);
+    this.pup.setX(s.px);
+    if (speed) { const per = s.mode === 'run' ? 50 : 90; this.pupImg.setFlipX(s.pv > 0).setY(-Math.abs(Math.sin(now / per)) * 10);
+      if (!this.tweens.isTweening(this.pupImg)) this.pupImg.setAngle(Math.sin(now / per) * (s.mode === 'run' ? 9 : 6)); } // waddle: rocks foot to foot in step with the hop
+    else if (!this.tweens.isTweening(this.pupImg)) { const k = 1 - Math.exp(-dt * 18); this.pupImg.setY(this.pupImg.y * (1 - k)).setAngle(this.pupImg.angle * (1 - k)); } // stopping: land the hop instead of freezing mid-air
     this.dazeStars.setText(s.mode === 'stop' && this.pupImg.texture.key === 'pup_dizzy' ? '★ ✦ ★' : '').setAngle(Math.sin(now / 100) * 15);
     for (const p of [...this.peels]) { p.t -= dt; if (p.t < 1.2) p.o.setAlpha(0.4 + 0.6 * Math.abs(Math.sin(now / 80))); if (p.t <= 0) { p.o.destroy(); this.peels.splice(this.peels.indexOf(p), 1); continue; }
       if (speed && !s.umbrella && Math.abs(p.x - s.px) < 40) { this.tweens.killTweensOf(p.o); p.o.destroy(); this.peels.splice(this.peels.indexOf(p), 1); this.hit(s.px, true); } }
@@ -122,10 +125,14 @@ export class TrashScene extends Phaser.Scene {
     this.steam = this.steam.filter(p => (p.a -= dt * 0.25) > 0); for (const p of this.steam) { p.y -= 50 * dt; p.r += 18 * dt; p.x += Math.sin(now / 400 + p.r) * 0.4; g.fillStyle(0xd8d4ec, p.a).fillCircle(p.x, p.y, p.r); }
     g.fillStyle(0x22252b, 1).fillEllipse(320, GROUND + 34, 90, 18).lineStyle(3, 0x55506a, 1).strokeEllipse(320, GROUND + 34, 90, 18);
   }
+  /** small hearts/stars popping up from Puppy's head (never heart EYES, never from the heroine) */
+  private popHead(n = 3) { for (let i = 0; i < n; i++) { const t = txt(this, (i - (n - 1) / 2) * 26, -175, i % 2 ? '★' : '♥', 24, i % 2 ? '#ffdf6b' : '#ff6b9a', '#22252b', 4).setScale(0.3);
+    this.pup.add(t); this.tweens.add({ targets: t, scale: 1, y: -240 - (i % 2) * 18, x: t.x * 1.6, duration: 480, delay: i * 90, ease: 'Back.Out' });
+    this.tweens.add({ targets: t, alpha: 0, delay: 600 + i * 90, duration: 280, onComplete: () => t.destroy() }); } }
   private newMode() {
     const s = this.st; this.umb.setVisible(false); s.umbrella = false; s.umbHits = 0; this.pupImg.setTexture('pup_idle');
     const r = Math.random(), runP = s.phase >= 2 ? 0.34 : 0.26;
-    if (r < 0.18) { s.mode = 'stop'; s.modeT = Phaser.Math.FloatBetween(0.6, 1.2); this.pupImg.setTexture('pup_hearts'); if (Math.random() < 0.4) this.talk(s.px, GROUND - 230, pick(LINES.puppyGag), 20, 900); }
+    if (r < 0.18) { s.mode = 'stop'; s.modeT = Phaser.Math.FloatBetween(0.6, 1.2); this.pupImg.setTexture('pup_hearts'); this.popHead(); if (Math.random() < 0.4) this.talk(s.px, GROUND - 230, pick(LINES.puppyGag), 20, 900); }
     else if (r < 0.36) { s.mode = 'stop'; s.umbrella = true; s.modeT = Phaser.Math.FloatBetween(1.2, 2); this.umb.setVisible(true).setScale(this.umb.scaleX, 0.1); this.tweens.add({ targets: this.umb, scaleY: this.umb.scaleX, duration: 180, ease: 'Back.Out' }); }
     else if (r < 0.36 + runP) { s.mode = 'run'; s.modeT = Phaser.Math.FloatBetween(0.6, 1.1); this.pupImg.setTexture('pup_panic'); if (Math.random() < 0.5) s.pv = -s.pv; }
     else { s.mode = 'walk'; s.modeT = Phaser.Math.FloatBetween(1, 2); if (Math.random() < 0.35) s.pv = -s.pv; }

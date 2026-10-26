@@ -1,5 +1,5 @@
 // BUNNY FINALE — LASSO ROUND-UP: you are Bunny. HOLD to spin the lasso and aim (crosshair follows your finger),
-// RELEASE when the spin dot is in the GREEN zone for a big loop. Puppy uses tricks from every level. Rope him 5 times in 60s.
+// RELEASE when the spin dot is in the GREEN zone for a big loop. Puppy uses tricks from every level. Rope him 5 times in 45s.
 import Phaser from 'phaser';
 import { leaveOnce } from '../systems/leave';
 import { GAME_W as W, GAME_H as H, COLORS } from '../config';
@@ -10,6 +10,7 @@ import { txt } from '../systems/fx';
 import { Fx, Sfx } from '../systems/audio';
 import { popBanner, say, floatText, tutorialCard, makePauseButton, pointerInPause, setPageBg } from '../systems/kit';
 import { LINES, pick } from '../lines';
+import { TESTER } from '../standalone';
 import { Hud, impact } from '../systems/level';
 import { Storage } from '../systems/storage';
 import { pupFlail } from '../systems/rigs';
@@ -50,9 +51,9 @@ class LassoBunny {
   }
   update(dt: number, twirl: boolean, phase: number) {
     this.t += dt; const p = this.p, br = Math.sin(this.t * 3.4);
-    if (twirl && !this.throwing) { // twirl overhead: hand circles the loop, elbow rolls with it, knees dip
+    if (twirl && !this.throwing) { // twirl: arm up and OUT beside her head (straight up put the paw on her face, rope out of her mouth), hand circles the loop, knees dip
       const a = phase * Math.PI * 2, k = 1 - Math.exp(-dt * 18);
-      p.sh += (178 + Math.cos(a) * 14 - p.sh) * k; p.el += (Math.sin(a) * 26 - p.el) * k; p.lean += (-5 + Math.sin(a) * 3 - p.lean) * k; p.kn += (14 - p.kn) * k; p.sq += (-0.03 - p.sq) * k;
+      p.sh += (TW_SH + Math.cos(a) * 10 - p.sh) * k; p.el += (TW_EL + Math.sin(a) * 18 - p.el) * k; p.lean += (-5 + Math.sin(a) * 3 - p.lean) * k; p.kn += (14 - p.kn) * k; p.sq += (-0.03 - p.sq) * k;
     } else if (!this.throwing) { const k = 1 - Math.exp(-dt * 8); p.sh += (20 + br * 4 - p.sh) * k; p.el += (-10 - p.el) * k; p.lean += (0 - p.lean) * k; p.kn += (6 - p.kn) * k; p.sq += (0 - p.sq) * k; }
     const breathe = this.throwing ? 0 : br * 0.02, bob = Math.abs(Math.sin(this.t * 3.4)) * 3;
     this.torso.setAngle(p.lean).setScale(1 - (p.sq + breathe) * 0.6, 1 + p.sq + breathe).setY(-38 * this.m - bob + p.kn * 0.4);
@@ -61,7 +62,8 @@ class LassoBunny {
   }
 }
 
-const TIME = 38, NEED = 6, HAND = { x: 230, y: 960 }, FLY = 420, HOME = 50, HOME_ROPES = 99, TRICK_CAP = 0.8, GRACE = 0.15;
+const TW_SH = 235, TW_EL = -25; // twirl arm: shoulder/elbow angles (180 = straight up, bigger = out to her right)
+const TIME = 45, NEED = 5, HAND = { x: 230, y: 960 }, FLY = 420, HOME = 50, HOME_ROPES = 99, TRICK_CAP = 0.8, GRACE = 0.15;
 type Trick = 'none' | 'hop' | 'umbrella' | 'decoy' | 'shadow' | 'crate';
 const CRATE = { x: 560, y: 1000 };
 
@@ -69,13 +71,13 @@ export class LassoScene extends Phaser.Scene {
   st = { time: TIME, ropes: 0, throws: 0, score: 0, running: false, over: false, hold: false, phase: 0, tx: 450, ty: 1050, flying: false, umbrella: false, hiding: false };
   private bunny!: LassoBunny; private loop!: Phaser.GameObjects.Graphics; private aim!: Phaser.GameObjects.Graphics; private meter!: Phaser.GameObjects.Graphics;
   private pup!: Phaser.GameObjects.Container; private pupImg!: Phaser.GameObjects.Image; private umb!: Phaser.GameObjects.Image; private decoy?: Phaser.GameObjects.Image;
-  private moveTw?: Phaser.Tweens.Tween; private roamId = 0; private hud!: Hud;
+  private moveTw?: Phaser.Tweens.Tween; private roamId = 0; private wadTw?: Phaser.Tweens.Tween; private hud!: Hud;
   private wasGreen = false; private peakQ = 0; private peakT = 0; private tick!: Phaser.GameObjects.Text; private gGlow!: Phaser.GameObjects.Arc; private dustT = 0; private lpx = 470; private lpy = 1120; private beams: Phaser.GameObjects.Graphics[] = [];
   constructor() { super('Lasso'); }
   create() {
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x3a1250, 0x8a4a1a);
     this.st = { time: TIME, ropes: 0, throws: 0, score: 0, running: false, over: false, hold: false, phase: 0, tx: 450, ty: 1050, flying: false, umbrella: false, hiding: false };
-    art(this, 0, 0, 'bg_stage'); this.wasGreen = false; this.beams = []; this.lpx = 470; this.lpy = 1120;
+    art(this, 0, 0, 'bg_stage'); this.wasGreen = false; this.beams = []; this.lpx = 470; this.lpy = 1120; this.wadTw = undefined;
     this.arena();
     art(this, W / 2, 470, 'pr_logo_glow', 0.9).setAlpha(0.9);
     ['Ruby', 'Glassia', 'Zoe', 'Nana', 'Midnight', 'Noir', 'Iris', 'Linye'].forEach((n, i) => { const h = art(this, 60 + i * 86, 780, `head_${n}_happy`, 0.3).setDepth(2); this.tweens.add({ targets: h, y: 765, yoyo: true, repeat: -1, duration: 300 + i * 30 }); });
@@ -97,10 +99,10 @@ export class LassoScene extends Phaser.Scene {
     this.roam();
     tutorialCard(this, 'bunny1', 'PLAYROOM RODEO!', ['You are BUNNY! 🐰 The grand finale!', 'HOLD to spin + aim, RELEASE to throw', 'Let go in the GREEN zone for a BIG loop', `Puppy knows tricks! Rope him ${NEED} times`], () => this.begin());
   }
-  private begin() { popBanner(this, 'FINAL ROUND!', 700, 0xe0243a); this.time.delayedCall(600, () => { this.talk( 400, 600, pick(LINES.start.Bunny), 22); this.st.running = true; }); }
+  private begin() { popBanner(this, 'FINAL ROUND!', 700, 0xe0243a); this.time.delayedCall(600, () => { this.talk( 400, 600, pick(TESTER ? LINES.startBunnyTest : LINES.start.Bunny), 22); this.st.running = true; }); }
   private setAim(x: number, y: number) { this.st.tx = Phaser.Math.Clamp(x, 80, 660); this.st.ty = Phaser.Math.Clamp(y, 900, 1220); }
   /** 0..1, 1 = dead centre of the green zone. */
-  quality() { const d = Math.abs(((this.st.phase % 1) + 1) % 1 - 0.75); return Math.max(0, 1 - d / 0.14); }
+  quality() { const d = Math.abs(((this.st.phase % 1) + 1) % 1 - 0.75); return Math.max(0, 1 - d / 0.20); } // falloff .14 -> .20 (audit27): good window about +/-180 ms of the 0.9 s spin
   update(_t: number, dms: number) {
     const s = this.st; const dt = Math.min(dms, 50) / 1000; const lg = this.loop.clear(), m = this.meter.clear();
     this.bunny.update(dt, s.hold, s.phase); const hp = this.bunny.handPos();
@@ -120,7 +122,7 @@ export class LassoScene extends Phaser.Scene {
       if (!G && this.wasGreen) this.tweens.add({ targets: this.tick, alpha: 0, duration: 120 });
       this.gGlow.setFillStyle(0x7dff9a, G ? 0.18 + 0.12 * this.quality() : 0); this.wasGreen = G;
       if (Math.random() < dt * 4) Fx.whoosh();
-    } else { lg.lineStyle(10, 0xffffff, 0.9).strokeEllipse(hp.x + 4, hp.y + 22, 60, 40); lg.lineStyle(6, 0x8a5a2a, 1).strokeEllipse(hp.x + 4, hp.y + 22, 60, 40);
+    } else { if (!s.flying) { lg.lineStyle(10, 0xffffff, 0.9).strokeEllipse(hp.x + 4, hp.y + 22, 60, 40); lg.lineStyle(6, 0x8a5a2a, 1).strokeEllipse(hp.x + 4, hp.y + 22, 60, 40); } // no spare coil in her paw while the loop is in the air
       if (this.wasGreen) { this.wasGreen = false; this.tick.setAlpha(0); } this.gGlow.setFillStyle(0x7dff9a, 0); }
     this.beams.forEach((b, i) => b.setRotation(Math.sin(this.time.now / 1400 + i * 2) * 0.18)); this.pupDust(dt);
     if (!s.running || s.over) return;
@@ -135,6 +137,7 @@ export class LassoScene extends Phaser.Scene {
     this.pupImg.setFlipX(tx > this.pup.x);
     this.moveTw = this.tweens.add({ targets: this.pup, x: tx, y: ty, duration: dur, ease: 'Sine.InOut', onUpdate: () => this.pup.setDepth(this.pup.y > CRATE.y ? 15 : 10), onComplete: () => this.time.delayedCall(Phaser.Math.Between(150, 600), () => id === this.roamId && this.roam()) });
     this.tweens.add({ targets: this.pupImg, y: -12, duration: 110, yoyo: true, repeat: Math.floor(dur / 220) });
+    this.wadTw?.stop(); this.wadTw = this.tweens.add({ targets: this.pupImg, angle: { from: -6, to: 6 }, duration: 110, yoyo: true, repeat: Math.floor(dur / 220), onComplete: () => this.pupImg.setAngle(0), onStop: () => this.pupImg.setAngle(0) }); // waddle in step with the hop
   }
   private trick(): Trick {
     const r = Math.random(); const lvl = this.st.ropes;
@@ -163,7 +166,7 @@ export class LassoScene extends Phaser.Scene {
     this.bunny.throwAt(s.tx, s.ty);
   }
   private doTrick(t: Trick, tx: number, ty: number) {
-    if (this.st.over) return; this.moveTw?.stop(); this.roamId++; const s = this.st;
+    if (this.st.over) return; this.moveTw?.stop(); this.wadTw?.stop(); this.roamId++; const s = this.st;
     floatText(this, this.pup.x, this.pup.y - 240, ({ hop: 'RUBY DODGE!', umbrella: 'NANA UMBRELLA!', decoy: 'ZOE DECOY!', shadow: 'LINYE STEP!', crate: 'GLASSIA HIDE!' } as Record<string, string>)[t], '#ffdf6b', 28);
     if (t === 'hop') { Fx.boing(); const dir = this.pup.x > tx ? 1 : -1; this.tweens.add({ targets: this.pup, x: Phaser.Math.Clamp(this.pup.x + dir * 170, 300, 670), duration: 200 }); this.tweens.add({ targets: this.pupImg, y: -90, duration: 150, yoyo: true }); }
     if (t === 'umbrella') { s.umbrella = true; this.umb.setVisible(true); }
@@ -222,7 +225,7 @@ export class LassoScene extends Phaser.Scene {
     const d = this.add.circle(this.pup.x - Math.sign(dx) * 30, this.pup.y + 6, Phaser.Math.Between(8, 14), 0xd8b080, 0.6).setDepth(this.pup.depth - 1);
     this.tweens.add({ targets: d, scale: 2, alpha: 0, y: d.y - 16, duration: 400, onComplete: () => d.destroy() }); }
   finish(win: boolean) {
-    const s = this.st; if (s.over) return; s.over = true; s.running = false; this.moveTw?.stop(); this.roamId++;
+    const s = this.st; if (s.over) return; s.over = true; s.running = false; this.moveTw?.stop(); this.wadTw?.stop(); this.roamId++;
     (window as any).__pr.ended = win ? 'win' : 'lose'; Fx.sting(win);
     const score = s.score + Math.round(s.time) * 30;
     if (win) { Storage.submitLevel('Bunny', score); Storage.setBeaten(9); popBanner(this, 'PUPPY ROUNDED UP!', 600, 0x2fbf5a, 900); this.cameras.main.flash(300, 255, 240, 200);

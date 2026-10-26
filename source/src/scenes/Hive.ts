@@ -19,6 +19,8 @@ import { LINES, pick } from '../lines';
 // Bunny's drink is "disguised" for CANO_HIDE s (Puppy pops up empty-pawed, then whips it out). ~64% wins for a decent player (sim).
 const TIME = 45, TARGET = 2500, CANO_HIDE = 0, CANO_PEN = 100, BEE_PEN = 150, MIN_STAY = 600, STAY_K = 1300;
 const PHASE2 = 15, PHASE3 = 30, FEVER_AT = 10, FEVER_T = 5, FEVER_MULT = 1.5, GOLD_PTS = 300, HELM_CHIP = 50;
+// Zoe's speech bubble: bottom-right, beside her (it used to sit at 400,960 right on top of her face)
+const SAY = { x: 500, y: 1170 };
 const HIVES: [number, number][] = [[150, 560], [360, 520], [570, 560], [150, 830], [360, 790], [570, 830]];
 type Kind = 'pup' | 'cano' | 'bees';
 type Variant = 'helm' | 'gold' | null;
@@ -64,7 +66,7 @@ export class HiveScene extends Phaser.Scene {
   }
   private begin() {
     popBanner(this, 'BONK THAT PUPPY!', 700, 0xff9a1f);
-    this.time.delayedCall(600, () => { say(this, 400, 960, pick(LINES.start.Zoe), 24); this.st.running = true; });
+    this.time.delayedCall(600, () => { say(this, SAY.x, SAY.y, pick(LINES.start.Zoe), 24); this.st.running = true; });
   }
   private get speed() { return 1 + (TIME - this.st.time) / TIME * 0.9 + Math.min(this.st.combo, 10) * 0.02; }
   update(_t: number, dms: number) {
@@ -258,8 +260,8 @@ export class HiveScene extends Phaser.Scene {
     this.tweens.add({ targets: pop.img, scaleX: b, scaleY: b, duration: 260, ease: 'Elastic.Out', easeParams: [1.3, 0.35] });
     this.tweens.add({ targets: pop.img, angle: { from: -14, to: 14 }, duration: 70, yoyo: true, repeat: 2 });
     this.tweens.add({ targets: pop.img, y: 190, angle: 200, delay: 280, duration: 200, ease: 'Back.In', onComplete: () => this.clear(i, pop) });
-    if (s.combo > 0 && s.combo % 5 === 0) { popBanner(this, `COMBO x${s.combo}!`, 420, 0x2fbf5a, 600); say(this, 400, 960, pick(LINES.hiveBonk), 22, 1200); }
-    else if (Math.random() < 0.18) say(this, 400, 960, pick(LINES.hiveBonk), 22, 1000);
+    if (s.combo > 0 && s.combo % 5 === 0) { popBanner(this, `COMBO x${s.combo}!`, 420, 0x2fbf5a, 600); say(this, SAY.x, SAY.y, pick(LINES.hiveBonk), 22, 1200); }
+    else if (Math.random() < 0.18) say(this, SAY.x, SAY.y, pick(LINES.hiveBonk), 22, 1000);
   }
   private spill(i: number, pop: Pop, x: number, y: number) {
     const s = this.st; s.spills++; s.score = Math.max(0, s.score - CANO_PEN); this.scorePop(x, y, -CANO_PEN, true); // QC: a spill only costs points; combo + fever survive
@@ -268,7 +270,7 @@ export class HiveScene extends Phaser.Scene {
       this.tweens.add({ targets: d, x: x + Math.cos(a) * 120, y: y - 80 + Math.sin(a) * 120 + 140, alpha: 0, duration: 600, ease: 'Quad.In', onComplete: () => d.destroy() }); }
     floatText(this, x, y - 170, 'SPILLED!', '#ff6b6b', 34);
     pop.img.setTexture('pup_panic'); this.tweens.add({ targets: pop.img, angle: { from: -10, to: 10 }, duration: 60, yoyo: true, repeat: 3 }); popBanner(this, 'Bunny\'s drink!!', 420, 0xe0243a, 600);
-    say(this, 400, 960, pick(LINES.hiveCano), 22, 1300);
+    say(this, SAY.x, SAY.y, pick(LINES.hiveCano), 22, 1300);
     this.tweens.add({ targets: pop.img, y: 150, delay: 250, duration: 160, onComplete: () => this.clear(i, pop) });
   }
   private sting(i: number, pop: Pop, x: number, y: number) {
@@ -278,7 +280,7 @@ export class HiveScene extends Phaser.Scene {
     this.tweens.add({ targets: pop.img, x: this.zoe.x - x, y: this.zoe.y - y - 220, duration: 380, ease: 'Quad.In', onComplete: () => this.clear(i, pop) });
     this.time.delayedCall(360, () => { this.zoe.setMood('dizzy'); floatText(this, this.zoe.x, this.zoe.y - 330, 'STING!', '#ff6b6b', 34); this.scorePop(this.zoe.x, this.zoe.y - 200, -BEE_PEN);
       this.cameras.main.flash(120, 255, 40, 40); this.cameras.main.shake(200, 0.012); this.zoe.setTint(0xff9a9a); this.time.delayedCall(300, () => this.zoe.clearTint()); this.time.delayedCall(600, () => this.zoe.setMood('smug')); });
-    say(this, 400, 960, pick(LINES.hiveBees), 22, 1300);
+    say(this, SAY.x, SAY.y, pick(LINES.hiveBees), 22, 1300);
   }
   private updateHud() {
     const s = this.st; this.shownScore += Math.sign(s.score - this.shownScore) * Math.max(1, Math.min(Math.abs(s.score - this.shownScore), Math.ceil(Math.abs(s.score - this.shownScore) * 0.2)));
@@ -291,6 +293,10 @@ export class HiveScene extends Phaser.Scene {
     const s = this.st; if (s.over) return; s.over = true; s.running = false; this.shownScore = s.score; this.updateHud();
     (window as any).__pr.ended = win ? 'win' : 'lose';
     popBanner(this, win ? 'TIME! PUPPY IS BONKED!' : 'TIME!', 600, win ? 0x2fbf5a : 0x6b4cc9, 800);
+    // Zoe reacts instead of standing frozen: victory hops (win) or a dizzy wobble (lose)
+    this.zoe.setMood(win ? 'happy' : 'dizzy');
+    if (win) this.tweens.add({ targets: this.zoe.root, y: this.zoe.root.y - 34, duration: 170, yoyo: true, repeat: 3, ease: 'Quad.Out' });
+    else this.tweens.add({ targets: this.zoe.root, angle: { from: -5, to: 5 }, duration: 260, yoyo: true, repeat: 2, ease: 'Sine.InOut', onComplete: () => this.zoe.root.setAngle(0) });
     this.time.delayedCall(1100, () => endCard(this, 'Zoe', 2, win, s.score + s.best * 20, `${s.bonks} bonks • ${s.golds} gold • best combo x${s.best}`));
   }
 }

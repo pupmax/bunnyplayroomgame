@@ -2,7 +2,7 @@
 // Go-big pass: moonlit room (window light shaft, dust motes, lamp glow, rug), cracked/tinted CREAKY boards that flash
 // and puff dust, a pulsing NOISE-meter outline + sound rings, "creak!" popups, a floor pounce-range ring (green NEAR /
 // gold FLYING band), a big "!" when Puppy SPOTS you, crouch-and-leap pounce with stretch, trail and landing squash.
-// Depth: 9 catches in 62s, Puppy grows warier each catch (shorter "?" warnings, shorter look-aways), creaks can make
+// Depth: 7 catches in 70s, Puppy grows warier each catch (shorter "?" warnings, shorter look-aways), creaks can make
 // him turn, moving in his sight = SPOTTED (he bolts), 2 hiding spots (snack box + plant), pouncing while he turns ("?")
 // is a coin flip, FLYING POUNCE from further out (+400), one YARN ball per approach (2.5s distraction),
 // phase 2 (2 catches) he paces about, phase 3 (5 catches) he FAKES his turn. SILENT and STREAK bonuses.
@@ -23,7 +23,7 @@ import { HeroRig, pupFlail } from '../systems/rigs';
 // tuned with tests/pouncebots.mjs (see header); exposed as __pr.K so the harness can sweep it
 // round 2 (QC r21 "too harsh"): look-aways 1.2-2.6 s, fewer no-"?" glances, gentler meter, sniff 1.6 s, 180 ms crouch; moving behind cover
 // still shows at 35% (else walking straight up stays half-hidden), which let the move-meter drop to 115/s and the clock settle at 63 s
-const K = { NEED: 7, NOISE_K: 200, DODGE_N: 10, AWAY_MIN: 1.2, AWAY_MAX: 2.6, SUS_MOVE: 115, SUS_STILL: 40, GLANCE_P: 0.08, FAKE_P: 0.2, TIME: 63, SPEED: 110, CAP: 90, SNIFF_T: 1.6, CROUCH: 180, COVER_MOVE: 0.35 };
+const K = { NEED: 7, NOISE_K: 200, DODGE_N: 10, AWAY_MIN: 1.2, AWAY_MAX: 2.6, SUS_MOVE: 115, SUS_STILL: 40, GLANCE_P: 0.08, FAKE_P: 0.2, TIME: 70, SPEED: 110, CAP: 90, SNIFF_T: 1.6, CROUCH: 180, COVER_MOVE: 0.35 };
 const FLOOR = 1000, START = 110, NEAR = 200, FAR = 280; const CREAK = [[230, 290], [430, 480]];
 const HIDES = [250, 410], HIDE_R = 48, CREAK_N = 45, STEP_N = 3, DECAY = 9, CREAK_ALERT = 1.6, PACE = 40, P2 = 2, P3 = 5, YARN_T = 2.5, FLY_T = 420, NEAR_T = 260;
 // Rework v2 (anti "just sneak up"): every timing below is random from the very first catch.
@@ -44,13 +44,13 @@ export class PounceScene extends Phaser.Scene {
   private boards!: Phaser.GameObjects.Graphics; private fxg!: Phaser.GameObjects.Graphics; private motes: { x: number; y: number; v: number; p: number }[] = [];
   private waves: { x: number; r: number; a: number }[] = []; private creakFlash = [0, 0]; private yarnBtn!: Phaser.GameObjects.Container; private yarnBall?: Phaser.GameObjects.Image;
   private paceDir = 1; private noirBase = 1; private pupBase = 1; private creakCool = 0; private bang!: Phaser.GameObjects.Text;
-  private pupOff = 0; private leaping = false; private cue!: Phaser.GameObjects.Text; private susLift = 0; private sus!: Phaser.GameObjects.Container; private susFill!: Phaser.GameObjects.Image; private susEye!: Phaser.GameObjects.Image; private eyeKey = '';
+  private pupOff = 0; private runHop = false; private leaping = false; private cue!: Phaser.GameObjects.Text; private susLift = 0; private sus!: Phaser.GameObjects.Container; private susFill!: Phaser.GameObjects.Image; private susEye!: Phaser.GameObjects.Image; private eyeKey = '';
   constructor() { super('Pounce'); }
   create() {
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x2a1a3e, 0x6a3e1e);
     this.st = { time: K.TIME, catches: 0, escapes: 0, score: 0, running: false, over: false, x: START, px: 580, noise: 0, look: 'away', lookT: 2, hold: false, busy: false, phase: 1, yarn: 1, yarnT: 0, streak: 0, spotted: 0, flying: 0,
       mode: '', sus: 0, sniffT: 0, dodges: 0, turned: 0, fake: 0, glance: 0, scampT: 0, dazed: 0 };
-    this.pupOff = 0; this.eyeKey = '';
+    this.pupOff = 0; this.eyeKey = ''; this.runHop = false;
     this.motes = []; this.waves = []; this.creakFlash = [0, 0]; this.paceDir = 1; this.creakCool = 0; this.yarnBall = undefined;
     this.makeTextures();
     art(this, 0, 0, 'bg_room');
@@ -240,8 +240,9 @@ export class PounceScene extends Phaser.Scene {
     (this.children.getByName('nshadow') as Phaser.GameObjects.Image).setPosition(this.noir.x, FLOOR + 14).setScale(1 - (FLOOR + 10 - this.noir.y) / 400);
     const yarnOn = s.yarnT > 0;
     this.pup.x = s.px + this.pupOff;
-    if (s.mode !== 'flee' && s.mode !== 'catch') this.pup.setFlipX(yarnOn ? false : s.look !== 'look').setTexture(yarnOn ? 'pup_hearts' : s.look === 'look' ? (s.noise > 50 || s.spotted || s.sus > 70 ? 'pup_panic' : 'pup_idle') : s.look === 'warn' ? 'pup_lean' : 'pup_hearts');
+    if (s.mode !== 'flee' && s.mode !== 'catch') this.pup.setFlipX(yarnOn ? false : s.look !== 'look').setTexture(yarnOn ? 'pup_hearts' : s.look === 'look' ? (s.noise > 50 || s.spotted || s.sus > 70 ? 'pup_panic' : 'pup_idle') : s.look === 'warn' ? 'pup_lean' : 'pup_idle'); // looking away = plain face turned away (was pup_hearts for most of the round); the starry face is kept for the yarn
     if (!s.busy) this.pup.y = FLOOR - (s.look === 'away' ? Math.abs(Math.sin(now / 200)) * 6 : 0);
+    if (this.runHop) { const ph = now / 65; this.pup.setY(FLOOR - Math.abs(Math.sin(ph)) * 14).setAngle(Math.sin(ph) * 8); } // scamper off / back in: hop + waddle instead of a flat slide
     (this.children.getByName('pshadow') as Phaser.GameObjects.Image).setPosition(this.pup.x, FLOOR + 6);
     this.q.setPosition(this.pup.x, FLOOR - 240 - this.susLift * 30 + Math.sin(now / 120) * 6).setText(s.spotted ? '' : s.look === 'warn' ? '?' : s.look === 'look' ? '👀' : yarnOn ? '♥' : '');
     if (!s.spotted) this.bang.setVisible(false); else this.bang.setPosition(this.pup.x + Math.sin(now / 30) * 4, FLOOR - 265);
@@ -325,7 +326,7 @@ export class PounceScene extends Phaser.Scene {
   private dodged() {
     const s = this.st; s.streak = 0; s.dodges++; this.setMode('dodge');
     Fx.boing(); this.tweens.add({ targets: this.pup, y: FLOOR - 70, duration: 160, yoyo: true, ease: 'Quad.Out' }); this.ft(s.px, FLOOR - 410, 'DODGED!', '#ff8a8a', 36);
-    this.rig.setMood('dizzy'); s.noise = Math.min(99, s.noise + K.DODGE_N); this.talk(s.px, FLOOR - 500, pick(LINES.pounceSeen), 20, 1000);
+    this.rig.setMood('dizzy'); s.noise = Math.min(99, s.noise + K.DODGE_N); this.talk(s.px, FLOOR - 500, pick(s.dodges >= SCAMPER_N ? LINES.pounceFled : LINES.pounceSeen), 20, 1000); // 2nd dodge = he bolts to a new spot
     s.look = 'look'; s.glance = 0; s.fake = 0; s.lookT = DODGE_WATCH; s.sniffT = 0;
     // slapstick: bonk off his nose and tumble backwards head over heels
     const fx = this.noir.x, tx = Math.max(START, s.px - KNOCK);
@@ -358,7 +359,7 @@ export class PounceScene extends Phaser.Scene {
   private flee() {
     const s = this.st; if (s.mode === 'flee') return; this.setMode('flee'); s.escapes++; s.streak = 0; Fx.save(); this.talk(s.px, FLOOR - 470, pick(s.sus >= 100 ? LINES.pounceSpotted : LINES.pounceFled), 22, 1100);
     if (!s.spotted) { this.bang.setVisible(true).setPosition(s.px, FLOOR - 290).setScale(1.8); this.tweens.add({ targets: this.bang, scale: 1.2, duration: 160, ease: 'Back.Out' }); s.spotted = 1; }
-    this.pup.setTexture('pup_panic').setFlipX(true); this.tweens.add({ targets: this, pupOff: W + 150 - s.px, duration: 500, ease: 'Quad.In' });
+    this.pup.setTexture('pup_panic').setFlipX(true); this.runHop = true; this.tweens.add({ targets: this, pupOff: W + 150 - s.px, duration: 500, ease: 'Quad.In' });
     for (let i = 0; i < 5; i++) { const p = this.add.circle(s.px - i * 30, FLOOR, 14, 0xd9b080, 0.6).setDepth(9); this.tweens.add({ targets: p, x: p.x - 40, alpha: 0, scale: 2, delay: i * 50, duration: 400, onComplete: () => p.destroy() }); }
     this.time.delayedCall(1100, () => this.reset());
   }
@@ -368,7 +369,7 @@ export class PounceScene extends Phaser.Scene {
     this.yarnBall?.destroy(); this.yarnBall = undefined; this.tweens.killTweensOf(s); this.tweens.killTweensOf(this);
     this.rig.setMood('smug'); this.noir.setScale(this.noirBase).setAngle(0); this.rig.act([], false, 0.2); this.pup.setAngle(0).setScale(this.pupBase).setY(FLOOR).setFlipX(false);
     this.pupOff = W + 120 - s.px; this.setMode(after === 'catch' ? 'catch' : 'flee'); // the clock stays paused only while re-entering after a catch
-    this.tweens.add({ targets: this, pupOff: 0, duration: 600, onComplete: () => { if (!s.over) this.setMode(''); } });
+    this.runHop = true; this.tweens.add({ targets: this, pupOff: 0, duration: 600, onComplete: () => { this.runHop = false; this.pup.setAngle(0).setY(FLOOR); if (!s.over) this.setMode(''); } });
   }
   finish(win: boolean) {
     const s = this.st; if (s.over) return; s.over = true; s.running = false; (window as any).__pr.ended = win ? 'win' : 'lose';

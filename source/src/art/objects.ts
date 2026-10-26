@@ -3,7 +3,7 @@ import { INK as OUT, SW, svgDoc, heart, heartPath, bunnycano, radial, linear } f
 
 export interface ArtDef { vbW: number; vbH: number; body: string; defs?: string; }
 
-/** Mini Bunny head (used for the van emblem and the Motivation badge). */
+/** Mini Bunny head (used for the van emblem). The old 'motivation' badge (Bunny head + hearts) was removed in audit27: hearts must never pop at Bunny's head. */
 export function bunnyHead(cx: number, cy: number, s: number, fill = '#fbf6f4', stroke = OUT, face = true): string {
   const T = (x: number) => (x * s).toFixed(1);
   let o = `<g transform="translate(${cx} ${cy})">` +
@@ -63,14 +63,6 @@ export const OBJECTS: Record<string, ArtDef> = {
       `<circle cx="55" cy="55" r="50" fill="url(#bb)" stroke="${OUT}" stroke-width="5"/>` +
       `<g transform="translate(30 30) scale(1.25)">` + bunnycano(0, 0, 1, OUT) + `</g>` +
       `<ellipse cx="55" cy="30" rx="38" ry="20" fill="url(#bg1)"/>`,
-  },
-  motivation: {
-    vbW: 110, vbH: 110,
-    defs: radial('mb', [[0, '#ffe0ee'], [0.6, '#ff9fca'], [1, '#e0588f']], 0.35, 0.3, 0.8) + GLOSS('mg1'),
-    body:
-      `<circle cx="55" cy="55" r="50" fill="url(#mb)" stroke="${OUT}" stroke-width="5"/>` +
-      bunnyHead(55, 72, 1.05) + heart(24, 30, 22) + heart(88, 28, 20) +
-      `<ellipse cx="55" cy="28" rx="38" ry="18" fill="url(#mg1)"/>`,
   },
   scooter: {
     vbW: 150, vbH: 110,

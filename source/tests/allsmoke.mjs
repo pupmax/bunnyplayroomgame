@@ -22,7 +22,7 @@ const btn = async (key, labels, ms = 15000) => { const t = Date.now(); while (Da
   const at = await p.evaluate(([key, labels]) => { const S = window.__game.scene.getScene(key); let hit = null;
     const walk = l => l.forEach(o => { if (hit) return; if (o.list) walk(o.list); else if (o.type === 'Text' && labels.includes(o.text) && o.visible) { const m = o.getWorldTransformMatrix(); hit = [m.tx, m.ty, o.text]; } });
     if (S?.sys.isActive()) walk(S.children.list); return hit; }, [key, labels]);
-  if (at) { await wait(900); await tap(at[0], at[1]); return at[2]; } await wait(250); } return null; };
+  if (at) { await wait(900); await until(() => !window.__cardArmed || window.__cardArmed(), null, 6000); await tap(at[0], at[1]); return at[2]; } /* press-armed cards (Lasso finale): wait until armed, game time lags at headless fps */ await wait(250); } return null; };
 const rows = [];
 await tap(360, 1120); await until(() => window.__game.scene.isActive('Hub')); await wait(2500);
 for (const [who, key, door] of L) {

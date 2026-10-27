@@ -16,7 +16,7 @@ const mk = async (route) => {
   return { ctx, p, errs, P, start, navs: () => navs };
 };
 { const T = await mk(); const { p, P } = T;
-  await p.evaluate(() => { localStorage.setItem('playroom.beaten', '8'); for (const k of ['rubybag','glassia3','zoe1','nana1','midnight1','noir1','iris1','linye1','bunny1']) localStorage.setItem('playroom.tut.' + k, '1'); });
+  await p.evaluate(() => { localStorage.setItem('playroom.beaten', '8'); for (const k of ['rubybag','glassia3','zoe1','nana1','midnight1','noir2','iris1','linye1','bunny1']) localStorage.setItem('playroom.tut.' + k, '1'); });
   // (1) lose Hive, hammer HALL (505,1010) for 600 ms: Hub once, no level started from leftover taps
   let leaks = 0;
   for (let r = 0; r < 5; r++) {

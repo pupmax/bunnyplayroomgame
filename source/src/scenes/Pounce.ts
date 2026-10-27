@@ -1,16 +1,17 @@
-// Noir SNEAK & POUNCE: hold SNEAK to creep toward a nervous Puppy. Only move while he looks away (watch for "?").
-// Go-big pass: moonlit room (window light shaft, dust motes, lamp glow, rug), cracked/tinted CREAKY boards that flash
-// and puff dust, a pulsing NOISE-meter outline + sound rings, "creak!" popups, a floor pounce-range ring (green NEAR /
-// gold FLYING band), a big "!" when Puppy SPOTS you, crouch-and-leap pounce with stretch, trail and landing squash.
-// Depth: 7 catches in 70s, Puppy grows warier each catch (shorter "?" warnings, shorter look-aways), creaks can make
-// him turn, moving in his sight = SPOTTED (he bolts), 2 hiding spots (snack box + plant), pouncing while he turns ("?")
-// is a coin flip, FLYING POUNCE from further out (+400), one YARN ball per approach (2.5s distraction),
-// phase 2 (2 catches) he paces about, phase 3 (5 catches) he FAKES his turn. SILENT and STREAK bonuses.
-// Tuned with pups3-out/noir/sim.mjs (same constants): avg bot ~72%.
+// Noir: BOX BANDIT (replaces Sneaky Pounce). Noir hides in cardboard boxes in the moonlit room. Puppy hunts box to box:
+// he sniffs a box (nose busy), dives head-first into it (head busy, butt + wagging tail in the air), pulls out and looks
+// round. Only move while his eyes are busy. MEOW? throws Noir's voice into the empty box next to hers so he dives into
+// the WRONG box; while his head is in a box, POUNCE (or tap him) = BOO-X! He pops out frozen with his tail sticking out:
+// TAP the tail to GRAB it, then TAP TAP TAP to win the tug. The box flops down over him, he waddles about blind and
+// bonks into the walls, then pops out with a postage stamp stuck on his nose. Last boop: RETURN TO SENDER parcel with
+// Noir sitting smugly on top. Busted (seen moving, found, bad pounce) = he covers his eyes and counts while Noir
+// relocates; the clock keeps running. Escalation: 3 boxes -> 4 boxes, shorter peeks, double-checks (he pops back out
+// mid-peek), feints (he changes his mind mid-walk and heads for YOUR box), and he grows wise to a 3rd MEOW in a row.
+// Pounce-only art helpers live in ./pounceArt.ts; K is tuned with tests/boxbandit-bots.mjs (exposed as __pr.K).
 import Phaser from 'phaser';
 import { GAME_W as W } from '../config';
 import { setupCamera, worldPoint } from '../systems/resolution';
-import { art } from '../art/registry';
+import { art, ensureArt } from '../art/registry';
 import { pointerInMute, makeMuteButton } from '../systems/ui';
 import { txt } from '../systems/fx';
 import { Fx } from '../systems/audio';
@@ -18,362 +19,577 @@ import { popBanner, say, floatText, tutorialCard, makePauseButton, pointerInPaus
 import { endCard } from '../systems/endcard';
 import { LINES, pick } from '../lines';
 import { Hud, impact } from '../systems/level';
-import { HeroRig, pupFlail } from '../systems/rigs';
+import { HeroRig } from '../systems/rigs';
+import { TailPup } from '../systems/tailRigs';
+import { BOX_W, BOX_H, BoxGfx, makeBox, placeBox, ensureStampTexture, makeParcel, makeReturnMark } from './pounceArt';
 
-// tuned with tests/pouncebots.mjs (see header); exposed as __pr.K so the harness can sweep it
-// round 2 (QC r21 "too harsh"): look-aways 1.2-2.6 s, fewer no-"?" glances, gentler meter, sniff 1.6 s, 180 ms crouch; moving behind cover
-// still shows at 35% (else walking straight up stays half-hidden), which let the move-meter drop to 115/s and the clock settle at 63 s
-const K = { NEED: 7, NOISE_K: 200, DODGE_N: 10, AWAY_MIN: 1.2, AWAY_MAX: 2.6, SUS_MOVE: 115, SUS_STILL: 40, GLANCE_P: 0.08, FAKE_P: 0.2, TIME: 70, SPEED: 110, CAP: 90, SNIFF_T: 1.6, CROUCH: 180, COVER_MOVE: 0.35 };
-const FLOOR = 1000, START = 110, NEAR = 200, FAR = 280; const CREAK = [[230, 290], [430, 480]];
-const HIDES = [250, 410], HIDE_R = 48, CREAK_N = 45, STEP_N = 3, DECAY = 9, CREAK_ALERT = 1.6, PACE = 40, P2 = 2, P3 = 5, YARN_T = 2.5, FLY_T = 420, NEAR_T = 260;
-// Rework v2 (anti "just sneak up"): every timing below is random from the very first catch.
-const AWAY: [number, number] = [0.8, 2.0], WARN_T: [number, number] = [0.2, 0.5], LOOK_T: [number, number] = [0.9, 1.6], GLANCE_T: [number, number] = [0.5, 0.7],
-  GLANCE_P = 0.18, GLANCE_P3 = 0.26, FAKE_P = 0.2, FAKE_P3 = 0.28,
-  // suspicion meter (0..100): full = SPOTTED (he bolts, round resets)
-  SUS_MOVE = 190, SUS_STILL = 28, SUS_NEAR = 250, SUS_CREAK = 18, SUS_COVER = 45, SUS_FAR = 30, SUS_IDLE = 6,
-  SNIFF_R = 150, KNOCK = 320, DODGE_WATCH = 1.0, DODGE_N = 25, SCAMPER_N = 2;
-const YX = 640, YY = 470;
-type Look = 'away' | 'warn' | 'look';
-type Mode = '' | 'pounce' | 'dodge' | 'flee' | 'catch';
+export const K = {
+  NEED: 6, TIME: 40,
+  WALK: 175, DASH: 330,                   // Puppy speed (px/s): hunting walk / lured dash
+  SNIFF: [0.8, 1.2], SNIFF_NOIR: [1.0, 1.35], LURE_SNIFF: 0.3,
+  PEEK: [1.2, 1.6], PEEK_DROP: 0.1, PEEK_MIN: 0.8, // head-in-box time, shrinks per boop
+  TELL: 0.4,                              // tail freezes stiff + "?" before he pulls out
+  DC_FROM: 1, DC_P: 0.3, DC_STEP: 0.06, DC_T: 0.6, // double-check: he pops out mid-peek and looks round (eyes open)
+  LOOK_P: 0.4, LOOK_T: [0.45, 0.8],
+  FEINT_FROM: 3, FEINT_P: 0.35,
+  FIND_P: 0.33, FIND_STEP: 0.05, FIND_MAX: 0.5, // chance his next pick is Noir's box
+  MEOW_CD: 2.2, MEOW_ROW: 2,              // the 3rd MEOW before a boop backfires
+  HOP: 0.34, HOP_PER: 0.06,               // Noir's box-to-box hop
+  LEAP: 0.3, LEAP_PX: 0.0005,             // pounce flight time
+  GRAB_T: 1.2,
+  TUG0: 0.32, TUG_TAP: 0.085, TUG_DRAIN: 0.3, TUG_MIN: 1.4, TUG_MAX: 4.5,
+  COUNT: 2.2, FOUR_AT: 2, WAD: 270,
+};
+const FLOOR = 1000, BB = FLOOR + 40, RIM = BB - BOX_H, NOIR_M = 0.85, PUP_M = 1.0;
+const PEEK_Y = RIM + 142, DUCK_Y = PEEK_Y + 100, LANE = BB - 2, PUP_IN = RIM - 92;
+const XS3 = [180, 360, 540], XS4 = [120, 280, 440, 600];
+const ART = ['pt_stand', 'pt_panic', 'pt_dizzy', 'pt_tail', 'su_shadow', ...[0, 1, 2, 3, 4, 5].map(i => 'pt_run' + i)];
+const CROUCH = { ls: -40, le: 60, rs: -30, re: 60, lh: -50, lk: 80, rh: -30, rk: 70, lean: 18, sq: -0.16, dy: 18, tilt: 6 };
+const SIT = { ls: 15, le: 95, rs: -15, re: -100, lh: 8, lk: -4, rh: 26, rk: -10, lean: -3, tilt: -7, sq: 0.03, dy: 0 }; // seated, paws crossed, legs dangling
+const STRETCH = { ls: -150, le: 10, rs: -140, re: 10, lh: 30, lk: 20, rh: -30, rk: 10, lean: 20, sq: 0.08, dy: 0, tilt: 8 };
+type Pup = 'off' | 'walk' | 'feint' | 'sniff' | 'dive' | 'peek' | 'tell' | 'up' | 'look' | 'count' | 'seq';
+type Phase = 'wait' | 'hunt' | 'bust' | 'seq' | 'grab' | 'tug' | 'reset' | 'end';
+type NState = 'in' | 'hop' | 'out' | 'seq';
+const F = (r: number[]) => Phaser.Math.FloatBetween(r[0], r[1]);
 
 export class PounceScene extends Phaser.Scene {
-  st = { time: K.TIME, catches: 0, escapes: 0, score: 0, running: false, over: false, x: START, px: 580, noise: 0, look: 'away' as Look, lookT: 2, hold: false, busy: false,
-    phase: 1, yarn: 1, yarnT: 0, streak: 0, spotted: 0, flying: 0, mode: '' as Mode, sus: 0, sniffT: 0, dodges: 0, turned: 0, fake: 0, glance: 0, scampT: 0, dazed: 0 };
-  private noir!: Phaser.GameObjects.Container; private rig!: HeroRig; private pup!: Phaser.GameObjects.Image; private q!: Phaser.GameObjects.Text; private cone!: Phaser.GameObjects.Graphics;
-  private hud!: Hud; private noiseBar!: Phaser.GameObjects.Graphics; private ring!: Phaser.GameObjects.Graphics; private pb!: Phaser.GameObjects.Container; private sb!: Phaser.GameObjects.Container;
-  private boards!: Phaser.GameObjects.Graphics; private fxg!: Phaser.GameObjects.Graphics; private motes: { x: number; y: number; v: number; p: number }[] = [];
-  private waves: { x: number; r: number; a: number }[] = []; private creakFlash = [0, 0]; private yarnBtn!: Phaser.GameObjects.Container; private yarnBall?: Phaser.GameObjects.Image;
-  private paceDir = 1; private noirBase = 1; private pupBase = 1; private creakCool = 0; private bang!: Phaser.GameObjects.Text;
-  private pupOff = 0; private runHop = false; private leaping = false; private cue!: Phaser.GameObjects.Text; private susLift = 0; private sus!: Phaser.GameObjects.Container; private susFill!: Phaser.GameObjects.Image; private susEye!: Phaser.GameObjects.Image; private eyeKey = '';
+  st = this.fresh();
+  private fresh() {
+    return { time: K.TIME, boops: 0, score: 0, running: false, over: false, phase: 'wait' as Phase, pup: 'off' as Pup, px: 820, face: -1, tgt: 0, pbox: -1,
+      noirBox: 0, nState: 'in' as NState, noirOut: 0, sees: 1, meowCd: 0, meowRow: 0, busts: 0, slips: 0, streak: 0, tug: 0, grabT: 0, t: 0, dash: 0,
+      boxes: 3, firstPick: 1, dc: 0, dcDone: 0, feintDone: 0, wise: 0, slow: 1, hint: '', lastHopAt: -9 };
+  }
+  private boxes: BoxGfx[] = []; private rig!: HeroRig; private pup!: TailPup; private pupShadow!: Phaser.GameObjects.GameObject & { setVisible: (v: boolean) => any };
+  private hud!: Hud; private badge!: Phaser.GameObjects.Container; private badgeEye!: Phaser.GameObjects.Image; private badgeRing!: Phaser.GameObjects.Graphics;
+  private pill!: Phaser.GameObjects.Text; private mb!: Phaser.GameObjects.Container; private pbtn!: Phaser.GameObjects.Container; private mbG!: Phaser.GameObjects.Graphics; private pbG!: Phaser.GameObjects.Graphics;
+  private mbT!: Phaser.GameObjects.Text; private pbT!: Phaser.GameObjects.Text; private btnKey = ''; private fxg!: Phaser.GameObjects.Graphics; private motes: { x: number; y: number; v: number; p: number }[] = [];
+  private q!: Phaser.GameObjects.Text; private hints = new Set<string>(); private hintC?: Phaser.GameObjects.Container; private tapTxt?: Phaser.GameObjects.Text; private meter!: Phaser.GameObjects.Graphics;
+  private stamp?: Phaser.GameObjects.Image; private tugAge = 0; private shoutT = 0; private wad = { on: 0, x: 0, dir: 1, bonks: 0, t: 0, final: 0 }; private flopBox = -1; private away = 1; private tugX = 0;
+  private stateT = 0; private peekLeft = 0; private sniffTxtT = 0; private lookFlipT = 0; private countN = 0; private noirTween?: Phaser.Tweens.Tween; private seqLock = 0;
   constructor() { super('Pounce'); }
   create() {
     setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x2a1a3e, 0x6a3e1e);
-    this.st = { time: K.TIME, catches: 0, escapes: 0, score: 0, running: false, over: false, x: START, px: 580, noise: 0, look: 'away', lookT: 2, hold: false, busy: false, phase: 1, yarn: 1, yarnT: 0, streak: 0, spotted: 0, flying: 0,
-      mode: '', sus: 0, sniffT: 0, dodges: 0, turned: 0, fake: 0, glance: 0, scampT: 0, dazed: 0 };
-    this.pupOff = 0; this.eyeKey = ''; this.runHop = false;
-    this.motes = []; this.waves = []; this.creakFlash = [0, 0]; this.paceDir = 1; this.creakCool = 0; this.yarnBall = undefined;
-    this.makeTextures();
+    this.st = this.fresh(); this.boxes = []; this.motes = []; this.hints = new Set(); this.hintC = undefined; this.tapTxt = undefined; this.stamp = undefined; this.btnKey = '';
+    this.wad = { on: 0, x: 0, dir: 1, bonks: 0, t: 0, final: 0 }; this.seqLock = 0;
+    this.makeTextures(); ensureStampTexture(this);
     art(this, 0, 0, 'bg_room');
-    // moonlight shaft from the window + lamp pool + rug
+    // moonlight shaft from the window + lamp pool + rug + dust motes (kept from Sneaky Pounce)
     const light = this.add.graphics().setDepth(1).setBlendMode(Phaser.BlendModes.ADD);
     light.fillStyle(0xaab8ff, 0.10).fillPoints([new Phaser.Math.Vector2(92, 342), new Phaser.Math.Vector2(268, 342), new Phaser.Math.Vector2(420, 1060), new Phaser.Math.Vector2(150, 1060)], true);
     light.fillStyle(0xaab8ff, 0.07).fillEllipse(285, 1040, 300, 60);
     this.tweens.add({ targets: light, alpha: 0.7, yoyo: true, repeat: -1, duration: 2600, ease: 'Sine.easeInOut' });
     const lamp = this.add.image(640, 980, 'pn_glow').setDepth(1).setScale(2.4, 0.5).setAlpha(0.35).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffcf8a);
     this.tweens.add({ targets: lamp, alpha: 0.25, yoyo: true, repeat: -1, duration: 1400, ease: 'Sine.easeInOut' });
-    const rug = this.add.graphics().setDepth(1.5); rug.fillStyle(0x7a2a4a, 0.9).fillEllipse(560, 1030, 300, 70).fillStyle(0xb04a6a, 1).fillEllipse(560, 1030, 250, 50).lineStyle(4, 0xffdf6b, 0.6).strokeEllipse(560, 1030, 200, 34);
+    const rug = this.add.graphics().setDepth(1.5); rug.fillStyle(0x7a2a4a, 0.9).fillEllipse(360, 1062, 560, 70).fillStyle(0xb04a6a, 1).fillEllipse(360, 1062, 500, 50).lineStyle(4, 0xffdf6b, 0.6).strokeEllipse(360, 1062, 420, 34);
     for (let i = 0; i < 26; i++) this.motes.push({ x: Phaser.Math.Between(100, 420), y: Phaser.Math.Between(360, 1040), v: Phaser.Math.FloatBetween(6, 18), p: Math.random() * 6 });
-    this.boards = this.add.graphics().setDepth(2);
     this.fxg = this.add.graphics().setDepth(35);
-    for (const [a, b] of CREAK) txt(this, (a + b) / 2, FLOOR + 56, 'CREAKY', 18, '#ffe0a0', '#2a1408', 4).setDepth(3);
-    this.ring = this.add.graphics().setDepth(4);
-    this.cone = this.add.graphics().setDepth(5).setBlendMode(Phaser.BlendModes.ADD);
-    this.add.image(this.st.px, FLOOR + 4, 'pn_shadow').setDepth(9).setName('pshadow');
-    this.pup = art(this, this.st.px, FLOOR, 'pup_idle', 0.8).setDepth(10).setFlipX(true); this.pupBase = this.pup.scaleX;
-    // suspicion meter over Puppy's head (baked pieces; per frame only crop/tint/position)
-    this.susFill = this.add.image(-46, 0, 'pn_susfill').setOrigin(0, 0.5); this.susFill.setCrop(0, 0, 0, 24);
-    this.susEye = this.add.image(-72, 0, 'pn_eyez');
-    this.sus = this.add.container(this.st.px, FLOOR - 172, [this.add.image(0, 0, 'pn_susbg'), this.susFill, this.add.image(20, 0, 'pn_susshine'), this.susEye]).setDepth(42).setAlpha(0);
-    this.q = txt(this, this.st.px, FLOOR - 285, '', 64, '#ffdf6b', '#22252b', 8).setDepth(40);
-    this.bang = txt(this, this.st.px, FLOOR - 300, '!', 130, '#ff3b3b', '#22252b', 12).setDepth(41).setVisible(false);
-    this.add.image(START, FLOOR + 12, 'pn_shadow').setDepth(11).setName('nshadow');
-    this.rig = new HeroRig(this, 'Noir', START, FLOOR + 10, 0.95, { tail: true }).setDepth(12); this.noir = this.rig.root; this.noirBase = 0.95;
-    this.noir.addAt(this.add.ellipse(0, -110, 190, 250, 0xc9a6ff, 0.16).setBlendMode(Phaser.BlendModes.ADD), 0); // soft rim so her dark limbs read against the wall
-    this.drawCovers();
-    this.cue = comic(this, 0, 0, 'wiggle wiggle!', 30, '#d9c2ff', '#ffffff', '#2a1a4a').setDepth(60).setVisible(false) as Phaser.GameObjects.Text;
-    this.hud = new Hud(this, 'SNEAKY POUNCE', 0x7dff9a);
-    this.noiseBar = this.add.graphics().setDepth(600); txt(this, 120, 372, 'NOISE', 28, '#fff', '#22252b', 6).setDepth(600);
-    const mk = (x: number, label: string, col: number) => { const c = this.add.container(x, 1180).setDepth(700); const g = this.add.graphics(); g.fillStyle(0x000000, 0.35).fillRoundedRect(-150, -60, 300, 130, 28).fillStyle(col, 1).lineStyle(6, 0x22252b, 1).fillRoundedRect(-150, -70, 300, 130, 28).strokeRoundedRect(-150, -70, 300, 130, 28);
-      c.add([g, txt(this, 0, -5, label, 40, '#fff', '#22252b', 7)]); return c; };
-    this.sb = mk(190, 'SNEAK', 0x6b4cc9); this.pb = mk(530, 'POUNCE!', 0xff5c8a);
-    this.yarnBtn = this.add.container(YX, YY).setDepth(700);
-    { const g = this.add.graphics(); g.fillStyle(0x22252b, 0.8).fillCircle(0, 0, 56).lineStyle(5, 0xffffff, 0.9).strokeCircle(0, 0, 56);
-      this.yarnBtn.add([g, this.add.image(0, -6, 'pn_yarn').setScale(0.8), txt(this, 0, 40, 'YARN', 18, '#ffdf6b', '#22252b', 4)]); }
+    XS3.forEach(x => this.boxes.push(makeBox(this, x, BB)));
+    this.hud = new Hud(this, 'BOX BANDIT', 0x7dff9a);
+    this.pill = txt(this, W / 2, 335, '', 34, '#ffffff', '#22252b', 7).setDepth(600);
+    this.meter = this.add.graphics().setDepth(600);
+    this.q = txt(this, 0, 0, '?', 70, '#ffdf6b', '#22252b', 8).setDepth(40).setVisible(false);
+    // eye badge over Puppy: OPEN = he can see you (stay put), SHUT = busy (move!)
+    this.badgeRing = this.add.graphics(); this.badgeEye = this.add.image(0, 0, 'pn_eye').setScale(1.2);
+    this.badge = this.add.container(0, 0, [this.badgeRing, this.badgeEye]).setDepth(42).setVisible(false);
+    const mk = (x: number, label: string) => { const c = this.add.container(x, 1180).setDepth(700), g = this.add.graphics(), t = txt(this, 0, -5, label, 42, '#fff', '#22252b', 7); c.add([g, t]); return { c, g, t }; };
+    { const a = mk(190, 'MEOW?'); this.mb = a.c; this.mbG = a.g; this.mbT = a.t; const b = mk(530, 'POUNCE!'); this.pbtn = b.c; this.pbG = b.g; this.pbT = b.t; }
     makeMuteButton(this); makePauseButton(this, () => this.st.running);
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { const w = worldPoint(this, p); if (pointerInMute(w.x, w.y) || pointerInPause(w.x, w.y)) return;
-      if (Math.hypot(w.x - YX, w.y - YY) < 62) return this.throwYarn();
-      if (w.y > 1080 && w.x > W / 2) this.pounce(); else this.st.hold = true; });
-    this.input.on('pointerup', () => { this.st.hold = false; });
-    (window as any).__pr = { scene: 'Pounce', st: this.st, K, force: (win: boolean) => this.finish(win), yarn: () => this.throwYarn() };
-    tutorialCard(this, 'noir1', 'SNEAKY POUNCE!', ['You are NOIR! 🐈‍⬛ HOLD SNEAK to creep', 'His 👁 meter fills if he sees you — full = SPOTTED!', 'Freeze or hide when he turns. He can peek fast!', `POUNCE as he looks away • ${K.NEED} catches wins`], () => this.begin());
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { const w = worldPoint(this, p); if (pointerInMute(w.x, w.y) || pointerInPause(w.x, w.y)) return; this.tapAt(w.x, w.y); });
+    (window as any).__pr = { scene: 'Pounce', st: this.st, K, ready: false, force: (win: boolean) => this.finish(win), tap: (x: number, y: number) => this.tapAt(x, y),
+      meow: () => this.meow(), pounce: () => this.pounce(), hop: (i: number) => this.hopTo(i), grab: () => this.grab(), boxX: () => this.boxes.map(b => b.x),
+      tip: () => this.pup ? this.pup.tipPos() : null };
+    ensureArt(this, ART).then(() => { if (!this.sys.isActive() && !this.sys.isPaused()) return; this.build(); });
+  }
+  private build() {
+    const s = this.st;
+    this.rig = new HeroRig(this, 'Noir', XS3[0], DUCK_Y, NOIR_M, { tail: true }).setDepth(9);
+    this.rig.root.addAt(this.add.ellipse(0, -110, 190, 250, 0xc9a6ff, 0.16).setBlendMode(Phaser.BlendModes.ADD), 0); // soft rim so her dark limbs read on the wall
+    const mg = this.make.graphics({ x: 0, y: 0 }, false); mg.fillStyle(0xffffff).fillRect(0, 0, W, BB); this.rig.root.setMask(mg.createGeometryMask()); // she sinks INTO boxes (clipped at the box base)
+    this.pup = new TailPup(this, s.px, LANE, PUP_M); this.pup.setDepth(20); this.pup.flip(true); this.pupShadow = this.pup.root.list[0] as any; this.pup.root.setVisible(false);
+    (window as any).__pr.ready = true;
+    tutorialCard(this, 'noir2', /* Box Bandit: new tutorial id so everyone sees it once */ 'BOX BANDIT!', ['You are NOIR! 🐈‍⬛ Hide in the boxes.', 'MEOW? tricks him into the WRONG box', 'Head in a box? POUNCE! = BOO-X!', 'Then TAP his tail + TAP TAP TAP!',
+      `Move only when his 👁 is shut • ${K.NEED} boops`], () => this.begin());
   }
   private makeTextures() {
     const t = this.textures;
-    if (!t.exists('pn_susbg')) { const g = this.make.graphics({ x: 0, y: 0 }, false);
-      g.fillStyle(0x000000, 0.3).fillRoundedRect(4, 8, 200, 48, 24).fillStyle(0xffffff, 1).fillRoundedRect(0, 2, 200, 48, 24).fillStyle(0x22252b, 1).fillRoundedRect(4, 6, 192, 40, 20);
-      g.fillStyle(0x3a2a5a, 1).fillRoundedRect(52, 12, 138, 28, 14).fillStyle(0xffffff, 1).fillCircle(28, 26, 21); g.generateTexture('pn_susbg', 206, 58); g.destroy(); }
-    if (!t.exists('pn_susfill')) { const g = this.make.graphics({ x: 0, y: 0 }, false); g.fillStyle(0xffffff, 1).fillRoundedRect(0, 0, 132, 24, 12); g.generateTexture('pn_susfill', 132, 24); g.destroy(); }
-    if (!t.exists('pn_susshine')) { const g = this.make.graphics({ x: 0, y: 0 }, false); g.fillStyle(0xffffff, 0.35).fillRoundedRect(0, 0, 120, 7, 3.5); g.generateTexture('pn_susshine', 120, 26); g.destroy(); }
-    if (!t.exists('pn_eye')) { const g = this.make.graphics({ x: 0, y: 0 }, false); // wide-open suspicious eye
+    if (!t.exists('pn_eye')) { const g = this.make.graphics({ x: 0, y: 0 }, false); // wide-open eye: he can see
       g.fillStyle(0xffffff, 1).fillEllipse(20, 20, 34, 26).lineStyle(3, 0x22252b, 1).strokeEllipse(20, 20, 34, 26).fillStyle(0x3a2412, 1).fillCircle(17, 21, 9).fillStyle(0x000000, 1).fillCircle(17, 21, 5)
         .fillStyle(0xffffff, 1).fillCircle(14, 18, 3); g.lineStyle(3, 0x22252b, 1).beginPath(); g.moveTo(4, 5); g.lineTo(30, 3); g.strokePath(); g.generateTexture('pn_eye', 40, 40); g.destroy(); }
-    if (!t.exists('pn_eyez')) { const g = this.make.graphics({ x: 0, y: 0 }, false); // happy closed eye (^) + blush: not looking
+    if (!t.exists('pn_eyez')) { const g = this.make.graphics({ x: 0, y: 0 }, false); // shut eye (^): busy
       g.lineStyle(5, 0x22252b, 1).beginPath(); g.arc(20, 26, 11, Math.PI * 1.1, Math.PI * 1.9); g.strokePath(); g.fillStyle(0xff9ab8, 0.8).fillEllipse(20, 32, 16, 6); g.generateTexture('pn_eyez', 40, 40); g.destroy(); }
     if (!t.exists('pn_glow')) { const g = this.make.graphics({ x: 0, y: 0 }, false); for (let i = 30; i > 0; i--) g.fillStyle(0xffffff, 0.04).fillCircle(100, 100, i * 3.3); g.generateTexture('pn_glow', 200, 200); g.destroy(); }
     if (!t.exists('pn_shadow')) { const g = this.make.graphics({ x: 0, y: 0 }, false); for (let i = 8; i > 0; i--) g.fillStyle(0x1a0a08, 0.07).fillEllipse(90, 20, 20 * i + 20, 4 * i + 6); g.generateTexture('pn_shadow', 180, 40); g.destroy(); }
-    if (!t.exists('pn_yarn')) { const g = this.make.graphics({ x: 0, y: 0 }, false);
-      g.fillStyle(0x22252b, 1).fillCircle(50, 50, 40).fillStyle(0xff5c8a, 1).fillCircle(50, 50, 35).fillStyle(0xff9ab8, 1).fillCircle(42, 40, 16);
-      g.lineStyle(4, 0xb02a5a, 1); for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(50, 50, 12 + i * 5, -2.6 + i * 0.4, -0.2 + i * 0.5); g.strokePath(); }
-      g.lineStyle(4, 0xff5c8a, 1).beginPath(); g.moveTo(84, 62); g.lineTo(96, 74); g.lineTo(90, 90); g.strokePath(); g.generateTexture('pn_yarn', 100, 100); g.destroy(); }
   }
-  /** Shaded snack box (with a crisp bag peeking out) + potted plant: the two hiding spots. */
-  private drawCovers() {
-    const box = this.add.graphics().setDepth(20), B = HIDES[0];
-    box.fillStyle(0x000000, 0.25).fillEllipse(B, FLOOR + 12, 190, 26);
-    box.fillStyle(0xffdf6b, 1).lineStyle(4, 0x2a1408, 1).fillRect(B - 30, FLOOR - 205, 40, 50).strokeRect(B - 30, FLOOR - 205, 40, 50);
-    box.fillStyle(0x8a5a2a, 1).lineStyle(6, 0x2a1408, 1).fillRect(B - 75, FLOOR - 170, 150, 180).strokeRect(B - 75, FLOOR - 170, 150, 180);
-    box.fillStyle(0xa8743a, 1).fillRect(B + 40, FLOOR - 167, 32, 174).fillStyle(0x6a3e1e, 1).fillRect(B - 72, FLOOR - 167, 16, 174);
-    box.fillStyle(0x9a6a32, 1).lineStyle(5, 0x2a1408, 1).fillTriangle(B - 75, FLOOR - 170, B - 110, FLOOR - 200, B - 20, FLOOR - 186).strokeTriangle(B - 75, FLOOR - 170, B - 110, FLOOR - 200, B - 20, FLOOR - 186);
-    box.fillTriangle(B + 75, FLOOR - 170, B + 112, FLOOR - 196, B + 20, FLOOR - 186).strokeTriangle(B + 75, FLOOR - 170, B + 112, FLOOR - 196, B + 20, FLOOR - 186);
-    box.lineStyle(4, 0x5a3414, 1).lineBetween(B - 75, FLOOR - 120, B + 75, FLOOR - 120); txt(this, B, FLOOR - 60, 'SNACKS', 26, '#ffdf6b', '#2a1408', 5).setDepth(21);
-    const pl = this.add.graphics().setDepth(20).setPosition(HIDES[1], FLOOR).setScale(0.72), P = 0, FL = 0;
-    pl.fillStyle(0x000000, 0.25).fillEllipse(P, FL + 12, 130, 22);
-    const leaf = (a: number, l: number, col: number) => { const x2 = P + Math.cos(a) * l, y2 = FL - 90 + Math.sin(a) * l; pl.fillStyle(col, 1).lineStyle(4, 0x0f2a12, 1);
-      const pts = [new Phaser.Math.Vector2(P, FL - 90), new Phaser.Math.Vector2((P + x2) / 2 + Math.sin(a) * 26, (FL - 90 + y2) / 2 - Math.cos(a) * 26), new Phaser.Math.Vector2(x2, y2), new Phaser.Math.Vector2((P + x2) / 2 - Math.sin(a) * 26, (FL - 90 + y2) / 2 + Math.cos(a) * 26)];
-      pl.fillPoints(pts, true).strokePoints(pts, true); pl.lineStyle(2, 0x9ae8a0, 0.6).lineBetween(P, FL - 90, x2, y2); };
-    [[-2.6, 120, 0x2f8a3a], [-0.5, 120, 0x2f8a3a], [-2.0, 150, 0x3fae4a], [-1.1, 150, 0x3fae4a], [-1.57, 165, 0x4cc458], [-2.9, 90, 0x2a7a32], [-0.25, 90, 0x2a7a32]].forEach(([a, l, c]) => leaf(a, l, c));
-    pl.fillStyle(0xc0603a, 1).lineStyle(5, 0x2a1408, 1).fillPoints([new Phaser.Math.Vector2(P - 50, FL - 95), new Phaser.Math.Vector2(P + 50, FL - 95), new Phaser.Math.Vector2(P + 36, FL + 8), new Phaser.Math.Vector2(P - 36, FL + 8)], true)
-      .strokePoints([new Phaser.Math.Vector2(P - 50, FL - 95), new Phaser.Math.Vector2(P + 50, FL - 95), new Phaser.Math.Vector2(P + 36, FL + 8), new Phaser.Math.Vector2(P - 36, FL + 8)], true);
-    pl.fillStyle(0xe08a5a, 1).fillRect(P + 18, FL - 90, 14, 90).fillStyle(0xa04a2a, 1).fillRect(P - 56, FL - 105, 112, 18).lineStyle(4, 0x2a1408, 1).strokeRect(P - 56, FL - 105, 112, 18);
+  private begin() {
+    const s = this.st; popBanner(this, 'SHHH...', 700, 0x6b4cc9);
+    this.time.delayedCall(600, () => { this.talk(360, 560, pick(LINES.start.Noir), 22); s.running = true; this.startRound(); });
   }
-  private begin() { this.st.lookT = Phaser.Math.FloatBetween(K.AWAY_MIN, 1.6); popBanner(this, 'SHHH...', 700, 0x6b4cc9); this.time.delayedCall(600, () => { this.talk(360, 560, pick(LINES.start.Noir), 22); this.st.running = true; }); }
-  private get hidden() { return this.st.dazed <= 0 && HIDES.some(h => Math.abs(this.st.x - h) < HIDE_R); } // dazed after a dodge = tumbled out in the open
-  private setMode(m: Mode) { this.st.mode = m; this.st.busy = m !== ''; }
-  update(_t: number, dms: number) {
-    const s = this.st; const dt = Math.min(dms, 50) / 1000; this.draw(dt);
-    if (!s.running || s.over || s.mode === 'catch') return; // the clock only pauses for a successful catch (reward), never for dodges/escapes
-    s.time -= dt; if (s.time <= 0) { s.time = 0; return this.finish(false); }
-    this.hud.set(`CATCHES ${s.catches}/${K.NEED}`, s.time, s.catches / K.NEED);
-    if (s.mode === 'flee') return;
-    const ph = s.catches >= P3 ? 3 : s.catches >= P2 ? 2 : 1;
-    if (ph !== s.phase) { s.phase = ph; popBanner(this, ph === 2 ? 'PUPPY IS PACING!' : 'SNEAKY PUPPY — QUICK GLANCES!', 600, ph === 2 ? 0x2fa0bf : 0xbf6a2f, 900); Fx.alert(); }
-    this.lookCycle(dt, ph);
-    if (s.mode === 'pounce') { if (s.yarnT <= 0 && (s.look === 'look' || (s.look === 'warn' && !this.leaping))) s.turned = 1; return; } // turned during the crouch, or looked during the leap -> he dodges
-    if (s.mode === 'dodge') return;
-    if (s.dazed > 0) s.dazed -= dt;
-    if (s.scampT > 0) s.scampT -= dt;
-    else if (ph >= 2 && s.yarnT <= 0) { s.px += this.paceDir * PACE * dt; if (s.px > 640) this.paceDir = -1; if (s.px < 520) this.paceDir = 1; }
-    const moving = s.hold && s.x < s.px - K.CAP, d = s.px - s.x, hid = this.hidden;
-    let creak = false;
-    this.creakCool -= dt;
-    if (moving) {
-      s.x += K.SPEED * dt; s.noise += STEP_N * dt;
-      CREAK.forEach(([a, b], i) => { if (s.x > a && s.x < b) { creak = true; s.noise += CREAK_N * dt; this.creakFlash[i] = 1;
-        if (this.creakCool <= 0) { this.creakCool = 0.35; this.creakPop(s.x); }
-        if (s.look === 'away' && s.yarnT <= 0 && Math.random() < CREAK_ALERT * dt) { s.lookT = Math.min(s.lookT, 0.05); this.ft(s.px, FLOOR - 410, 'huh?', '#ffffff', 30); } } });
-      if (s.noise > 25 && Math.random() < dt * 5) this.waves.push({ x: s.x, r: 30, a: Math.min(1, s.noise / 80) });
-    } else s.noise = Math.max(0, s.noise - DECAY * dt);
-    // suspicion meter: moving in his sight fills it fast, lurking exposed nearby fills it slowly, half rate while he turns ("?");
-    // cover or distance drains it; creaky boards always add a little. Full = SPOTTED.
-    const eyes = s.yarnT <= 0 && s.look !== 'away' ? (s.look === 'look' ? 1 : 0.5) : 0;
-    let rate = 0;
-    if (eyes && !hid) rate = moving ? K.SUS_MOVE * eyes * (d > 420 ? 0.6 : 1) : d <= SUS_NEAR ? K.SUS_STILL * eyes * (d < SNIFF_R ? 2 : 1) : 0; // lurking right beside him = twice as risky
-    else if (eyes && moving) rate = K.SUS_MOVE * eyes * K.COVER_MOVE; // cover only fully hides you while you keep still
-    if (creak) rate += SUS_CREAK;
-    if (rate > 0) s.sus = Math.min(100, s.sus + rate * dt);
-    else s.sus = Math.max(0, s.sus - (hid ? SUS_COVER : d > SUS_NEAR ? SUS_FAR : eyes ? 0 : SUS_IDLE) * dt);
-    if (s.sus >= 100) { s.noise = 100; this.spot(); }
-    // close-range sniff: lurking right behind him too long makes him turn round (cover still protects)
-    if (d < SNIFF_R && s.look === 'away' && s.yarnT <= 0) { s.sniffT += dt; if (s.sniffT > K.SNIFF_T) { s.sniffT = 0; s.look = 'warn'; s.fake = 0; s.lookT = 0.25; Fx.alert(); this.qPop();
-      this.ft(s.px, FLOOR - 410, 'sniff sniff...?', '#ffffff', 28); } } else if (d >= SNIFF_R) s.sniffT = 0;
-    if (s.noise >= 100) this.flee();
-  }
-  /** Puppy's look cycle: away 0.8-2.0 s -> "?" 0.2-0.5 s (sometimes a FAKE that turns back) -> look; sometimes a quick glance with no "?". */
-  private lookCycle(dt: number, ph: number) {
-    const s = this.st, F = Phaser.Math.FloatBetween;
-    if (s.yarnT > 0) { s.yarnT -= dt; s.look = 'away'; if (s.yarnT <= 0) this.yarnDone(); return; }
-    s.lookT -= dt * (1 + s.noise / K.NOISE_K);
-    if (s.lookT > 0) return;
-    if (s.look === 'away') {
-      if (Math.random() < (K.GLANCE_P + (ph === 3 ? GLANCE_P3 - GLANCE_P : 0))) { s.look = 'look'; s.glance = 1; s.lookT = F(...GLANCE_T); Fx.alert(); this.qPop(); }
-      else { s.look = 'warn'; s.fake = Math.random() < (K.FAKE_P + (ph === 3 ? FAKE_P3 - FAKE_P : 0)) ? 1 : 0; s.lookT = F(...WARN_T); Fx.alert(); this.qPop(); }
-    } else if (s.look === 'warn') {
-      if (s.fake) { s.look = 'away'; s.fake = 0; s.lookT = F(0.6, 1.4); if (Math.random() < 0.4) this.ft(s.px, FLOOR - 410, '...nah', '#ffffff', 26); }
-      else { s.look = 'look'; s.glance = 0; s.lookT = F(...LOOK_T); if (Math.random() < 0.3) this.talk(s.px, FLOOR - 470, pick(LINES.puppyGag), 20, 900); }
-    } else { s.look = 'away'; s.glance = 0; s.lookT = F(K.AWAY_MIN, K.AWAY_MAX) * Math.max(0.85, 1 - 0.02 * s.catches); }
-  }
-  /** floatText kept fully on screen (estimated half-width from the string). */
+  // ------------------------------------------------------------------ helpers
+  private bx(i: number) { return this.boxes[i].x; }
+  private get headIn() { const p = this.st.pup; return p === 'peek' || p === 'tell'; }
+  private eyesOpen() { const p = this.st.pup; return p === 'walk' || p === 'feint' || p === 'look' || (p === 'up' && this.stateT > 0.5); }
   private ft(x: number, y: number, t: string, col?: string, size = 40) { const half = t.length * size * 0.3 + 16; floatText(this, Phaser.Math.Clamp(x, half, W - half), y, t, col, size); }
-  /** Speech bubble clamped so it never runs off the screen edges. */
   private talk(x: number, y: number, text: string, size?: number, hold?: number) {
     const b = say(this, x, y, text, size, hold) as Phaser.GameObjects.Container;
     const t = b.list.find(o => o instanceof Phaser.GameObjects.Text) as Phaser.GameObjects.Text | undefined;
-    const half = (t ? t.width : 300) / 2 + 30; b.x = Phaser.Math.Clamp(x, half + 8, W - half - 8); return b;
+    const half = t ? t.width / 2 + 34 : 200; b.x = Phaser.Math.Clamp(b.x, half, W - half); return b;
   }
-  private qPop() { this.q.setScale(0.3); this.tweens.add({ targets: this.q, scale: 1, duration: 160, ease: 'Back.Out' }); }
-  private creakPop(x: number) {
-    Fx.step(); const t = comic(this, x + Phaser.Math.Between(-20, 20), FLOOR - 200, 'creak!', 40, '#ffb060', '#fff0d0', '#2a1408').setDepth(60).setAngle(Phaser.Math.Between(-14, 14)).setScale(0.4);
-    this.tweens.add({ targets: t, scale: 1, duration: 120, ease: 'Back.Out' }); this.tweens.add({ targets: t, y: t.y - 70, alpha: 0, delay: 250, duration: 450, onComplete: () => t.destroy() });
-    for (let i = 0; i < 4; i++) { const d = this.add.circle(x + Phaser.Math.Between(-30, 30), FLOOR + 10, Phaser.Math.Between(6, 12), 0xd9b080, 0.7).setDepth(13);
-      this.tweens.add({ targets: d, y: d.y - 40, x: d.x + Phaser.Math.Between(-30, 30), alpha: 0, scale: 1.8, duration: 500, onComplete: () => d.destroy() }); }
-    this.noir.setScale(this.noirBase * 1.05, this.noirBase * 0.9); this.tweens.add({ targets: this.noir, scaleX: this.noirBase, scaleY: this.noirBase, duration: 200, ease: 'Back.Out' });
+  private pupTalk(text: string, hold = 1100) { const tip = !!this.hintC?.active; // a TIP is up (text at y 545-670): Puppy's bubble goes above it, not on it
+    this.talk(this.pup.root.x, tip ? 445 : Math.min(this.pup.root.y - 300, 640), text, 22, hold); }
+  private setFace(f: number) { this.st.face = f; this.pup.flip(f < 0); }
+  private boxAt(x: number, y: number) { if (y < RIM - 200 || y > BB + 70) return -1; const half = this.st.boxes === 3 ? 90 : 80; return this.boxes.findIndex(b => Math.abs(x - b.x) < half); }
+  // ------------------------------------------------------------------ input
+  tapAt(x: number, y: number) {
+    const s = this.st; if (!s.running || s.over || !this.pup) return;
+    if (s.phase === 'grab') { const tp = this.pup.tipPos(); if (Math.hypot(x - tp.x, y - tp.y) < 170 || Math.hypot(x - this.pup.root.x, y - (this.pup.root.y - 90)) < 140 || (y > 1090 && x > W / 2)) this.grab(); else this.ft(tp.x, tp.y - 60, 'tap the TAIL!', '#7dff9a', 30); return; }
+    if (s.phase === 'tug') { this.tugTap(); return; }
+    if (s.phase !== 'hunt') return;
+    if (y > 1090) { if (x < W / 2) this.meow(); else this.pounce(); return; }
+    // tapping Puppy's wiggling butt / the box he's in = POUNCE (big target)
+    if (this.headIn && s.pbox >= 0 && Math.abs(x - this.bx(s.pbox)) < BOX_W / 2 + 20 && y > RIM - 230 && y < BB + 40) { this.pounce(); return; }
+    const i = this.boxAt(x, y); if (i >= 0 && i !== s.noirBox) this.hopTo(i);
   }
-  private spot() {
-    const s = this.st; if (s.spotted > 0) return; s.spotted = 1;
-    this.bang.setVisible(true).setPosition(s.px, FLOOR - 260).setScale(1.8); this.tweens.add({ targets: this.bang, scale: 1.2, duration: 160, ease: 'Back.Out' });
-    this.cameras.main.shake(200, 0.012); flashVignette(this, 0xff3b3b, 0.45); this.ft(s.x, FLOOR - 260, 'SPOTTED!', '#ff6b6b', 44);
+  // ------------------------------------------------------------------ Noir moves
+  /** hop (box to box, or from the floor/rim into box j). Exposed above the rims = he sees you if his eyes are open. */
+  hopTo(j: number, auto = false) {
+    const s = this.st; if (s.over || !this.rig || j < 0 || j >= this.boxes.length) return;
+    if (!auto && (s.phase !== 'hunt' || s.nState !== 'in' || j === s.noirBox)) return;
+    if (!auto && this.headIn && j === s.pbox) return this.pounce();
+    const from = s.nState === 'in' ? s.noirBox : -1, x0 = this.rig.x, y0 = this.rig.y, x1 = this.bx(j), fromOut = s.nState !== 'in';
+    const n = from >= 0 ? Math.abs(from - j) : Math.max(1, Math.round(Math.abs(x1 - x0) / 160));
+    const dur = (K.HOP + K.HOP_PER * Math.max(0, n - 1)) * 1000, apex = RIM - 110 - Math.min(70, Math.abs(x1 - x0) * 0.12), cy = 2 * apex - (y0 + DUCK_Y) / 2;
+    this.boxes.forEach(b => b.eyes.setVisible(false));
+    s.nState = 'hop'; s.noirBox = j; s.lastHopAt = s.t; this.hideHint('sneak');
+    this.rig.setFlip(x1 < x0).setMood('smug');
+    this.rig.act([{ dur: 0.07, to: CROUCH }, { dur: dur / 2000, to: STRETCH }, { dur: dur / 2000, to: CROUCH }], false, 0.2);
+    Fx.whoosh(); this.noirTween?.stop();
+    this.noirTween = this.tweens.addCounter({ from: 0, to: 1, duration: dur, ease: 'Sine.InOut', onUpdate: (tw) => {
+      const p = tw.getValue()!, y = (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * cy + p * p * DUCK_Y; this.rig.setPosition(Phaser.Math.Linear(x0, x1, p), y);
+      const above = y < RIM + 6; this.rig.setDepth(above || (p < 0.5 && fromOut) ? 22 : 9); s.noirOut = y < RIM + 70 || (p < 0.5 && fromOut) ? 1 : 0; },
+    onComplete: () => { s.nState = 'in'; s.noirOut = 0; this.rig.setDepth(9); this.boxes[j].c.setAngle(0); this.wobbleBox(j, 6); Fx.step(); } });
   }
-  private susK = -1;
-  private drawSus(now: number) {
-    const s = this.st, show = s.running && !s.over && s.mode !== 'flee' && s.mode !== 'catch';
-    if (!show) { this.sus.setAlpha(0); return; }
-    const k = s.sus / 100, eyes = s.yarnT <= 0 && s.look !== 'away';
-    if (Math.abs(k - this.susK) > 0.002) { const rising = k > this.susK; this.susK = k; this.susFill.setCrop(0, 0, Math.round(132 * k), 24).setTint(k < 0.4 ? 0xffe066 : k < 0.7 ? 0xffa63a : 0xff4a4a);
-      this.sus.setScale(rising ? 1.08 : 1); } else this.sus.setScale(1);
-    const key = eyes ? 'pn_eye' : 'pn_eyez'; if (key !== this.eyeKey) { this.eyeKey = key; this.susEye.setTexture(key); }
-    this.susEye.setScale(eyes ? 1 + 0.08 * Math.sin(now / 70) : 1);
-    const jig = k > 0.7 ? Math.sin(now / 22) * 4 * k : 0, near = Phaser.Math.Clamp((250 - (this.pup.x - this.noir.x)) / 90, 0, 1);
-    this.susLift += (near - this.susLift) * 0.2; // Noir close -> the meter floats up above both heads, clear of her face
-    this.sus.setPosition(Phaser.Math.Clamp(this.pup.x + jig, 112, W - 112), this.pup.y - 172 - this.susLift * 150).setAlpha(k > 0.01 || eyes ? 1 : 0.6);
+  private wobbleBox(i: number, a = 5) { const b = this.boxes[i]; if (!b || this.flopBox === i) return; this.tweens.killTweensOf(b.c); b.c.setAngle(0).setScale(1);
+    this.tweens.add({ targets: b.c, angle: { from: -a, to: a }, duration: 70, yoyo: true, repeat: 2, onComplete: () => b.c.setAngle(0) });
+    this.tweens.add({ targets: [b.flapL, b.flapR], angle: { from: 0, to: -14 }, duration: 90, yoyo: true }); }
+  // ------------------------------------------------------------------ MEOW
+  meow() {
+    const s = this.st; if (s.phase !== 'hunt' || s.nState !== 'in' || s.meowCd > 0) return;
+    if (s.pup === 'count' || s.pup === 'dive' || s.pup === 'up' || s.pup === 'off' || s.pup === 'seq') { this.ft(190, 1060, 'not now!', '#ffffff', 28); return; }
+    s.meowCd = K.MEOW_CD; s.meowRow++; this.hideHint('meow'); this.hints.add('meow');
+    const nx = this.bx(s.noirBox); Fx.alert();
+    if (s.meowRow > K.MEOW_ROW) { // he's wise to it: the meow came from HER box
+      s.wise++; this.meowBubble(s.noirBox); this.pupTalk(pick(LINES.boxWise), 1200); this.lure(s.noirBox, K.SNIFF_NOIR[0]); return; }
+    const cand = this.boxes.map((_, i) => i).filter(i => i !== s.noirBox && i !== s.pbox);
+    const m = cand.sort((a, b) => Math.abs(this.bx(a) - nx) - Math.abs(this.bx(b) - nx))[0] ?? this.boxes.findIndex((_, i) => i !== s.noirBox);
+    this.meowBubble(m); this.time.delayedCall(250, () => { if (!s.over && s.phase === 'hunt') this.pupTalk(pick(LINES.boxLured), 1000); });
+    this.lure(m, K.LURE_SNIFF);
   }
-  private draw(dt: number) {
-    const s = this.st, now = this.time.now;
-    // Noir: tiptoe slink while sneaking, crouch when frozen
-    if (!s.busy) { const sneak = s.hold && s.running; this.noir.x = s.x; this.noir.y = FLOOR + 10 + (sneak ? -Math.abs(Math.sin(now / 90)) * 8 : 0);
-      this.noir.setAngle(sneak ? Math.sin(now / 90) * 3 : 0);
-      // creeping: low crouch, paws padding forward in turn, legs tiptoeing; otherwise blend back to a relaxed crouch-ready stance
-      const w = Math.sin(now / 90), P = this.rig.pose as Record<string, number>;
-      const T: Record<string, number> = sneak ? { ls: 70 + w * 25, le: -30, rs: 60 - w * 25, re: -30, lh: -20 + w * 22, lk: 40, rh: 20 - w * 22, rk: -10, lean: 14, sq: -0.08, dy: 10, tilt: 4 }
-        : { ls: -12, le: -10, rs: 12, re: 10, lh: -4, lk: 0, rh: 4, rk: 0, lean: 0, sq: 0, dy: 0, tilt: 0 };
-      if (!this.rig.busy) { const k = 1 - Math.exp(-dt * 12), nx: Record<string, number> = {}; for (const key in T) nx[key] = P[key] + (T[key] - P[key]) * k; this.rig.setPose(nx); } }
-    const behind = this.hidden && !this.leaping; this.noir.setAlpha(behind ? 0.55 : 1).setDepth(behind ? 15 : 22); // in the air = out of cover
-    (this.children.getByName('nshadow') as Phaser.GameObjects.Image).setPosition(this.noir.x, FLOOR + 14).setScale(1 - (FLOOR + 10 - this.noir.y) / 400);
-    const yarnOn = s.yarnT > 0;
-    this.pup.x = s.px + this.pupOff;
-    if (s.mode !== 'flee' && s.mode !== 'catch') this.pup.setFlipX(yarnOn ? false : s.look !== 'look').setTexture(yarnOn ? 'pup_hearts' : s.look === 'look' ? (s.noise > 50 || s.spotted || s.sus > 70 ? 'pup_panic' : 'pup_idle') : s.look === 'warn' ? 'pup_lean' : 'pup_idle'); // looking away = plain face turned away (was pup_hearts for most of the round); the starry face is kept for the yarn
-    if (!s.busy) this.pup.y = FLOOR - (s.look === 'away' ? Math.abs(Math.sin(now / 200)) * 6 : 0);
-    if (this.runHop) { const ph = now / 65; this.pup.setY(FLOOR - Math.abs(Math.sin(ph)) * 14).setAngle(Math.sin(ph) * 8); } // scamper off / back in: hop + waddle instead of a flat slide
-    (this.children.getByName('pshadow') as Phaser.GameObjects.Image).setPosition(this.pup.x, FLOOR + 6);
-    this.q.setPosition(this.pup.x, FLOOR - 240 - this.susLift * 30 + Math.sin(now / 120) * 6).setText(s.spotted ? '' : s.look === 'warn' ? '?' : s.look === 'look' ? '👀' : yarnOn ? '♥' : '');
-    if (!s.spotted) this.bang.setVisible(false); else this.bang.setPosition(this.pup.x + Math.sin(now / 30) * 4, FLOOR - 265);
-    this.drawSus(now);
-    // vision cone (two soft layers) — reddens as he notices
-    const c = this.cone.clear(); if (s.look === 'look' && !s.busy && !yarnOn) { const col = s.sus > 35 || s.noise > 60 ? 0xff7a6a : 0xfff4a0;
-      c.fillStyle(col, 0.10).fillTriangle(s.px - 30, FLOOR - 120, 0, FLOOR - 380, 0, FLOOR + 160); c.fillStyle(col, 0.12).fillTriangle(s.px - 30, FLOOR - 120, 0, FLOOR - 300, 0, FLOOR + 80); }
-    else if (s.look === 'warn' && !s.busy) c.fillStyle(0xfff4a0, 0.05 + 0.05 * Math.sin(now / 40)).fillTriangle(s.px - 30, FLOOR - 120, s.px - 260, FLOOR - 260, s.px - 260, FLOOR + 40);
-    // creaky boards: cracked, tinted, flash orange + shake when stepped on
-    const b = this.boards.clear();
-    CREAK.forEach(([a, e], i) => { this.creakFlash[i] = Math.max(0, this.creakFlash[i] - dt * 3); const on = s.x > a - 10 && s.x < e + 10 && !s.busy, f = this.creakFlash[i], jig = f > 0 ? Math.sin(now / 25) * 2 * f : 0;
-      b.fillStyle(0xc88a4a, 1).fillRect(a, FLOOR - 14 + jig, e - a, 44).fillStyle(0xff8a3a, 0.25 + 0.5 * f + 0.1 * Math.sin(now / 300)).fillRect(a, FLOOR - 14 + jig, e - a, 44);
-      b.fillStyle(0x8a5226, 1).fillRect(a, FLOOR + 22 + jig, e - a, 8).lineStyle(4, 0x2a1408, 1).strokeRect(a, FLOOR - 14 + jig, e - a, 44);
-      b.lineStyle(3, 0x2a1408, 1).beginPath(); b.moveTo(a + 6, FLOOR - 4 + jig); b.lineTo(a + (e - a) * 0.3, FLOOR + 8 + jig); b.lineTo(a + (e - a) * 0.5, FLOOR + jig); b.lineTo(a + (e - a) * 0.7, FLOOR + 16 + jig); b.lineTo(e - 6, FLOOR + 6 + jig); b.strokePath();
-      b.lineBetween(a + (e - a) * 0.5, FLOOR + jig, a + (e - a) * 0.55, FLOOR - 12 + jig); b.fillStyle(0x2a1408, 1).fillCircle(a + 8, FLOOR - 6 + jig, 3).fillCircle(e - 8, FLOOR - 6 + jig, 3);
-      if (on) { const gl = 0.5 + 0.5 * Math.sin(now / 110); b.fillStyle(0xffb050, 0.18 + 0.2 * gl).fillRect(a - 10, FLOOR - 24, e - a + 20, 64); b.lineStyle(6, 0xffd070, 0.55 + 0.4 * gl).strokeRect(a - 4, FLOOR - 18, e - a + 8, 52); }
-      if (f > 0) { b.lineStyle(3, 0xffd0a0, f).lineBetween(a - 6, FLOOR - 30, a - 18, FLOOR - 50).lineBetween(e + 6, FLOOR - 30, e + 18, FLOOR - 50).lineBetween((a + e) / 2, FLOOR - 34, (a + e) / 2, FLOOR - 58); } });
-    // dust motes in the moon shaft
-    const fx = this.fxg.clear();
-    for (const m of this.motes) { m.y -= m.v * dt; m.x += Math.sin(now / 900 + m.p) * 0.2; if (m.y < 350) { m.y = 1040; m.x = Phaser.Math.Between(110, 400); }
-      fx.fillStyle(0xdfe6ff, 0.35 + 0.25 * Math.sin(now / 400 + m.p)).fillCircle(m.x, m.y, 2.2); }
-    // sound rings from Noir
-    this.waves = this.waves.filter(w => (w.r += 220 * dt) < 160); for (const w of this.waves) fx.lineStyle(4, 0xffb060, w.a * (1 - w.r / 160)).beginPath().arc(w.x, FLOOR - 80, w.r, -Math.PI * 0.85, -Math.PI * 0.15).strokePath();
-    // noise meter with pulsing outline (faster + redder as it fills)
-    const n = this.noiseBar.clear(), k = s.noise / 100, pulse = 0.5 + 0.5 * Math.sin(now / (220 - 160 * k)), ocol = k > 0.7 ? 0xff3b3b : k > 0.4 ? 0xffc021 : 0xffffff;
-    n.lineStyle(6 + pulse * 6 * (0.3 + k), ocol, 0.35 + 0.5 * pulse * (0.3 + k)).strokeRoundedRect(184 - pulse * 3, 346 - pulse * 3, 452 + pulse * 6, 52 + pulse * 6, 26);
-    n.fillStyle(0x22252b, 1).lineStyle(4, 0xffffff, 1).fillRoundedRect(190, 352, 440, 40, 20).strokeRoundedRect(190, 352, 440, 40, 20).fillStyle(s.noise > 70 ? 0xff3b3b : s.noise > 40 ? 0xffc021 : 0x7dff9a, 1).fillRoundedRect(196, 358, Math.max(28, 428 * Math.min(1, k)), 28, 14);
-    n.fillStyle(0xffffff, 0.25).fillRoundedRect(200, 360, Math.max(20, 420 * Math.min(1, k)), 8, 4);
-    n.lineStyle(3, 0xffffff, 0.6).lineBetween(196 + 428 * 0.4, 356, 196 + 428 * 0.4, 388).lineBetween(196 + 428 * 0.7, 356, 196 + 428 * 0.7, 388);
-    // pounce-range ring on the floor: green = NEAR, gold = FLYING POUNCE band; Puppy's spot marker lights up when in reach
-    const d = s.px - s.x, near = d < NEAR, fly = !near && d < FAR, r = this.ring.clear();
-    if (!s.busy && s.running) { const pr = 0.85 + 0.15 * Math.sin(now / 150);
-      r.fillStyle(0xffdf6b, fly ? 0.22 : 0.08).fillEllipse(s.x + FAR / 2, FLOOR + 14, FAR * 2, 70).fillStyle(0x7dff9a, near ? 0.28 : 0.1).fillEllipse(s.x + NEAR / 2, FLOOR + 14, NEAR * 2, 58);
-      r.lineStyle(4, 0xffdf6b, fly ? 0.9 * pr : 0.35).strokeEllipse(s.x + FAR / 2, FLOOR + 14, FAR * 2, 70).lineStyle(5, 0x7dff9a, near ? 0.95 * pr : 0.4).strokeEllipse(s.x + NEAR / 2, FLOOR + 14, NEAR * 2, 58);
-      r.lineStyle(5, near ? 0x7dff9a : fly ? 0xffdf6b : 0xff4a4a, near || fly ? 1 : 0.8).strokeCircle(s.px, FLOOR + 10, 22 + Math.sin(now / 90) * 4);
-      if (!near && !fly) r.lineStyle(5, 0xff4a4a, 0.75 * pr).strokeEllipse(s.x + FAR / 2, FLOOR + 14, FAR * 2 + 10, 76); }
-    this.pb.setAlpha(near || fly ? 1 : 0.45).setScale(near || fly ? 1 + Math.sin(now / 120) * 0.04 : 1);
-    this.yarnBtn.setAlpha(s.yarn > 0 && !yarnOn ? 1 : 0.3).setScale(s.yarn > 0 && s.noise > 50 && !yarnOn ? 1 + Math.sin(now / 100) * 0.06 : 1);
+  private meowBubble(i: number) { const b = this.boxes[i]; this.wobbleBox(i, 7);
+    const t = comic(this, b.x, RIM - 60, pick(LINES.boxMeow), 40, '#ffffff', '#d9c2ff', '#2a1a4a').setDepth(60).setScale(0.3).setAngle(Phaser.Math.Between(-10, 10));
+    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' }); this.tweens.add({ targets: t, y: t.y - 70, alpha: 0, delay: 600, duration: 400, onComplete: () => t.destroy() }); }
+  /** send Puppy dashing to box i (pulls his head out first if he's mid-peek) */
+  private lure(i: number, sniff: number) {
+    const s = this.st; s.dash = 1; const go = () => { if (s.over || s.phase === 'seq') return; this.walkTo(i, true); this.sniffLen = sniff; };
+    if (this.headIn) this.pullOut(go, 0.22); else if (s.pup === 'sniff' && s.tgt === i) { this.sniffLen = Math.min(this.sniffLen, this.stateT + sniff); } else go();
   }
-  throwYarn() {
-    const s = this.st; if (!s.running || s.over || s.busy || s.yarn <= 0 || s.yarnT > 0) return;
-    s.yarn = 0; s.yarnT = YARN_T; s.look = 'away'; Fx.boing(); this.ft(s.px, FLOOR - 410, 'YARN!!', '#ff9ab8', 40);
-    this.yarnBall?.destroy(); this.yarnBall = this.add.image(YX, YY, 'pn_yarn').setDepth(30).setScale(0.6);
-    this.tweens.add({ targets: this.yarnBall, x: s.px + 90, y: FLOOR - 10, angle: 720, duration: 500, ease: 'Quad.Out', onUpdate: (tw) => { this.yarnBall!.y = Phaser.Math.Linear(YY, FLOOR - 10, tw.progress) - Math.sin(tw.progress * Math.PI) * 160; } });
-    if (Math.random() < 0.6) this.talk(s.px, FLOOR - 470, 'Ooh! A YARN ball!!', 20, 900);
-  }
-  private yarnDone() { this.st.lookT = Math.min(this.st.lookT, 0.6); if (this.yarnBall) { const y = this.yarnBall; this.tweens.add({ targets: y, alpha: 0, duration: 300, onComplete: () => y.destroy() }); this.yarnBall = undefined; } }
+  // ------------------------------------------------------------------ POUNCE
   pounce() {
-    const s = this.st; if (!s.running || s.over || s.busy) return;
-    const d = s.px - s.x; if (d > FAR) { this.ft(s.x + 80, FLOOR - 250, 'too far!', '#fff', 30); s.noise += 15; return; }
-    const fly = d >= NEAR, T = fly ? FLY_T : NEAR_T, CROUCH = K.CROUCH; this.setMode('pounce'); this.leaping = false; s.flying = fly ? 1 : 0; this.rig.setMood('smug');
-    s.turned = s.yarnT <= 0 && s.look !== 'away' ? 1 : 0; // pouncing while he looks or turns = he sees it coming
-    const sx = s.x, tx = s.px - 30, apex = fly ? 280 : 200, E = Phaser.Math.Easing;
-    // 250 ms visible wind-up: low crouch + butt wiggle (if Puppy turns now or mid-air, he dodges) -> stretched leap -> landing squash
-    this.rig.act([{ dur: CROUCH / 1000, to: { ls: -40, le: 60, rs: -30, re: 60, lh: -50, lk: 80, rh: -30, rk: 70, lean: 18, sq: -0.16, dy: 18, tilt: 6 }, ease: E.Quadratic.Out },
-      { dur: T / 1000 * 0.45, to: { ls: 125, le: -10, rs: 110, re: -15, lh: -70, lk: 20, rh: -55, rk: 30, lean: 22, sq: 0.08, dy: -4, tilt: -4 }, ease: E.Cubic.Out },
-      { dur: T / 1000 * 0.55, to: { ls: 80, le: 10, rs: 65, re: 10, lh: -20, lk: 30, rh: 10, rk: 20, lean: 18, sq: 0.02, dy: 0 } }], true);
-    // wind-up tell, readable even behind the plant: deep squash + butt wiggle, dust puff in front of the cover, "wiggle wiggle" cue
-    this.tweens.add({ targets: this.noir, scaleX: this.noirBase * 1.3, scaleY: this.noirBase * 0.7, duration: CROUCH * 0.5, ease: 'Quad.Out' });
-    this.tweens.add({ targets: this.noir, angle: { from: -10, to: 10 }, duration: CROUCH / 6, yoyo: true, repeat: 2, onComplete: () => this.noir.setAngle(0) });
-    for (let i = 0; i < 4; i++) { const p = this.add.circle(sx + (i - 1.5) * 34, FLOOR + 14, 11, 0xd9b080, 0.8).setDepth(26);
-      this.tweens.add({ targets: p, x: p.x + (i - 1.5) * 22, y: FLOOR - 14, scale: 2, alpha: 0, duration: 380, ease: 'Quad.Out', onComplete: () => p.destroy() }); }
-    this.cue.setVisible(true).setPosition(sx, FLOOR - 270).setAlpha(1).setScale(0.4).setAngle(-8); this.tweens.killTweensOf(this.cue);
-    this.tweens.add({ targets: this.cue, scale: 1, angle: 8, duration: CROUCH * 0.6, ease: 'Back.Out' });
-    this.tweens.add({ targets: this.cue, alpha: 0, y: FLOOR - 320, delay: CROUCH + 120, duration: 260, onComplete: () => this.cue.setVisible(false) });
-    this.time.delayedCall(CROUCH, () => {
-      if (s.mode !== 'pounce' || s.over) return;
-      Fx.whoosh(); this.leaping = true;
-      this.tweens.addCounter({ from: 0, to: 1, duration: T, ease: 'Sine.easeInOut', onUpdate: (tw) => { const p = tw.getValue()!; this.noir.x = Phaser.Math.Linear(sx, tx, p); this.noir.y = FLOOR + 10 - Math.sin(p * Math.PI) * apex;
-          this.noir.setScale(this.noirBase * (0.9 + 0.1 * Math.abs(p - 0.5) * 2), this.noirBase * (1.15 - 0.15 * Math.abs(p - 0.5) * 2)).setAngle((p - 0.5) * 30);
-          if (Math.random() < 0.5) { const gh = this.add.ellipse(this.noir.x, this.noir.y - 130, 150, 230, 0x9a7aff, 0.25).setDepth(21).setAngle(this.noir.angle);
-            this.tweens.add({ targets: gh, alpha: 0, duration: 220, onComplete: () => gh.destroy() }); } },
-        onComplete: () => { if (s.mode !== 'pounce' || s.over) return; this.noir.y = FLOOR + 10; this.noir.setAngle(0); s.x = this.noir.x;
-          this.rig.act([{ dur: 0.08, to: { ls: 40, le: 20, rs: 30, re: 20, sq: -0.1, dy: 10, lean: 10, lh: -30, lk: 50, rh: 20, rk: -20 } }, { dur: 0.25, to: { sq: 0, dy: 4, lean: 6 } }], false, 0.25);
-          this.noir.setScale(this.noirBase * 1.2, this.noirBase * 0.82); this.tweens.add({ targets: this.noir, scaleX: this.noirBase, scaleY: this.noirBase, duration: 260, ease: 'Back.Out' });
-          for (let i = 0; i < 6; i++) { const p = this.add.circle(this.noir.x + Phaser.Math.Between(-50, 50), FLOOR + 10, 10, 0xd9b080, 0.7).setDepth(13); this.tweens.add({ targets: p, y: FLOOR - 30, alpha: 0, scale: 2, duration: 400, onComplete: () => p.destroy() }); }
-          this.leaping = false; if (s.turned || (s.yarnT <= 0 && s.look === 'look')) this.dodged(); else this.catch(); } });
+    const s = this.st; if (s.phase !== 'hunt' || !this.rig) return; if (s.nState === 'hop' || s.nState === 'seq') return;
+    this.hideHint('pounce');
+    const target = this.headIn && s.pbox >= 0 && s.pbox !== s.noirBox ? s.pbox : -1;
+    const x0 = this.rig.x, y0 = this.rig.y, tx = target >= 0 ? this.bx(target) : Phaser.Math.Clamp(this.pup.root.x - s.face * 90, 80, 640), ty = target >= 0 ? RIM + 4 : LANE;
+    const dur = (K.LEAP + Math.abs(tx - x0) * K.LEAP_PX) * 1000, cy = 2 * (Math.min(y0, ty) - 170) - (y0 + ty) / 2;
+    s.nState = 'hop'; s.phase = 'hunt'; s.noirOut = 1; this.boxes.forEach(b => b.eyes.setVisible(false));
+    this.rig.setFlip(tx < x0).setMood('smug').act([{ dur: 0.08, to: CROUCH }, { dur: dur / 1000, to: STRETCH }], true);
+    Fx.whoosh(); this.noirTween?.stop();
+    this.noirTween = this.tweens.addCounter({ from: 0, to: 1, duration: dur, ease: 'Quad.In', onUpdate: (tw) => { const p = tw.getValue()!;
+      this.rig.setPosition(Phaser.Math.Linear(x0, tx, p), (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * cy + p * p * ty); this.rig.setDepth(p > 0.1 ? 22 : 9); },
+    onComplete: () => { if (s.over) return;
+      if (target >= 0 && s.pbox === target && this.headIn) this.boox(target);
+      else if (target >= 0) { s.nState = 'in'; s.noirBox = target; this.rig.setPosition(tx, DUCK_Y).setDepth(9); this.rig.act([], false, 0.2); this.bust('dodge'); }
+      else { s.nState = 'out'; this.rig.act([], false, 0.2); this.bust('early'); } } });
+  }
+  // ------------------------------------------------------------------ Puppy AI
+  private sniffLen = 1; private nextCheck = 0;
+  private walkTo(i: number, dash = false) {
+    const s = this.st; s.tgt = i; s.dash = dash ? 1 : 0; s.pup = 'walk'; this.stateT = 0; this.q.setVisible(false); this.pup.setFrame('run0'); this.pup.root.setAngle(0); this.pup.inner.setAngle(0);
+    this.sniffLen = F(i === s.noirBox ? K.SNIFF_NOIR : K.SNIFF);
+  }
+  private pickNext(from: number) {
+    const s = this.st, n = this.boxes.length, others = [...Array(n).keys()].filter(i => i !== from), safe = others.filter(i => i !== s.noirBox);
+    if (s.firstPick) { s.firstPick = 0; // first pick of a round is never Noir's box: start the furthest away
+      const nx = this.bx(s.noirBox); return (safe.length ? safe : others).sort((a, b) => Math.abs(this.bx(b) - nx) - Math.abs(this.bx(a) - nx))[0]; }
+    const findP = Math.min(K.FIND_MAX, K.FIND_P + K.FIND_STEP * s.boops);
+    if (s.noirBox !== from && (Math.random() < findP || !safe.length)) return s.noirBox;
+    return Phaser.Utils.Array.GetRandom(safe);
+  }
+  private dive(i: number) {
+    const s = this.st, b = this.bx(i), x0 = this.pup.root.x, y0 = this.pup.root.y, f = s.face; s.pup = 'dive'; s.pbox = i; this.stateT = 0; this.q.setVisible(false);
+    this.pup.setFrame('stand'); Fx.boing(); const found = i === s.noirBox;
+    this.tweens.addCounter({ from: 0, to: 1, duration: 320, ease: 'Sine.InOut', onUpdate: (tw) => { const p = tw.getValue()!;
+      this.pup.root.setPosition(Phaser.Math.Linear(x0, b, p), (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * (PUP_IN - 120) + p * p * PUP_IN).setAngle(180 * f * Phaser.Math.Easing.Sine.In(p));
+      this.pup.setDepth(p > 0.55 ? 10 : 20); this.pupShadow.setVisible(p < 0.3);
+      if (found && p > 0.55 && s.pup === 'dive') { tw.stop(); this.foundYou(i); } },
+    onComplete: () => { if (s.pup !== 'dive') return; s.pup = 'peek'; this.stateT = 0; this.wobbleBox(i, 4);
+      this.peekLeft = Math.max(K.PEEK_MIN, F(K.PEEK) - K.PEEK_DROP * s.boops);
+      s.dc = s.boops >= K.DC_FROM && !s.dcDone && Math.random() < K.DC_P + K.DC_STEP * (s.boops - K.DC_FROM) ? 1 : 0; this.nextCheck = this.peekLeft * F([0.35, 0.6]);
+      if (!this.hints.has('pounce') && s.running) this.showHint('pounce'); } });
+  }
+  /** pull his head out (back to the floor beside the box) then call next */
+  private pullOut(next: () => void, dur = 0.3) {
+    const s = this.st, i = s.pbox, b = i >= 0 ? this.bx(i) : this.pup.root.x, side = b > 600 ? -1 : b < 120 ? 1 : -s.face, x1 = Phaser.Math.Clamp(b + side * 62, 70, 650), a0 = this.pup.root.angle;
+    s.pup = 'up'; this.stateT = 0; this.q.setVisible(false); this.pup.setFrame('stand'); this.hideHint('pounce');
+    this.tweens.addCounter({ from: 0, to: 1, duration: dur * 1000, ease: 'Sine.Out', onUpdate: (tw) => { const p = tw.getValue()!; this.stateT = p;
+      this.pup.root.setPosition(Phaser.Math.Linear(b, x1, p), (1 - p) * (1 - p) * PUP_IN + 2 * (1 - p) * p * (PUP_IN - 60) + p * p * LANE).setAngle(a0 * (1 - p));
+      this.pup.setDepth(p > 0.45 ? 20 : 10); this.pupShadow.setVisible(p > 0.7); },
+    onComplete: () => { if (s.pup !== 'up') return; this.pup.root.setAngle(0); s.pbox = -1; this.setFace(-side); this.wobbleBox(i, 3); next(); } });
+  }
+  private afterPeek(lookP = K.LOOK_P) {
+    const s = this.st, from = s.pbox; this.pupTalkMaybe(LINES.boxEmpty, 0.55);
+    this.pullOut(() => { if (Math.random() < lookP) { s.pup = 'look'; this.stateT = 0; this.lookT = F(K.LOOK_T); this.lookFlipT = 0.25; } else this.walkTo(this.pickNext(from)); });
+  }
+  private lookT = 0;
+  private pupTalkMaybe(pool: string[], p: number) { if (Math.random() < p) this.pupTalk(pick(pool), 900); }
+  private pupAI(dt: number) {
+    const s = this.st, pr = this.pup.root; this.stateT += dt;
+    switch (s.pup) {
+      case 'walk': {
+        const b = this.bx(s.tgt), side = pr.x > b ? 1 : -1, gx = Phaser.Math.Clamp(b + side * 62, 70, 650), d = gx - pr.x, sp = s.dash ? K.DASH : K.WALK;
+        if (Math.abs(d) > 4) { this.setFace(Math.sign(d)); pr.x += Math.sign(d) * Math.min(Math.abs(d), sp * dt); pr.y = LANE - Math.abs(Math.sin(this.pup.frame / 6 * Math.PI * 2)) * 5; }
+        else { pr.y = LANE; this.setFace(-side); s.pup = 'sniff'; this.stateT = 0; this.sniffTxtT = 0; this.pup.setFrame('stand'); if (s.tgt === s.noirBox && !this.hints.has('sneak')) this.showHint('sneak'); }
+        // feint (later rounds): halfway to the wrong box he changes his mind and heads for HERS
+        if (s.boops >= K.FEINT_FROM && !s.dash && !s.feintDone && s.tgt !== s.noirBox && this.stateT > 0.35 && Math.abs(d) < 260 && Math.abs(d) > 120) {
+          s.feintDone = 1; if (Math.random() < K.FEINT_P) { s.pup = 'feint'; this.stateT = 0; this.pup.setFrame('stand'); this.pupTalk(pick(LINES.boxFeint), 900); this.qPop(); } }
+        break; }
+      case 'feint': if (this.stateT > 0.35) { this.walkTo(s.noirBox, true); this.sniffLen = F(K.SNIFF_NOIR) * 0.75; } break;
+      case 'sniff': {
+        this.sniffTxtT -= dt; if (this.sniffTxtT <= 0) { this.sniffTxtT = 0.55; this.ft(pr.x + s.face * 40, pr.y - 230, pick(LINES.boxSniff), '#ffffff', 24); this.wobbleBox(s.tgt, 2); }
+        if (this.stateT > this.sniffLen) { this.dive(s.tgt); this.hideHint('sneak'); } break; }
+      case 'peek': {
+        if (s.dc && this.stateT > this.nextCheck) { // double-check: a quick stiff tail, then he pops out to look round
+          s.dc = 0; s.dcDone = 1; this.peekLeft -= this.stateT; s.pup = 'tell'; this.stateT = 0; this.tellLen = 0.22; this.dcTell = 1; this.qPop(); break; }
+        if (this.stateT > this.peekLeft) { s.pup = 'tell'; this.stateT = 0; this.tellLen = K.TELL; this.dcTell = 0; this.qPop(); } break; }
+      case 'tell': if (this.stateT > this.tellLen) { if (this.dcTell) { const box = s.pbox; this.pullOut(() => { s.pup = 'look'; this.stateT = 0; this.lookT = K.DC_T; this.lookFlipT = 0.2; this.dcBox = box; this.ft(pr.x, pr.y - 260, 'hmm?!', '#ffffff', 34); }, 0.22); }
+        else this.afterPeek(); } break;
+      case 'look': {
+        this.lookFlipT -= dt; if (this.lookFlipT <= 0) { this.lookFlipT = 0.3; this.setFace(-s.face); }
+        if (this.stateT > this.lookT) { if (this.dcBox >= 0) { const b = this.dcBox; this.dcBox = -1; if (b === s.noirBox) { this.walkTo(b); this.sniffLen = 0.25; } else { this.walkTo(b); this.sniffLen = 0.15; this.peekBack = 1; } } else this.walkTo(this.pickNext(-1)); } break; }
+      case 'count': {
+        const n = Math.min(3, Math.floor(this.stateT / (K.COUNT / 3)) + 1); if (n !== this.countN) { this.countN = n; this.ft(pr.x, pr.y - 250, n < 3 ? `${n}...` : '3!', '#ffffff', 46); Fx.step(); }
+        if (this.stateT > K.COUNT) { this.pupTalkMaybe(['Puppy: Ready or not!'], 0.5); s.firstPick = 1; this.walkTo(this.pickNext(-1)); } break; }
+    }
+  }
+  private tellLen = 0.4; private dcTell = 0; private dcBox = -1; private peekBack = 0;
+  private qPop() { const pr = this.pup.root; this.q.setText('?').setVisible(true).setPosition(pr.x, Math.min(pr.y, PUP_IN) - 120).setScale(1.6); this.tweens.add({ targets: this.q, scale: 1, duration: 160, ease: 'Back.Out' }); Fx.alert(); }
+  // ------------------------------------------------------------------ busts
+  private foundYou(i: number) {
+    const s = this.st; s.pbox = i; this.rig.setPosition(this.bx(i), PEEK_Y - 40); this.wobbleBox(i, 9); this.bang(this.bx(i), RIM - 160);
+    this.pullOut(() => {}, 0.25); this.bust('found');
+  }
+  private bang(x: number, y: number) { const t = txt(this, x, y, '!', 120, '#ff3b3b', '#22252b', 12).setDepth(45).setScale(1.8); this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out' }); this.tweens.add({ targets: t, alpha: 0, delay: 700, duration: 250, onComplete: () => t.destroy() }); }
+  /** busted: he saw her / found her / she whiffed. He covers his eyes and counts while Noir relocates (clock keeps running). */
+  private bust(kind: 'seen' | 'found' | 'dodge' | 'early') {
+    const s = this.st; if (s.phase !== 'hunt' || s.over) return; s.phase = 'bust'; s.busts++; s.streak = 0; this.hideHint('');
+    Fx.save(); flashVignette(this, 0xff3b3b, 0.25); this.rig.setMood('dizzy');
+    if (kind === 'seen') this.bang(this.rig.x, this.rig.y - 300);
+    if (kind === 'early') { this.tweens.add({ targets: this.pup.root, y: LANE - 90, duration: 170, yoyo: true, ease: 'Quad.Out' }); }
+    const line = kind === 'found' ? LINES.boxFound : kind === 'seen' ? LINES.boxBust : LINES.boxDodge;
+    this.time.delayedCall(kind === 'found' ? 260 : 120, () => { if (!s.over) this.pupTalk(pick(line), 1100); });
+    this.ft(360, 470, 'BUSTED!', '#ff8a8a', 50);
+    this.time.delayedCall(kind === 'found' ? 1000 : 850, () => { if (s.over) return;
+      const go = () => { s.phase = 'hunt'; s.pup = 'count'; this.stateT = 0; this.countN = 0; this.pup.setFrame('stand'); this.pup.root.setAngle(0).setY(LANE); this.setFace(this.pup.root.x < 360 ? -1 : 1);
+        this.pupTalkMaybe(LINES.boxCount, 0.6); this.rig.setMood('smug');
+        // Noir slips into another box while he counts (unless the player moves her first)
+        const hopAt = s.t; this.time.delayedCall(450, () => { if (s.over || s.pup !== 'count' || s.lastHopAt > hopAt) return;
+          const opts = this.boxes.map((_, i) => i).filter(i => i !== s.noirBox || s.nState !== 'in'); this.hopTo(Phaser.Utils.Array.GetRandom(opts), true); }); };
+      if (s.pup === 'up' || s.pup === 'dive') this.time.delayedCall(300, go); else go(); });
+  }
+  // ------------------------------------------------------------------ BOO-X! -> GRAB -> TAP TAP -> FLOP -> waddle -> stamp
+  private boox(i: number) {
+    const s = this.st; s.phase = 'seq'; s.pup = 'seq'; s.nState = 'seq'; s.noirOut = 0; this.q.setVisible(false); this.hideHint('');
+    const b = this.bx(i), first = !this.hints.has('grab'); s.score += 300;
+    Fx.punch(); Fx.boing(); impact(this, b, RIM - 80, s.boops === 0 ? 'BOO-X!' : pick(['BOO-X!', 'BOO-X!', 'SURPRISE!', 'PEEKABOO-X!']), 300, '', true); flashVignette(this, 0xffffff, 0.35);
+    this.rig.setMood('happy').act([{ dur: 0.1, to: { ls: -160, le: 20, rs: -160, re: 20, lean: 0, sq: 0.1, dy: -6 } }], true);
+    this.wobbleBox(i, 10);
+    // Puppy shoots out of the box and lands frozen on the floor, tail toward Noir
+    this.away = b < 360 ? 1 : -1; const lx = Phaser.Math.Clamp(b + this.away * 175, 150, 570), a0 = this.pup.root.angle, x0 = this.pup.root.x;
+    this.pup.setFrame('panic'); this.pup.wagAmp = 0; this.pup.tailStretch = 1.15;
+    this.tweens.addCounter({ from: 0, to: 1, duration: 520, ease: 'Sine.Out', onUpdate: (tw) => { const p = tw.getValue()!;
+      this.pup.root.setPosition(Phaser.Math.Linear(x0, lx, p), (1 - p) * (1 - p) * PUP_IN + 2 * (1 - p) * p * (PUP_IN - 300) + p * p * LANE).setAngle(a0 + (360 * this.away - a0) * p);
+      this.pup.setDepth(p > 0.25 ? 20 : 10); this.pupShadow.setVisible(p > 0.8); },
+    onComplete: () => { if (s.over) return; this.pup.root.setAngle(0); s.pbox = -1; this.setFace(this.away); this.ft(lx, LANE - 270, 'EEK!', '#ffffff', 44);
+      // Noir hops down off the rim behind him
+      const nx0 = this.rig.x, ny0 = this.rig.y, nx1 = Phaser.Math.Clamp(lx - this.away * 150, 70, 650);
+      this.rig.setFlip(this.away < 0).act([{ dur: 0.12, to: CROUCH }, { dur: 0.2, to: { sq: 0, dy: 0 } }], false, 0.15);
+      this.tweens.addCounter({ from: 0, to: 1, duration: 300, onUpdate: (tw) => { const p = tw.getValue()!; this.rig.setPosition(Phaser.Math.Linear(nx0, nx1, p), (1 - p) * (1 - p) * ny0 + 2 * (1 - p) * p * (RIM - 60) + p * p * LANE); },
+        onComplete: () => { if (s.over) return; s.phase = 'grab'; s.grabT = K.GRAB_T; this.grabBox = i; if (first) this.showHint('grab'); else this.ft(360, 470, 'GRAB HIS TAIL!', '#7dff9a', 46); } });
+    } });
+  }
+  private grabBox = 0;
+  grab() {
+    const s = this.st; if (s.phase !== 'grab') return; this.hideHint('grab'); s.phase = 'tug'; s.tug = K.TUG0; this.tugAge = 0; this.shoutT = 0.4;
+    const tp = this.pup.tipPos(), nx1 = Phaser.Math.Clamp(tp.x - this.away * 60, 60, 660), nx0 = this.rig.x; Fx.block(); this.pup.tail.clearTint();
+    this.tweens.addCounter({ from: 0, to: 1, duration: 140, onUpdate: (tw) => this.rig.setPosition(Phaser.Math.Linear(nx0, nx1, tw.getValue()!), LANE) });
+    this.rig.act([{ dur: 0.12, to: { ls: -95, le: -10, rs: -100, re: -10, lh: -25, lk: 30, rh: 35, rk: -10, lean: -16, sq: 0, dy: 6, tilt: -8 } }], true);
+    this.tugX = this.pup.root.x; comic(this, this.pup.root.x - this.away * 50, LANE - 140, 'GRAB!', 46).setDepth(70).setAngle(-6).setData('k', 1);
+    this.time.delayedCall(10, () => { const t = this.children.list.find(o => (o as any).getData?.('k') === 1) as Phaser.GameObjects.Text | undefined; if (t) this.tweens.add({ targets: t, alpha: 0, y: t.y - 40, delay: 380, duration: 250, onComplete: () => t.destroy() }); });
+    this.talk(this.rig.x, 810, pick(LINES.boxTug), 22, 1000); this.tapPrompt(!this.hints.has('tug')); this.hints.add('tug');
+  }
+  private tugTap() {
+    const s = this.st; const cap = K.TUG0 + (1 - K.TUG0) * Math.min(1, this.tugAge / K.TUG_MIN); s.tug = Math.min(cap, s.tug + K.TUG_TAP); Fx.combo(Math.round(s.tug * 10));
+    this.rig.act([{ dur: 0.06, to: { lean: -26, dy: 10 } }, { dur: 0.1, to: { lean: -16, dy: 6 } }], true);
+    if (this.hintC) this.hideHint('tug');
+  }
+  private tapPrompt(big: boolean) {
+    this.tapTxt?.destroy(); const t = this.tapTxt = comic(this, 360, big ? 610 : 590, big ? 'TAP TAP TAP\nto pull!' : 'TAP TAP TAP!', big ? 54 : 46).setDepth(66).setAngle(-4).setScale(0.3);
+    this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: t, scale: 1.1, duration: 170, yoyo: true, repeat: -1, ease: 'Sine.InOut' }) });
+    if (big) this.showHint('tug');
+  }
+  private endTug() { this.tapTxt?.destroy(); this.tapTxt = undefined; this.meter.clear(); this.pup.letGo(); this.pup.tailStretch = 1; this.pup.wagAmp = 22; this.hideHint(''); }
+  private tugTick(dt: number) {
+    const s = this.st; if (s.tug >= 0.995) { this.endTug(); this.flop(); return; }
+    this.tugAge += dt; s.tug = Math.max(0, s.tug - K.TUG_DRAIN * dt);
+    const pr = this.pup.root, pull = 1 - s.tug; pr.x = Phaser.Math.Clamp(this.tugX + this.away * (pull * 60 - 20), 60, 660); pr.y = LANE - Math.abs(Math.sin(this.tugAge * 18)) * 6;
+    this.pup.setFrame('run' + (Math.floor(this.tugAge * 20) % 6)); this.pup.inner.setAngle(this.away * 10); this.pup.tailStretch = 1.2 + pull * 0.5;
+    const paw = this.rig.point('rp'); this.pup.holdTo(paw.x, paw.y);
+    this.rig.setPosition(Phaser.Math.Clamp(pr.x - this.away * 175, 50, 670), LANE);
+    this.shoutT -= dt; if (this.shoutT <= 0) { this.shoutT = 0.9; this.ft(pr.x + this.away * 60, pr.y - 250, pick(LINES.boxPupTug), '#ffffff', 26); }
+    // meter
+    const g = this.meter.clear(), y = 470; g.fillStyle(0x22252b, 0.85).fillRoundedRect(110, y, 500, 46, 23).fillStyle(s.tug > 0.75 ? 0x7dff9a : 0xffdf6b, 1).fillRoundedRect(116, y + 6, 488 * s.tug, 34, 17).lineStyle(5, 0xffffff, 1).strokeRoundedRect(110, y, 500, 46, 23);
+    if ((s.tug <= 0.02 && this.tugAge > 0.6) || this.tugAge > K.TUG_MAX) { this.endTug(); this.slip(); }
+  }
+  private slip() {
+    const s = this.st; s.phase = 'seq'; s.slips++; s.streak = 0; Fx.save(); this.pup.tail.clearTint();
+    this.rig.setMood('dizzy').act([{ dur: 0.15, to: { lean: -30, sq: -0.15, dy: 20 } }], false, 0.4);
+    this.pupTalk(pick(LINES.boxSlip), 1000); this.pup.setFrame('panic'); this.pup.inner.setAngle(0);
+    const x0 = this.pup.root.x, x1 = this.away > 0 ? W + 160 : -160;
+    for (let i = 0; i < 5; i++) { const p = this.add.circle(x0 - this.away * i * 30, LANE, 14, 0xd9b080, 0.6).setDepth(19); this.tweens.add({ targets: p, x: p.x - this.away * 40, alpha: 0, scale: 2, delay: i * 50, duration: 400, onComplete: () => p.destroy() }); }
+    this.tweens.addCounter({ from: 0, to: 1, duration: 650, ease: 'Quad.In', onUpdate: (tw) => { const p = tw.getValue()!; this.pup.root.x = Phaser.Math.Linear(x0, x1, p); this.pup.setFrame('run' + (Math.floor(p * 30) % 6)); },
+      onComplete: () => this.startRound(false) });
+  }
+  private flop() {
+    const s = this.st; s.phase = 'seq'; s.boops++; s.streak++; s.meowRow = 0; const bonus = s.streak > 1 ? 200 * (s.streak - 1) : 0, pts = 500 + bonus + (s.busts === 0 ? 200 : 0); s.score += pts;
+    const i = this.grabBox, box = this.boxes[i], pr = this.pup.root, L = Phaser.Math.Clamp(pr.x - this.away * 70, 140, 580); this.flopBox = i;
+    this.rig.setMood('happy').act([{ dur: 0.1, to: { ls: -40, le: -40, rs: -30, re: -40, lean: -30, dy: 10 } }, { dur: 0.3, to: { lean: 6 } }], false, 0.3);
+    Fx.special(); this.ft(360, 470, pick(LINES.boxBoop), '#7dff9a', 42); floatText(this, 250, 420, `+${pts}${bonus ? ` x${s.streak} STREAK` : ''}`, '#7dff9a', 38);
+    this.pup.setFrame('panic'); this.pup.inner.setAngle(0); const px0 = pr.x;
+    this.tweens.addCounter({ from: 0, to: 1, duration: 620, ease: 'Sine.InOut', onUpdate: (tw) => { const p = tw.getValue()!; pr.setPosition(Phaser.Math.Linear(px0, L, p), LANE - Math.sin(p * Math.PI) * 330).setAngle(-360 * this.away * p); } });
+    // the box hops off its spot, flips over in the air and FLOPS down over him
+    this.tweens.killTweensOf(box.c); box.back.setVisible(false); box.flapL.setVisible(false); box.flapR.setVisible(false); box.eyes.setVisible(false); box.shadow.setVisible(false); box.c.setDepth(24);
+    const bx0 = box.x, yEnd = BB - 52 - BOX_H; // raised: his legs + tail poke out underneath
+    this.tweens.addCounter({ from: 0, to: 1, duration: 620, ease: 'Sine.InOut', onUpdate: (tw) => { const p = tw.getValue()!;
+      box.c.setPosition(Phaser.Math.Linear(bx0, L, p), (1 - p) * (1 - p) * BB + 2 * (1 - p) * p * (BB - 520) + p * p * yEnd).setAngle(180 * p); },
+    onComplete: () => { if (s.over) return; pr.setAngle(0).setPosition(L, LANE); this.pup.setDepth(23); this.pup.setFrame('run0'); this.pupShadow.setVisible(true);
+      Fx.kick(); this.cameras.main.shake(160, 0.012); comic(this, L, LANE - 260, 'FLOP!', 64).setDepth(75).setAngle(-8);
+      this.time.delayedCall(10, () => this.fadeLastComic());
+      for (let k = 0; k < 8; k++) { const d = this.add.circle(L + Phaser.Math.Between(-80, 80), LANE, 12, 0xd9b080, 0.7).setDepth(25); this.tweens.add({ targets: d, y: LANE - 40, x: d.x + Phaser.Math.Between(-40, 40), alpha: 0, scale: 2, duration: 450, onComplete: () => d.destroy() }); }
+      const final = s.boops >= K.NEED;
+      this.wad = { on: 1, x: L, dir: L < 360 ? -1 : 1, bonks: 0, t: 0, final: final ? 1 : 0 };
+      this.time.delayedCall(350, () => { if (!s.over) this.pupTalk(pick(LINES.boxBlind), 1200); });
+      // Noir perches on another box to watch (sits on the rim, grooming)
+      if (!final) this.perch(); } });
+  }
+  private fadeLastComic() { const t = [...this.children.list].reverse().find(o => o instanceof Phaser.GameObjects.Text && (o as any).depth === 75) as Phaser.GameObjects.Text | undefined;
+    if (t) this.tweens.add({ targets: t, alpha: 0, y: t.y - 40, delay: 450, duration: 250, onComplete: () => t.destroy() }); }
+  private perch() {
+    const opts = this.boxes.map((_, i) => i).filter(i => i !== this.flopBox), j = opts.sort((a, b) => Math.abs(this.bx(a) - 360) - Math.abs(this.bx(b) - 360))[0];
+    const x0 = this.rig.x, y0 = this.rig.y, x1 = this.bx(j), y1 = RIM + 6; this.rig.setFlip(x1 < x0).act([{ dur: 0.08, to: CROUCH }, { dur: 0.2, to: STRETCH }, { dur: 0.15, to: CROUCH }], false, 0.2);
+    this.tweens.addCounter({ from: 0, to: 1, duration: 420, onUpdate: (tw) => { const p = tw.getValue()!; this.rig.setPosition(Phaser.Math.Linear(x0, x1, p), (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * (RIM - 200) + p * p * y1).setDepth(22); },
+      onComplete: () => { this.perchBox = j; this.groom(); } });
+  }
+  private perchBox = -1;
+  private groom() { if (this.st.over) return; this.rig.setMood('smug').act([{ dur: 0.25, to: { rs: -150, re: -100, tilt: 10, lean: -4 } }, { dur: 0.2, to: { rs: -140, re: -120, tilt: 14 } }, { dur: 0.2, to: { rs: -150, re: -100, tilt: 10 } }], false, 0.3); }
+  private wadTick(dt: number) {
+    const w = this.wad, s = this.st, box = this.boxes[this.flopBox], pr = this.pup.root; if (!w.on || !box) return; w.t += dt;
+    const target = w.final && w.bonks >= 1 ? 360 : w.dir < 0 ? 95 : 625;
+    w.x += w.dir * K.WAD * (w.final && w.bonks >= 1 ? 0.6 : 1) * dt;
+    this.setFace(w.dir); this.pup.update(dt, 1.4, 1); pr.x = w.x; pr.y = LANE;
+    box.c.setPosition(w.x + Math.sin(w.t * 20) * 3, BB - 52 - BOX_H - Math.abs(Math.sin(w.t * 12)) * 6).setAngle(180 + Math.sin(w.t * 12) * 5);
+    if (w.final && w.bonks >= 1 && (w.dir > 0 ? w.x >= target : w.x <= target)) { w.on = 0; this.parcelOutro(); return; }
+    if (!(w.final && w.bonks >= 1) && (w.dir > 0 ? w.x >= target : w.x <= target)) { // BONK into the wall
+      w.bonks++; w.dir = -w.dir; w.x = target; Fx.ouch(); this.cameras.main.shake(140, 0.01);
+      const bxw = target + (w.dir > 0 ? -75 : 75); comic(this, Phaser.Math.Clamp(bxw, 120, 600), BB - 230, 'BONK!', 54).setDepth(75).setAngle(Phaser.Math.Between(-10, 10)); this.time.delayedCall(10, () => this.fadeLastComic());
+      for (let k = 0; k < 3; k++) { const st = txt(this, bxw, BB - 200, '★', 34, '#ffdf6b', '#22252b', 4).setDepth(45); this.tweens.add({ targets: st, x: bxw + w.dir * (30 + k * 30), y: BB - 260 - k * 20, alpha: 0, duration: 650, onComplete: () => st.destroy() }); }
+      if (w.final) { w.dir = 360 > w.x ? 1 : -1; this.time.delayedCall(200, () => this.pupTalk(pick(LINES.boxBlind), 1000)); }
+      else if (w.bonks >= 2 || w.t > 3.2) { w.on = 0; this.popOut(); }
+    }
+    void s;
+  }
+  private popOut() {
+    const s = this.st, i = this.flopBox, box = this.boxes[i], pr = this.pup.root; Fx.boing(); this.ft(pr.x, LANE - 280, 'POP!', '#ffffff', 50);
+    const x0 = box.c.x, y0 = box.c.y, slot = (s.boxes === 3 ? XS3 : XS4)[i];
+    this.tweens.addCounter({ from: 0, to: 1, duration: 650, ease: 'Sine.InOut', onUpdate: (tw) => { const p = tw.getValue()!;
+      box.c.setPosition(Phaser.Math.Linear(x0, slot, p), (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * (BB - 560) + p * p * BB).setAngle(180 + 180 * p); },
+    onComplete: () => { placeBox(box, slot, BB); box.c.setDepth(14).setAngle(0); box.back.setVisible(true); box.flapL.setVisible(true); box.flapR.setVisible(true); box.shadow.setVisible(true); this.flopBox = -1; this.wobbleBox(i, 6); Fx.kick(); } });
+    // Puppy: dizzy, postage stamp stuck on his nose
+    this.pup.setDepth(20).setFrame('dizzy'); this.setFace(pr.x < 360 ? 1 : -1); this.stampOn();
+    this.time.delayedCall(300, () => { if (!s.over) this.pupTalk(pick(LINES.boxStamp), 1300); });
+    this.time.delayedCall(1500, () => { if (s.over) return; this.peelStamp();
+      this.time.delayedCall(450, () => { if (s.over) return; const x1 = pr.x < 360 ? -170 : W + 170, xa = pr.x; this.setFace(Math.sign(x1 - xa));
+        this.tweens.addCounter({ from: 0, to: 1, duration: 700, ease: 'Quad.In', onUpdate: (tw) => { const p = tw.getValue()!; pr.x = Phaser.Math.Linear(xa, x1, p); this.pup.setFrame('run' + (Math.floor(p * 26) % 6)); pr.y = LANE - Math.abs(Math.sin(p * 26 / 6 * Math.PI * 2)) * 5; },
+          onComplete: () => this.startRound(true) }); }); });
+  }
+  private stampOn() {
+    this.stamp?.destroy(); const st = this.stamp = this.add.image(4, -124 * 0.78 * PUP_M + 26, 'bb_stamp').setScale(0.1).setAngle(-12); this.pup.inner.add(st);
+    this.tweens.add({ targets: st, scale: 0.55, duration: 220, ease: 'Back.Out' }); sparks(this, this.pup.root.x, this.pup.root.y - 100, 8);
+  }
+  private peelStamp() { const st = this.stamp; if (!st) return; this.stamp = undefined; const m = st.getWorldTransformMatrix(), x = m.tx, y = m.ty; st.destroy();
+    const f = this.add.image(x, y, 'bb_stamp').setScale(0.55).setAngle(-12).setDepth(60); this.ft(x, y - 50, 'peel!', '#ffffff', 28); Fx.whoosh();
+    this.tweens.add({ targets: f, y: LANE + 10, x: x + Phaser.Math.Between(-60, 60), angle: 200, duration: 900, ease: 'Sine.In' }); this.tweens.add({ targets: f, alpha: 0, delay: 700, duration: 300, onComplete: () => f.destroy() }); }
+  /** last boop: he waddles to the middle, sits down, the box becomes a parcel, Noir hops on top, RETURN TO SENDER */
+  private parcelOutro() {
+    const s = this.st, i = this.flopBox, box = this.boxes[i]; s.phase = 'end'; Fx.kick();
+    // clear the stage: the other boxes scoot off, the buttons fade (it's the curtain call)
+    this.boxes.forEach((b, j) => { if (j === i) return; const d = (b.x < 360 ? -1 : 1) * 520; b.eyes.setVisible(false);
+      this.tweens.add({ targets: [b.c, b.back, b.shadow], x: `+=${d}`, duration: 520, delay: 60 * j, ease: 'Back.In' }); });
+    this.tweens.add({ targets: [this.mb, this.pbtn], alpha: 0, duration: 300 });
+    this.tweens.add({ targets: box.c, y: BB - BOX_H, duration: 180, ease: 'Quad.In', onComplete: () => {
+      box.c.setVisible(false); this.pup.root.setVisible(false); const { c, face } = makeParcel(this, 360, BB, 24); c.setScale(1.06, 0.94); this.tweens.add({ targets: c, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.Out' });
+      this.tweens.add({ targets: face, x: { from: -8, to: 8 }, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+      // Noir hops up and SITS on top, legs dangling over the front, then grooms smugly
+      const x0 = this.rig.x, y0 = this.rig.y, y1 = BB - BOX_H - 22 + 46 * NOIR_M; this.rig.setFlip(x0 > 360).act([{ dur: 0.08, to: CROUCH }, { dur: 0.22, to: STRETCH }, { dur: 0.16, to: SIT }], true);
+      this.tweens.addCounter({ from: 0, to: 1, duration: 460, onUpdate: (tw) => { const p = tw.getValue()!; this.rig.setPosition(Phaser.Math.Linear(x0, 360, p), (1 - p) * (1 - p) * y0 + 2 * (1 - p) * p * (y1 - 240) + p * p * y1).setDepth(26); },
+        onComplete: () => { this.rig.setMood('smug'); Fx.block(); this.sitGroom();
+          this.time.delayedCall(350, () => { const m = makeReturnMark(this, 372, BB - 30).setDepth(27).setScale(3).setAngle(-10).setAlpha(0);
+            this.tweens.add({ targets: m, scale: 0.55, alpha: 1, duration: 200, ease: 'Quad.In', onComplete: () => { Fx.punch(); this.cameras.main.shake(200, 0.015); sparks(this, 372, BB - 30, 14); } }); });
+          this.time.delayedCall(800, () => this.talk(360, 600, pick(LINES.boxWin), 24, 1800));
+          this.time.delayedCall(1700, () => this.talk(360, 1150, pick(LINES.boxWinPup), 22, 1500));
+          this.time.delayedCall(2900, () => this.finish(true)); } });
+    } });
+  }
+  /** seated grooming loop (held pose, so she never pops back to standing on top of the parcel) */
+  private sitGroom() { if (this.st.over && this.st.phase !== 'end') return;
+    const lick = { ...SIT, rs: -150, re: -110, tilt: 12, lean: -2 };
+    this.rig.act([{ dur: 0.25, to: lick }, { dur: 0.18, to: { ...lick, re: -125, tilt: 15 } }, { dur: 0.18, to: lick }, { dur: 0.18, to: { ...lick, re: -125, tilt: 15 } }, { dur: 0.3, to: SIT }], true); }
+
+  // ------------------------------------------------------------------ rounds
+  private startRound(afterBoop = true) {
+    const s = this.st; if (s.over) return; s.phase = 'reset'; s.pup = 'off'; s.firstPick = 1; s.dcDone = 0; s.feintDone = 0; s.pbox = -1; s.dash = 0; this.clockOn = !afterBoop;
+    this.pup.root.setVisible(false).setAngle(0); this.pup.inner.setAngle(0); this.pup.wagAmp = 22; this.pup.tailStretch = 1; this.pup.letGo(); this.pupShadow.setVisible(true);
+    let delay = 0;
+    if (s.boops >= K.FOUR_AT && s.boxes === 3) { s.boxes = 4; delay = 700; popBanner(this, 'MORE BOXES!', 600, 0x2fa0bf, 800);
+      this.boxes.forEach((b, i) => { const x0 = b.x, x1 = XS4[i]; placeBox(b, x0, BB); this.tweens.addCounter({ from: 0, to: 1, duration: 420, onUpdate: (tw) => { const p = tw.getValue()!; placeBox(b, Phaser.Math.Linear(x0, x1, p), BB); b.c.y = BB - Math.sin(p * Math.PI) * 60; } }); });
+      const nb = makeBox(this, XS4[3], BB); nb.c.y = BB - 700; this.boxes.push(nb); this.tweens.add({ targets: nb.c, y: BB, duration: 500, delay: 200, ease: 'Bounce.Out' }); }
+    else if (s.boops === K.FEINT_FROM && afterBoop) { popBanner(this, 'PUPPY IS GETTING SNEAKY!', 600, 0xbf6a2f, 900); delay = 300; }
+    else if (s.boops === K.NEED - 1 && afterBoop) { popBanner(this, 'LAST ONE!', 600, 0xff5c8a, 800); delay = 300; }
+    this.time.delayedCall(delay, () => { if (s.over) return;
+      // Noir slips back into a box (not the one nearest the door he'll walk in from)
+      const side = Math.random() < 0.5 ? 1 : -1, n = this.boxes.length, opts = [...Array(n).keys()].filter(i => side > 0 ? i < n - 1 : i > 0), j = Phaser.Utils.Array.GetRandom(opts);
+      s.nState = 'out'; this.hopTo(j, true);
+      this.time.delayedCall(K.HOP * 1000 + 250, () => { if (s.over) return; s.phase = 'hunt'; this.clockOn = true;
+        const pr = this.pup.root; pr.setPosition(side > 0 ? W + 110 : -110, LANE).setVisible(true); this.pup.setDepth(20).setFrame('run0');
+        this.walkTo(this.pickNext(-1)); s.meowCd = Math.min(s.meowCd, 0.4);
+        if (!this.hints.has('meow')) this.time.delayedCall(700, () => { if (!s.over && s.phase === 'hunt' && s.pup === 'walk') this.showHint('meow'); });
+        if (Math.random() < 0.5 && s.boops > 0) this.talk(this.rig.x, 560, pick(LINES.boxNoir), 22, 1300); });
     });
   }
-  /** Dodge = real cost: clock keeps running, Noir tumbles back OUT of range, Puppy stares ~1 s; dodge him twice and he scampers off to a new spot. */
-  private dodged() {
-    const s = this.st; s.streak = 0; s.dodges++; this.setMode('dodge');
-    Fx.boing(); this.tweens.add({ targets: this.pup, y: FLOOR - 70, duration: 160, yoyo: true, ease: 'Quad.Out' }); this.ft(s.px, FLOOR - 410, 'DODGED!', '#ff8a8a', 36);
-    this.rig.setMood('dizzy'); s.noise = Math.min(99, s.noise + K.DODGE_N); this.talk(s.px, FLOOR - 500, pick(s.dodges >= SCAMPER_N ? LINES.pounceFled : LINES.pounceSeen), 20, 1000); // 2nd dodge = he bolts to a new spot
-    s.look = 'look'; s.glance = 0; s.fake = 0; s.lookT = DODGE_WATCH; s.sniffT = 0;
-    // slapstick: bonk off his nose and tumble backwards head over heels
-    const fx = this.noir.x, tx = Math.max(START, s.px - KNOCK);
-    this.tweens.addCounter({ from: 0, to: 1, duration: 520, ease: 'Quad.Out', onUpdate: (tw) => { const p = tw.getValue()!; this.noir.x = Phaser.Math.Linear(fx, tx, p); this.noir.y = FLOOR + 10 - Math.sin(p * Math.PI) * 110; this.noir.setAngle(-360 * p); },
-      onComplete: () => { this.noir.setAngle(0).setY(FLOOR + 10); s.x = tx; this.noir.setScale(this.noirBase * 1.15, this.noirBase * 0.85); this.tweens.add({ targets: this.noir, scaleX: this.noirBase, scaleY: this.noirBase, duration: 220, ease: 'Back.Out' }); } });
-    for (let i = 0; i < 3; i++) { const st = txt(this, fx - 30, FLOOR - 150, '★', 30, '#ffdf6b', '#22252b', 4).setDepth(45); this.tweens.add({ targets: st, x: fx - 110 + (i - 1) * 45, y: FLOOR - 230, alpha: 0, duration: 600, onComplete: () => st.destroy() }); }
-    if (s.dodges >= SCAMPER_N) this.time.delayedCall(250, () => this.scamper());
-    this.time.delayedCall(650, () => { if (s.mode !== 'dodge' || s.over) return; this.rig.setMood('smug'); s.x = tx; this.noir.setAngle(0).setY(FLOOR + 10); this.setMode('');
-      s.dazed = DODGE_WATCH; if (s.yarnT <= 0) { s.look = 'look'; s.glance = 0; s.fake = 0; s.lookT = DODGE_WATCH; } }); // he keeps staring ~1 s after she lands: freeze!
+  private clockOn = false;
+  // ------------------------------------------------------------------ first-occurrence hints (STEP prompts + tapping hand + slow-mo)
+  private showHint(k: string) {
+    if (this.hints.has(k) || this.st.over) return; this.hideHint(''); this.hints.add(k); this.st.hint = k;
+    const c = this.hintC = this.add.container(0, 0).setDepth(805); let hx = 0, hy = 0, msg = '', ty = 640, slow = 1;
+    const s = this.st;
+    if (k === 'meow') { hx = 190; hy = 1165; msg = 'Tap MEOW? to fool him\ninto the WRONG box!'; ty = 560; slow = 0.5; }
+    if (k === 'sneak') { const others = this.boxes.map((_, i) => i).filter(i => i !== s.noirBox && i !== s.tgt); const o = others.length ? others[0] : 0; hx = this.bx(o); hy = RIM + 60; msg = 'He is sniffing YOUR box!\nTap another box to sneak away'; ty = 620; slow = 0.35; }
+    if (k === 'pounce') { hx = this.bx(s.pbox); hy = RIM - 40; msg = 'His head is in a box!\nTap him or POUNCE!'; ty = 620; slow = 0.35; }
+    if (k === 'grab') { const tp = this.pup.tipPos(); hx = tp.x; hy = tp.y; msg = 'TAP his tail\nto GRAB it!'; ty = 620; slow = 0.35; }
+    if (k === 'tug') { hx = 620; hy = 690; msg = ''; slow = 1; }
+    const lab = txt(this, 360, ty - 75, k === 'tug' ? 'STEP 2' : k === 'grab' ? 'STEP 1' : 'TIP', 30, '#fff27a', '#22252b', 7);
+    if (msg) { const t = comic(this, 360, ty, msg, 46).setAngle(-3).setScale(0.3); t.setAlign('center'); c.add([lab, t]); this.tweens.add({ targets: t, scale: 1, duration: 180, ease: 'Back.Out' }); }
+    else c.add(lab.setPosition(360, 615));
+    const hand = this.tapHand(hx, hy, k === 'tug' ? 150 : 520); c.add(hand); c.setData('hand', hand); s.slow = slow;
+    if (k === 'meow') this.time.delayedCall(4500, () => this.hideHint('meow'));
   }
-  /** After repeated dodges Puppy scampers to a new spot (and stays a bit jumpier). */
-  scamper() {
-    const s = this.st; if (s.over || s.mode === 'flee' || s.mode === 'catch') return; s.dodges = 0;
-    let np = Phaser.Math.Between(520, 640); if (Math.abs(np - s.px) < 60) np = s.px < 580 ? Phaser.Math.Between(600, 640) : Phaser.Math.Between(520, 550);
-    s.scampT = 0.45; s.sus = Math.min(90, s.sus + 20); this.paceDir = np > s.px ? 1 : -1;
-    this.ft(s.px, FLOOR - 250, 'scamper!', '#ffe0a0', 30); Fx.step();
-    for (let i = 0; i < 4; i++) { const p = this.add.circle(s.px + Phaser.Math.Between(-30, 30), FLOOR, 12, 0xd9b080, 0.6).setDepth(9); this.tweens.add({ targets: p, y: FLOOR - 30, alpha: 0, scale: 2, delay: i * 60, duration: 380, onComplete: () => p.destroy() }); }
-    this.tweens.add({ targets: s, px: np, duration: 420, ease: 'Quad.Out' });
+  private hideHint(k: string) { const c = this.hintC; if (!c || (k && this.st.hint !== k)) return; this.hintC = undefined; this.st.hint = ''; this.st.slow = 1;
+    const hand = c.getData('hand') as Phaser.GameObjects.Container; if (hand) { this.tweens.killTweensOf(hand.list); } this.tweens.killTweensOf(c.list); c.destroy(); }
+  private tapHand(x: number, y: number, ms: number) {
+    const c = this.add.container(x, y), g = this.add.graphics(), k = 0x22252b;
+    g.fillStyle(0xffffff, 1).lineStyle(5, k, 1);
+    g.fillRoundedRect(-13, 0, 26, 74, 13).strokeRoundedRect(-13, 0, 26, 74, 13); g.fillRoundedRect(-34, 52, 74, 76, 26).strokeRoundedRect(-34, 52, 74, 76, 26);
+    g.fillRoundedRect(-50, 66, 30, 44, 14).strokeRoundedRect(-50, 66, 30, 44, 14); g.lineStyle(4, k, 0.6).lineBetween(-8, 82, -8, 100).lineBetween(10, 80, 10, 100).lineBetween(26, 80, 26, 98);
+    const ring = this.add.circle(0, 0, 18).setStrokeStyle(6, 0xfff27a); c.add([ring, g]);
+    this.tweens.add({ targets: g, y: 16, scale: 0.94, duration: ms * 0.45, yoyo: true, repeat: -1, ease: 'Sine.InOut', onYoyo: () => { ring.setScale(0.6).setAlpha(1); this.tweens.add({ targets: ring, scale: 2.4, alpha: 0, duration: ms * 1.6 }); } });
+    return c;
   }
-  private catch() {
-    const s = this.st; this.setMode('catch'); s.catches++; s.streak++; s.dodges = 0; const silent = s.noise < 30;
-    const pts = (silent ? 900 : 500) + (s.flying ? 400 : 0) + (s.streak > 1 ? 100 * (s.streak - 1) : 0); s.score += pts;
-    Fx.punch(); Fx.boing(); impact(this, s.px, FLOOR - 120, s.flying ? 'FLYING POUNCE!' : pick(['POUNCE!', 'BOOP!', 'GOTCHA!']), pts, [silent ? 'SILENT!' : '', s.streak > 1 ? `x${s.streak} STREAK` : ''].filter(Boolean).join(' '), true);
-    sparks(this, s.px, FLOOR - 80, 20, true);
-    this.pup.setTexture('pup_dizzy'); pupFlail(this, this.pup, 900); this.tweens.add({ targets: this.pup, angle: 360, scaleY: this.pupBase * 0.8, duration: 400, yoyo: true });
-    this.rig.setMood('happy'); this.talk(360, 560, pick(LINES.pounce), 22, 1200);
-    if (s.catches >= K.NEED) { this.time.delayedCall(800, () => this.finish(true)); return; }
-    this.time.delayedCall(1200, () => this.reset());
+  // ------------------------------------------------------------------ frame
+  update(_t: number, dms: number) {
+    const s = this.st, dt = Math.min(dms, 50) / 1000; s.t += dt; this.draw(dt);
+    if (!s.running || s.over || !this.pup) return;
+    const clock = s.phase === 'hunt' || s.phase === 'bust' || (s.phase === 'reset' && this.clockOn);
+    if (clock) { s.time -= dt; if (s.time <= 0) { s.time = 0; this.finish(false); return; } }
+    this.hud.set(`BOOPS ${s.boops}/${K.NEED}`, s.time, s.boops / K.NEED);
+    s.meowCd = Math.max(0, s.meowCd - dt);
+    if (s.phase === 'hunt' || s.phase === 'bust') {
+      const adt = dt * s.slow; if (s.phase === 'hunt') this.pupAI(adt); else this.stateT += adt;
+      if (this.peekBack && s.pup === 'peek') { this.peekBack = 0; }
+      s.sees = this.eyesOpen() ? 1 : 0;
+      if (s.phase === 'hunt' && s.noirOut && s.sees) this.bust('seen');
+    }
+    if (s.phase === 'grab') { s.grabT -= dt * s.slow; const tp = this.pup.tipPos(); this.pup.root.x += Math.sin(s.t * 60) * 0.8;
+      if (this.hintC && s.hint === 'grab') (this.hintC.getData('hand') as Phaser.GameObjects.Container).setPosition(tp.x, tp.y);
+      if (s.grabT <= 0) { this.hideHint(''); this.slip(); } }
+    if (s.phase === 'tug') this.tugTick(dt);
+    if (this.wad.on) this.wadTick(dt);
   }
-  private flee() {
-    const s = this.st; if (s.mode === 'flee') return; this.setMode('flee'); s.escapes++; s.streak = 0; Fx.save(); this.talk(s.px, FLOOR - 470, pick(s.sus >= 100 ? LINES.pounceSpotted : LINES.pounceFled), 22, 1100);
-    if (!s.spotted) { this.bang.setVisible(true).setPosition(s.px, FLOOR - 290).setScale(1.8); this.tweens.add({ targets: this.bang, scale: 1.2, duration: 160, ease: 'Back.Out' }); s.spotted = 1; }
-    this.pup.setTexture('pup_panic').setFlipX(true); this.runHop = true; this.tweens.add({ targets: this, pupOff: W + 150 - s.px, duration: 500, ease: 'Quad.In' });
-    for (let i = 0; i < 5; i++) { const p = this.add.circle(s.px - i * 30, FLOOR, 14, 0xd9b080, 0.6).setDepth(9); this.tweens.add({ targets: p, x: p.x - 40, alpha: 0, scale: 2, delay: i * 50, duration: 400, onComplete: () => p.destroy() }); }
-    this.time.delayedCall(1100, () => this.reset());
-  }
-  private reset() {
-    const s = this.st; if (s.over) return; const after = s.mode; s.x = START; s.noise = 0; s.look = 'away'; s.lookT = Phaser.Math.FloatBetween(K.AWAY_MIN, 1.6); s.px = Phaser.Math.Between(540, 620); s.yarn = 1; s.yarnT = 0; s.spotted = 0; s.flying = 0;
-    s.sus = 0; s.sniffT = 0; s.dodges = 0; s.turned = 0; s.fake = 0; s.glance = 0; s.scampT = 0; s.dazed = 0;
-    this.yarnBall?.destroy(); this.yarnBall = undefined; this.tweens.killTweensOf(s); this.tweens.killTweensOf(this);
-    this.rig.setMood('smug'); this.noir.setScale(this.noirBase).setAngle(0); this.rig.act([], false, 0.2); this.pup.setAngle(0).setScale(this.pupBase).setY(FLOOR).setFlipX(false);
-    this.pupOff = W + 120 - s.px; this.setMode(after === 'catch' ? 'catch' : 'flee'); // the clock stays paused only while re-entering after a catch
-    this.runHop = true; this.tweens.add({ targets: this, pupOff: 0, duration: 600, onComplete: () => { this.runHop = false; this.pup.setAngle(0).setY(FLOOR); if (!s.over) this.setMode(''); } });
+  private draw(dt: number) {
+    const s = this.st, g = this.fxg.clear();
+    for (const m of this.motes) { m.y -= m.v * dt; m.p += dt; if (m.y < 340) { m.y = 1040; m.x = Phaser.Math.Between(100, 420); } g.fillStyle(0xdfe6ff, 0.25 + Math.sin(m.p * 2) * 0.15).fillCircle(m.x + Math.sin(m.p) * 8, m.y, 2.4); }
+    if (!this.pup || !this.rig) return;
+    // Noir sinks/peeks inside her box; glowing eyes in the hand-hole while she's ducked
+    if (s.nState === 'in' && !s.over) {
+      const pr = this.pup.root, dx = Math.abs(pr.x - this.bx(s.noirBox)), duck = s.phase !== 'bust' && (s.phase !== 'hunt' || (pr.visible && (dx < 170 || (this.eyesOpen() && dx < 260))));
+      const ty = duck ? DUCK_Y : PEEK_Y; this.rig.setPosition(this.bx(s.noirBox), this.rig.y + (ty - this.rig.y) * (1 - Math.exp(-dt * 14)));
+      this.boxes.forEach((b, i) => b.eyes.setVisible(i === s.noirBox && this.rig.y > PEEK_Y + 60 && Math.sin(s.t * 1.7) > -0.93));
+    }
+    // Puppy animation (states that are not tween-driven)
+    const p = s.pup;
+    if (s.phase === 'hunt' || s.phase === 'bust' || s.phase === 'reset') {
+      if (p === 'walk') this.pup.update(dt, s.dash ? 1.7 : 1.0, 1);
+      else if (p === 'peek') { this.pup.update(dt, 1.2, 1.6); this.pup.wagSpd = 18; this.pup.root.setAngle(180 * s.face + Math.sin(s.t * 9) * 6).setY(PUP_IN + Math.sin(s.t * 14) * 3); }
+      else if (p === 'tell') { this.pup.wagSpd = 9; this.pup.setFrame('stand'); this.pup.update(dt, 0, 0.05); this.pup.tailStretch = 1.25; }
+      else if (p === 'sniff') { this.pup.update(dt, 0, 1); this.pup.inner.setAngle(s.face * (8 + Math.sin(s.t * 16) * 3)); }
+      else if (p === 'count') { this.pup.update(dt, 0, 0.3); this.pup.inner.setAngle(0); }
+      else this.pup.update(dt, 0, 1);
+      if (p !== 'sniff') this.pup.inner.setAngle(p === 'count' ? 0 : this.pup.inner.angle * 0.8);
+      if (p !== 'tell') this.pup.tailStretch += (1 - this.pup.tailStretch) * Math.min(1, dt * 8);
+    } else if (s.phase === 'grab') { this.pup.update(dt, 0, 0); this.pup.tail.setTint(Math.sin(s.t * 14) > 0 ? 0x7dff9a : 0xffffff); }
+    else if (s.phase === 'tug') { /* tugTick drives the frames */ this.pup.update(dt, 0, 0); const paw = this.rig.point('rp'); this.pup.holdTo(paw.x, paw.y); }
+    else if (!this.wad.on) this.pup.update(dt, 0, 1);
+    if (this.q.visible) { const pr = this.pup.root; this.q.setPosition(pr.x, Math.min(pr.y, PUP_IN) - 130); if (p !== 'tell' && p !== 'feint') this.q.setVisible(false); }
+    // eye badge
+    const show = (s.phase === 'hunt') && this.pup.root.visible && p !== 'off';
+    this.badge.setVisible(show);
+    if (show) { const open = this.eyesOpen(), pr = this.pup.root, by = (p === 'peek' || p === 'tell' || p === 'dive') ? RIM - 140 : pr.y - 255; // peek badge nudged down 35 px (was RIM-175): clear of the TIP text, still above his tail
+      this.badge.setPosition(Phaser.Math.Clamp(pr.x, 60, 660), by); this.badgeEye.setTexture(open ? 'pn_eye' : 'pn_eyez');
+      this.badgeRing.clear().fillStyle(0xffffff, 1).fillCircle(0, 0, 34).lineStyle(6, open ? 0xff3b3b : 0x2fbf5a, 1).strokeCircle(0, 0, 34); }
+    // status pill (what you may do right now)
+    let msg = '', col = '#ffffff';
+    if (s.phase === 'hunt' && p !== 'off') {
+      if (this.headIn && s.pbox !== s.noirBox) { msg = 'HEAD IN A BOX: POUNCE!'; col = '#7dff9a'; }
+      else if (p === 'count') { msg = 'He is counting: sneak to a box!'; col = '#7dff9a'; }
+      else if (this.eyesOpen()) { msg = 'He can SEE: stay hidden!'; col = '#ff8a8a'; }
+      else { msg = 'Eyes busy: you can sneak'; col = '#bfe8ff'; }
+    } else if (s.phase === 'grab') { msg = 'GRAB HIS TAIL!'; col = '#7dff9a'; } else if (s.phase === 'tug') { msg = 'TAP TAP TAP!'; col = '#ffdf6b'; }
+    if (this.pill.text !== msg) this.pill.setText(msg); this.pill.setColor(col);
+    // buttons
+    const live = s.phase === 'hunt' && p !== 'off', canM = live && s.meowCd <= 0 && s.nState === 'in' && p !== 'count' && p !== 'dive' && p !== 'up',
+      win = live && this.headIn && s.pbox !== s.noirBox && s.nState === 'in';
+    const key = `${s.phase}|${canM}|${win}|${Math.ceil(s.meowCd * 2)}`;
+    if (key !== this.btnKey) { this.btnKey = key;
+      const paint = (gr: Phaser.GameObjects.Graphics, col: number, on: boolean) => { gr.clear().fillStyle(0x000000, 0.35).fillRoundedRect(-150, -60, 300, 130, 28).fillStyle(on ? col : 0x5a5a6a, 1).lineStyle(6, 0x22252b, 1).fillRoundedRect(-150, -70, 300, 130, 28).strokeRoundedRect(-150, -70, 300, 130, 28);
+        if (on) gr.fillStyle(0xffffff, 0.25).fillRoundedRect(-138, -62, 276, 34, 16); };
+      if (s.phase === 'grab') { paint(this.mbG, 0x5a5a6a, false); paint(this.pbG, 0x2fbf5a, true); this.mbT.setText('MEOW?'); this.pbT.setText('GRAB!'); }
+      else if (s.phase === 'tug') { paint(this.mbG, 0xffb02e, true); paint(this.pbG, 0xffb02e, true); this.mbT.setText('TAP!'); this.pbT.setText('TAP!'); }
+      else { paint(this.mbG, 0x6b4cc9, canM); paint(this.pbG, win ? 0x2fbf5a : 0xff5c8a, live && s.nState === 'in'); this.mbT.setText(canM || !live ? 'MEOW?' : s.meowCd > 0 ? `MEOW ${s.meowCd.toFixed(0) === '0' ? '1' : Math.ceil(s.meowCd)}` : 'MEOW?'); this.pbT.setText(win ? 'POUNCE NOW!' : 'POUNCE!'); this.pbT.setFontSize(win ? 36 : 42); }
+    }
+    this.pbtn.setScale(win || s.phase === 'grab' ? 1 + Math.sin(s.t * 12) * 0.04 : 1); this.mb.setScale(s.phase === 'tug' ? 1 + Math.sin(s.t * 16) * 0.03 : 1);
   }
   finish(win: boolean) {
-    const s = this.st; if (s.over) return; s.over = true; s.running = false; (window as any).__pr.ended = win ? 'win' : 'lose';
-    popBanner(this, win ? 'CAUGHT RED-PAWED!' : 'TIME!', 600, win ? 0x2fbf5a : 0x6b4cc9, 800);
-    this.time.delayedCall(1100, () => endCard(this, 'Noir', 5, win, s.score + Math.round(s.time) * 20, `${s.catches} pounces • ${s.escapes} escapes`));
+    const s = this.st; if (s.over) return; s.over = true; s.running = false; s.phase = 'end'; (window as any).__pr.ended = win ? 'win' : 'lose'; this.hideHint(''); this.endTugSafe();
+    if (!win && this.pup) { this.pup.root.setVisible(true).setAngle(0); this.pup.setDepth(20).setFrame('stand'); this.tweens.add({ targets: this.pup.root, y: LANE - 50, duration: 180, yoyo: true, repeat: 3, ease: 'Quad.Out' });
+      this.talk(360, 770, pick(LINES.boxLose), 22, 1400); }
+    popBanner(this, win ? 'RETURN TO SENDER!' : 'TIME!', 600, win ? 0x2fbf5a : 0x6b4cc9, 800);
+    this.time.delayedCall(1100, () => endCard(this, 'Noir', 5, win, s.score + Math.round(s.time) * 20, `${s.boops} boops • ${s.busts} busts`));
   }
+  private endTugSafe() { if (this.tapTxt) { this.tapTxt.destroy(); this.tapTxt = undefined; } this.meter?.clear(); }
 }

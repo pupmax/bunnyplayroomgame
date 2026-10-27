@@ -38,14 +38,29 @@ export const LINES = {
   // EDIT ME, Marc: Dive, caught in a flashlight beam (last 3 are new)
   diveSpot: ['SPOTTED! Flashlight!', 'Puppy: I see you, birdie!', 'Stay out of the light, sweetie!',
     'Eek! Spotlight! Flap faster!', 'Beamed! Back to the shadows!', "Puppy: Smile, you're on camera!"],
-  // EDIT ME, Marc: Pounce, Noir catches Puppy (last 2 are new)
-  pounce: ['POUNCE! Gotcha!', 'Shh... boop!', 'Purr-fect timing!', 'Silent but adorable!', 'Puppy never saw it coming!', 'Ninja kitty strikes!',
-    'Gotcha! Tippy-toe victory!', 'Boop! Caught you napping!'],
-  pounceSeen: ['Puppy: I SAW that! Eek!', 'Freeze, Noir! FREEZE!', 'He turned around! Statue mode!', 'Puppy: Was that a cat? Was that a CAT?!'],
-  pounceSpotted: ['Puppy: I SEE you, kitty!', 'Puppy: AAAH! A CAT! A CAAAT!', 'Busted! He spotted you, Noir!', 'Puppy: Nice try, sneaky! Byeee!'],
-  // EDIT ME, Marc: Pounce, Puppy bolts (too noisy, or he scampers off after dodging twice). Last 3 are new.
-  pounceFled: ['Puppy ran away squealing!', 'Too noisy, sweetie. He bolted!', 'Puppy: Nope nope nope!',
-    'Zoom! Puppy left a dust cloud!', "Too many pitter-patters! He's gone!", 'Puppy: Byeee! Not today, kitty!'],
+  // EDIT ME, Marc: Box Bandit (Noir's level). Noir hides in boxes, MEOWs to lure Puppy, then BOO-X! The old pounce
+  // pools (pounce / pounceSeen / pounceSpotted / pounceFled) were folded in here; a few of their best lines live on below.
+  boxNoir: ['Noir: If it fits, I sits. And then I strike.', 'Noir: Shh. I am a parcel now.', 'Noir: A box is not a hiding spot, darling. It is a lifestyle.',
+    'Noir: Boxes. Comfy, sneaky, purr-fect.', 'Noir: I nap. I judge. I hide in cardboard.'],
+  boxMeow: ['meow?', 'mew~', 'mrrp?', 'meeeow?'],                                  // Noir throws her voice into another box
+  boxLured: ['Puppy: A kitty?! Here, kitty kitty!', 'Puppy: That box meowed! I heard it!', 'Puppy: Ooh! Kitty in THAT one!', 'Puppy: Since when do boxes meow?!'],
+  boxWise: ['Puppy: Not falling for THAT again!', 'Puppy: Hmm... that meow came from over HERE.', 'Puppy: Nice try. I know that trick!'],
+  boxEmpty: ['Puppy: Empty... empty... EMPTY?!', 'Puppy: Just old socks.', 'Puppy: Nobody home.', 'Puppy: Where IS she?', 'Puppy: Nice box. Totally normal box.'],
+  boxSniff: ['sniff sniff...', 'snff?', 'sniff... hmm.'],
+  boxFeint: ['Puppy: Wait... THAT box!', 'Puppy: Hmm... it blinked.', 'Puppy: I smell kitty over there!'],
+  boxFound: ['Puppy: FOUND YOU! Peekaboo!', 'Puppy: Aha! A kitty in a box!', 'Puppy: Gotcha, sneaky!'],
+  boxBust: ['Puppy: AHA! I SEE you, kitty!', 'Puppy: Was that a cat? Was that a CAT?!', 'Puppy: Peekaboo! I see you!', 'Puppy: Nice try, sneaky!'],
+  boxDodge: ['Puppy: Olé! Missed me!', 'Oops! Noir dived into an empty box!', 'Puppy: Too slow, kitty!'],
+  boxCount: ['Puppy: 1... 2... 3... ready or not!', 'Puppy: No peeking! Counting to three!', 'Puppy: Eyes closed! One, two, three...'],
+  boxBoop: ['Shh... boop!', 'Purr-fect timing!', 'Puppy never saw it coming!', 'Ninja kitty strikes!', 'Surprise delivery!'],
+  boxTug: ['Noir: Where do you think YOU are going?', 'Noir: Hold still, darling.', 'Noir: Gotcha by the fluff!', 'Noir: Mine. Paws off, darling.'],
+  boxPupTug: ['Leggo my tail!', 'Nnngh!', 'Not the fluff!', 'Eek!', 'Bunny, help!'],
+  boxSlip: ['Puppy: Nope nope nope!', 'Puppy: Byeee! Not today, kitty!', 'Zoom! Puppy left a dust cloud!', 'Slipped away! Grab faster, sweetie!'],
+  boxBlind: ['Puppy: Who turned off the lights?!', 'Puppy: Hello? Is it bedtime?', 'Puppy: I cannot see a thing!', 'Puppy: Why is the room box-shaped?'],
+  boxStamp: ['Puppy: Hey! I am NOT a letter!', 'Puppy: Why do I taste like an envelope?', 'Puppy: Did someone just MAIL me?', 'Puppy: Postage paid?!'],
+  boxWin: ['Noir: Return to sender, darling.', 'Noir: Signed, sealed, delivered.', 'Noir: This parcel is going straight back.'],
+  boxWinPup: ['Puppy: Hey! I am NOT a parcel!', 'Puppy: ...is this the post office?', 'Puppy: Can I at least have a window seat?'],
+  boxLose: ['Puppy: Nyeh nyeh! Hide and seek champion: ME!', 'Puppy: Found you more than you booped me!', 'Puppy: Woof! Puppy wins!'],
   trashHit: ['CLONK! Perfect drop!', 'Special delivery!', 'Bin-go!', 'Garbage day, Puppy!', 'Puppy got recycled!', 'Banana-rama!', 'Shoe-per shot!'],
   trashMiss: ['Missed! The pigeon is grateful.', 'Puppy: Nyeh! Missed me!', 'Wait for the shadow, sweetie!', 'That can is now modern art.'],
   // EDIT ME, Marc: Trash, junk bounces off the umbrella (last 3 are new)

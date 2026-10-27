@@ -27,6 +27,7 @@ const BOOT_USED_BUN = new Set(['bun_full_wink', 'bun_full_laugh', 'bun_full_cool
 function bootDeferred(key: string): boolean {
   if (key.startsWith('full_')) return !BOOT_USED_FULL.has(key.split('_')[2]) && !BOOT_USED_FULL_KEYS.has(key);
   if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
+  if (key.startsWith('pa_')) return true; // Acorn Puppy (Tail Catch rig) extra frames: drawn when Acorn opens (ensureArt)
   if (key === 'bun_rig_sneaky' || key.startsWith('bun_rig2_')) return true; // Tail Catch only (drawn when the level opens)
   if (key.startsWith('bun_rig_')) return false;
   if (/^bun_(full|wave|sip|bust)_/.test(key)) return !BOOT_USED_BUN.has(key);
@@ -66,6 +67,11 @@ function assets(): Asset[] {
   const pf = puppyFrames(), tailFrames: Record<string, any> = { stand: { face: 'normal' }, panic: pf.panic, dizzy: pf.dizzy, hearts: { face: 'hearts', earL: 10, earR: 10 } };
   for (let i = 0; i < 6; i++) tailFrames[`run${i}`] = pf[`run${i}_normal`];
   for (const name of Object.keys(tailFrames)) list.push({ key: `pt_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...tailFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
+  // ---------- Acorn Barrage Puppy (Pups 3): extra tail-less body frames for the Tail Catch rig (systems/acornPups.ts). On demand, like pt_*. ----------
+  const paFrames: Record<string, Record<string, unknown>> = { blink: { face: 'blink' }, worry: { face: 'worry', earL: 8, earR: 8 }, ouch: { face: 'ouch', earL: 30, earR: -6, legBack: -30, legFront: 34 },
+    taunt: { face: 'taunt', earL: 4, earR: 14 }, happy: { face: 'happy', earL: 6, earR: 6 }, jump: { ...pf.jump_normal, face: 'panic' }, fall: { ...pf.fall_normal, face: 'worry' }, flop: { ...pf.dizzy, face: 'dizzy' } };
+  for (const name of Object.keys(paFrames)) list.push({ key: `pa_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...paFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
+  // ---------- end Acorn Barrage Puppy ----------
   list.push({ key: 'pt_tail', nominal: PUP_SCALE, boost: 1.6, build: (k) => puppyTailSVG(k), originX: PUP_TAIL_VB.bx / PUP_TAIL_VB.w, originY: PUP_TAIL_VB.by / PUP_TAIL_VB.h });
   const exprs: BunExpr[] = ['cool', 'unimpressed', 'smile', 'wink', 'laugh', 'stern', 'sneaky'];
   for (const e of exprs) {

@@ -7,7 +7,7 @@
 import Phaser from 'phaser';
 import { GAME_W as W, GAME_H as H } from '../config';
 import { setupCamera, worldPoint } from '../systems/resolution';
-import { art } from '../art/registry';
+import { art, ensureArt } from '../art/registry';
 import { makeMuteButton, pointerInMute } from '../systems/ui';
 import { txt } from '../systems/fx';
 import { Fx, Sushi } from '../systems/audio';
@@ -15,6 +15,7 @@ import { popBanner, say, floatText, tutorialCard, makePauseButton, pointerInPaus
 import { endCard } from '../systems/endcard';
 import { LINES, pick } from '../lines';
 import { HeroRig, pupFlail } from '../systems/rigs';
+import { AcornPup, ACORN_PUP_KEYS } from '../systems/acornPups'; // Puppy look: Tail Catch rig (visual only)
 
 const TIME = 45, NEED = 10, THROWS = 24, HIT_R = 95, GOLD_R = 125, SPEED = 0.62, FLIGHT = 260, ASSIST = 70; const LAUNCH = { x: 420, y: 330 };
 const DIZZY_EXTRA = 280, STREAK_GOLD = 3, WIND_AT = 4, DECOY_AT = 7, WIND_MAX = 60, FOCUS_MAX = 3, FOCUS_GAIN = 0.8, FOCUS_DELAY = 0.25;
@@ -29,6 +30,7 @@ export class AcornScene extends Phaser.Scene {
   private ring!: Phaser.GameObjects.Graphics; private ringT!: Phaser.GameObjects.Text; private ringShown = 0; private windG!: Phaser.GameObjects.Graphics; private windT!: Phaser.GameObjects.Text;
   private decoy?: Phaser.GameObjects.Container; private layers: { o: any; k: number; bx: number }[] = []; private parX = 0; private shine!: Phaser.GameObjects.Text;
   private dragging = false; private dragT = 0; private slowT = 0; private wasFocus = false; private ghost?: Phaser.GameObjects.Graphics; private ghostImg?: Phaser.GameObjects.Image; private lastPup = { x: 360, y: 900 }; private pupV = { x: 0, y: 0 }; private roamId = 0; private wadTw?: Phaser.Tweens.Tween; private aimPt = { x: 360, y: 900 };
+  private skin: AcornPup | null = null; private umbY = -120;
   constructor() { super('Acorn'); }
   create() {
     this.ghost = undefined; this.ghostImg = undefined; this.slowT = 0; this.wasFocus = false;
@@ -48,6 +50,7 @@ export class AcornScene extends Phaser.Scene {
     this.umb = art(this, 0, -120, 'umbrella', 0.9).setVisible(false); this.umb.setData('s0', this.umb.scaleX);
     this.pupSh = this.add.image(0, 4, 'su_shadow').setScale(0.7, 0.5);
     this.pup.add([this.pupSh, this.pupImg, this.umb]);
+    this.skin = null; this.umbY = -120; this.attachSkin();
     LEAVES.forEach(([x, y], i) => { const l = art(this, x, y, 'leaf', 1.15).setDepth(25); this.tweens.add({ targets: l, angle: { from: -3, to: 3 }, yoyo: true, repeat: -1, duration: 1400 + i * 300, ease: 'Sine.InOut' }); });
     this.aim = this.add.graphics().setDepth(50);
     txt(this, W / 2, 400, 'ACORN BARRAGE', 40, '#ffdf6b', '#22252b', 8).setDepth(60);
@@ -60,9 +63,17 @@ export class AcornScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { const w = worldPoint(this, p); if (pointerInMute(w.x, w.y) || pointerInPause(w.x, w.y)) return; this.dragging = true; this.dragT = 0; this.cockArm(); this.drawAim(w.x, w.y); });
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { if (this.dragging && p.isDown) this.drawAim(worldPoint(this, p).x, worldPoint(this, p).y); });
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => { if (!this.dragging) return; this.dragging = false; if (this.wasFocus) this.slowT = 0.3; this.ghost?.clear(); this.aim.clear(); const w = worldPoint(this, p); this.fling(w.x, w.y); });
-    (window as any).__pr = { scene: 'Acorn', st: this.st, force: (win: boolean) => this.finish(win), pup: () => ({ x: this.pup.x, y: this.pup.y }), decoy: () => this.decoy ? { x: this.decoy.x, y: this.decoy.y } : null };
+    (window as any).__pr = { pupSkin: () => this.skin?.mode ?? null, scene: 'Acorn', st: this.st, force: (win: boolean) => this.finish(win), pup: () => ({ x: this.pup.x, y: this.pup.y }), decoy: () => this.decoy ? { x: this.decoy.x, y: this.decoy.y } : null };
     this.updateHud(); this.roam();
     tutorialCard(this, 'nana1', 'ACORN BARRAGE!', ['You are NANA! 🐿️ DRAG to aim, RELEASE!', `Only ${THROWS} acorns — aim where he's GOING!`, 'HOLD your aim = FOCUS slow-mo', 'Umbrella/leaf blocks. GOLDEN acorn smashes through!', '3 hits in a row = free GOLDEN! Hit him while DIZZY!', `Hit Puppy ${NEED} times in ${TIME}s!`], () => this.begin());
+  }
+  /** swap the old Puppy sprite for the Tail Catch rig once its on-demand frames exist (the hidden pupImg keeps every gameplay tween) */
+  private attachSkin() {
+    const go = (now = false) => { if ((!now && !this.sys.isActive() && !this.sys.isPaused()) || this.skin || !this.pup?.scene) return;
+      const sk = this.skin = new AcornPup(this, 0.9); this.pupImg.setVisible(false); this.pupSh.setVisible(false); this.pup.addAt(sk.root, 0); this.umbY = sk.umbY;
+      if (!this.tweens.isTweening(this.umb)) this.umb.setY(this.umbY);
+      const s = this.st; if (s.over) { if ((window as any).__pr?.ended === 'win') sk.win(); else sk.lose(); } else if (s.hiding >= 0) sk.hide(); else if (s.umbrella) sk.umbrella(); else if (this.moveTw?.isPlaying()) sk.run(this.pupImg.flipX ? 1 : -1); };
+    if (ACORN_PUP_KEYS.every(k => this.textures.exists(k))) go(true); else ensureArt(this, ACORN_PUP_KEYS).then(() => go());
   }
   private begin() { popBanner(this, 'NUTS TO YOU, PUPPY!', 700, 0xe08a3c); this.time.delayedCall(600, () => { say(this, 440, 570, pick(LINES.start.Nana), 22); this.st.running = true; }); }
   // ---------- painted forest layers (parallax with aim) ----------
@@ -102,10 +113,10 @@ export class AcornScene extends Phaser.Scene {
   private get fast() { const s = this.st; return (1 + (TIME - s.time) / TIME * 0.5 + s.hits * 0.02) * SPEED; }
   private roam() {
     if (this.st.over) return; const id = ++this.roamId; const s = this.st;
-    this.umb.setVisible(false); s.umbrella = false; s.hiding = -1; this.pupImg.setTexture('pup_idle').setAlpha(1).setAngle(0);
+    this.umb.setVisible(false); s.umbrella = false; s.hiding = -1; this.pupImg.setTexture('pup_idle').setAlpha(1).setAngle(0); this.skin?.idle();
     const r = Math.random(), fast = this.fast;
     if (s.running && r < 0.2) { // umbrella
-      s.umbrella = true; this.umb.setVisible(true).setScale(0); this.tweens.add({ targets: this.umb, scale: this.umb.getData('s0'), duration: 220, ease: 'Back.Out' });
+      s.umbrella = true; this.skin?.umbrella(); this.umb.setVisible(true).setScale(0); this.tweens.add({ targets: this.umb, scale: this.umb.getData('s0'), duration: 220, ease: 'Back.Out' });
       if (Math.random() < 0.4) say(this, this.pup.x, this.pup.y - 260, 'Puppy: Umbrella! Genius!', 20, 1000);
       this.time.delayedCall(Phaser.Math.Between(1300, 2000), () => id === this.roamId && this.roam()); return;
     }
@@ -113,12 +124,13 @@ export class AcornScene extends Phaser.Scene {
     if (s.running && r < 0.38) { hideAt = Phaser.Math.Between(0, LEAVES.length - 1); [tx, ty] = LEAVES[hideAt]; ty += 10; }
     else { tx = Phaser.Math.Between(90, 630); ty = Phaser.Math.Between(780, 1180); }
     const dur = Math.max(350, Phaser.Math.Distance.Between(this.pup.x, this.pup.y, tx, ty) / (260 * fast) * 1000);
-    this.pupImg.setFlipX(tx > this.pup.x);
+    this.pupImg.setFlipX(tx > this.pup.x); this.skin?.run(tx > this.pup.x ? 1 : -1);
     // anticipation: a quick crouch before he dashes off
     const b = this.pupImg.getData('b'); this.pupImg.setScale(b * 1.1, b * 0.9);
     this.moveTw = this.tweens.add({ targets: this.pup, x: tx, y: ty, duration: dur, ease: 'Sine.InOut', delay: 70, onUpdate: () => this.pup.setDepth(this.pup.y > 1000 ? 26 : 20), onComplete: () => {
-      if (hideAt >= 0) { s.hiding = hideAt; this.pupImg.setAlpha(0.35); this.pup.setDepth(24); }
-      else if (Math.random() < 0.2) { this.pupImg.setTexture('pup_hearts'); if (s.running && Math.random() < 0.5) say(this, this.pup.x, this.pup.y - 220, pick(LINES.puppyGag), 20, 1100); }
+      if (hideAt >= 0) { s.hiding = hideAt; this.pupImg.setAlpha(0.35); this.pup.setDepth(24); this.skin?.hide(); }
+      else if (Math.random() < 0.2) { this.pupImg.setTexture('pup_hearts'); this.skin?.gag(); if (s.running && Math.random() < 0.5) say(this, this.pup.x, this.pup.y - 220, pick(LINES.puppyGag), 20, 1100); }
+      else this.skin?.stop();
       this.pupImg.setScale(b * 1.12, b * 0.88); this.tweens.add({ targets: this.pupImg, scaleX: b, scaleY: b, duration: 200, ease: 'Back.Out' }); // skid-stop squash
       this.time.delayedCall(hideAt >= 0 ? Phaser.Math.Between(1000, 1600) : Phaser.Math.Between(700, 1700) / fast, () => id === this.roamId && this.roam());
     } });
@@ -128,6 +140,7 @@ export class AcornScene extends Phaser.Scene {
   update(_t: number, dms: number) {
     const s = this.st; const dt = Math.min(dms, 250) / 1000;
     this.updateParallax(dt); this.drawRing(dt);
+    if (this.skin) { const fo = this.dragging && this.dragT > FOCUS_DELAY && s.focus > 0 || this.slowT > 0; this.skin.update(dt, this.pupV.x, this.dragging && s.running ? this.aimPt : null, s.running && fo); }
     this.shine.setPosition(this.held.x + 22, this.held.y - 30); // golden sparkle stays on the acorn in her paw
     if (!s.running || s.over) return;
     s.time -= dt; s.cool -= dt; s.dizzy = Math.max(0, s.dizzy - dt);
@@ -146,6 +159,7 @@ export class AcornScene extends Phaser.Scene {
       this.ghost.fillStyle(0xfff4a0, 0.55).fillEllipse(gx, gy + 10, 140, 52).lineStyle(10, 0x22252b, 0.9).strokeEllipse(gx, gy + 10, 140, 52).lineStyle(6, 0xffe14a, 1).strokeEllipse(gx, gy + 10, 140, 52);
       if (far) { this.ghost.lineStyle(9, 0xffe14a, 1); const n = 6; for (let i = 0; i < n; i += 2) { const a0 = i / n, a1 = (i + 1) / n; this.ghost.lineBetween(this.pup.x + (gx - this.pup.x) * a0, this.pup.y + (gy - this.pup.y) * a0, this.pup.x + (gx - this.pup.x) * a1, this.pup.y + (gy - this.pup.y) * a1); } }
       if (!this.ghostImg || !this.ghostImg.scene) this.ghostImg = this.add.image(0, 0, this.pupImg.texture.key).setDepth(19).setTintFill(0xfff4a0);
+      if (this.skin) { const gh = this.skin.ghost(); this.ghostImg.setTexture(gh.key).setOrigin(0.5, 238 / 244).setScale(gh.sx, gh.sy).setPosition(gx, gy).setAlpha(far ? 0.7 : 0).setVisible(true); } else
       this.ghostImg.setTexture(this.pupImg.texture.key).setOrigin(this.pupImg.originX, this.pupImg.originY).setScale(this.pupImg.scaleX * this.pup.scaleX, this.pupImg.scaleY * this.pup.scaleY).setPosition(gx, gy + this.pupImg.y * this.pup.scaleY).setAlpha(far ? 0.7 : 0).setVisible(true);
     } else this.ghostImg?.setVisible(false);
     const k = focusing ? 0.5 : 1; if (this.moveTw) this.moveTw.timeScale = k;
@@ -213,7 +227,7 @@ export class AcornScene extends Phaser.Scene {
   private giveGolden(why: string) { const s = this.st; if (s.golden) return; s.golden = true; Sushi.golden(); floatText(this, LAUNCH.x + 120, LAUNCH.y - 40, `GOLDEN! (${why})`, '#ffd21f', 26); this.shine.setVisible(true);
     this.held.setTexture('gacorn'); this.tweens.add({ targets: this.held, scale: { from: this.held.getData('s0') * 1.6, to: this.held.getData('s0') }, duration: 300, ease: 'Back.Out' }); }
   private hop() {
-    if (this.st.over || this.st.dizzy > 0) return; this.moveTw?.stop(); const dir = this.pup.x < 360 ? 1 : -1; Fx.boing(); this.pupImg.setTexture('pup_panic');
+    if (this.st.over || this.st.dizzy > 0) return; this.moveTw?.stop(); const dir = this.pup.x < 360 ? 1 : -1; Fx.boing(); this.pupImg.setTexture('pup_panic'); this.skin?.hop(dir);
     const b = this.pupImg.getData('b'); this.pupImg.setScale(b * 1.2, b * 0.8);
     this.tweens.add({ targets: this.pup, x: this.pup.x + dir * 170, duration: 220, ease: 'Quad.Out' });
     this.tweens.add({ targets: this.pupImg, y: -90, scaleX: b * 0.9, scaleY: b * 1.15, duration: 160, yoyo: true, ease: 'Quad.Out', onComplete: () => { this.pupImg.setScale(b * 1.15, b * 0.85); this.tweens.add({ targets: this.pupImg, scaleX: b, scaleY: b, duration: 200, ease: 'Back.Out' }); } });
@@ -248,8 +262,8 @@ export class AcornScene extends Phaser.Scene {
     this.moveTw?.stop(); this.roamId++; this.tweens.killTweensOf(this.pupImg); this.pupImg.setAlpha(1).setY(0);
     Fx.punch(); Fx.boing(); this.cameras.main.shake(gold ? 400 : 200, gold ? 0.025 : 0.012); if (gold) { this.cameras.main.flash(120, 255, 230, 120); flashVignette(this, 0xffd21f, 0.6); }
     // hit-stop
-    this.tweens.timeScale = 0.05; this.time.delayedCall(gold ? 110 : 60, () => { this.tweens.timeScale = 1; });
-    if (s.umbrella) { const u = this.umb; this.tweens.add({ targets: u, y: -400, angle: 540, alpha: 0, duration: 600, onComplete: () => u.setVisible(false).setAlpha(1).setAngle(0).setY(-120) }); floatText(this, x, y - 160, 'UMBRELLA BUSTED!', '#ffd21f', 30); }
+    this.tweens.timeScale = 0.05; this.time.delayedCall(gold ? 110 : 60, () => { this.tweens.timeScale = 1; }); this.skin?.freeze(gold ? 110 : 60);
+    if (s.umbrella) { const u = this.umb; this.tweens.add({ targets: u, y: -400, angle: 540, alpha: 0, duration: 600, onComplete: () => u.setVisible(false).setAlpha(1).setAngle(0).setY(this.umbY) }); floatText(this, x, y - 160, 'UMBRELLA BUSTED!', '#ffd21f', 30); }
     sparks(this, x, y, gold ? 30 : 16, gold);
     const ring = this.add.graphics({ x, y }).setDepth(73); ring.lineStyle(8, gold ? 0xffd21f : 0xffffff, 0.9).strokeCircle(0, 0, 36); this.tweens.add({ targets: ring, scale: 2.8, alpha: 0, duration: 280, onComplete: () => ring.destroy() });
     const word = gold ? 'GOLDEN TONK!!' : wasDizzy ? 'DOUBLE TONK!' : head ? 'TONK!' : pick(['BONK!', 'PLINK!', 'THOCK!']);
@@ -260,12 +274,12 @@ export class AcornScene extends Phaser.Scene {
     // acorn bounces off his head
     const bo = art(this, x, y - 40, gold ? 'gacorn' : 'acorn', 0.7).setDepth(46); this.tweens.add({ targets: bo, x: x + Phaser.Math.Between(-140, 140), y: y - 220, angle: 540, duration: 380, ease: 'Quad.Out', onComplete: () => this.tweens.add({ targets: bo, y: y + 120, alpha: 0, duration: 300, ease: 'Quad.In', onComplete: () => bo.destroy() }) });
     // slapstick squash: pancake, then boing back up, wobble, stars orbit while DIZZY
-    this.pupImg.setTexture('pup_dizzy'); const b = this.pupImg.getData('b'); pupFlail(this, this.pupImg, 750); this.nana.setMood('happy'); this.time.delayedCall(700, () => this.nana.setMood('smug'));
+    this.pupImg.setTexture('pup_dizzy'); const b = this.pupImg.getData('b'); if (!this.skin) pupFlail(this, this.pupImg, 750); this.nana.setMood('happy'); this.time.delayedCall(700, () => this.nana.setMood('smug'));
     this.pupImg.setScale(b * 1.4, b * 0.55);
     this.tweens.add({ targets: this.pupImg, scaleX: b, scaleY: b, duration: 420, ease: 'Elastic.Out', easeParams: [1.3, 0.35] });
     this.tweens.add({ targets: this.pupImg, angle: { from: -15, to: 15 }, yoyo: true, repeat: 3, duration: 110, onComplete: () => this.pupImg.setAngle(0) });
-    const stunMs = (gold ? 900 : 650) + DIZZY_EXTRA; s.dizzy = stunMs / 1000;
-    for (let k = 0; k < 3; k++) { const st = txt(this, x, y - 70, '★', 30, '#ffdf6b', '#22252b', 4).setDepth(74);
+    const stunMs = (gold ? 900 : 650) + DIZZY_EXTRA; s.dizzy = stunMs / 1000; this.skin?.hit(gold, stunMs);
+    for (let k = 0; k < 3 && !this.skin; k++) { const st = txt(this, x, y - 70, '★', 30, '#ffdf6b', '#22252b', 4).setDepth(74);
       this.tweens.addCounter({ from: 0, to: 720, duration: stunMs, onUpdate: (tw) => { const a = Phaser.Math.DegToRad(tw.getValue()! + k * 120); st.setPosition(this.pup.x + Math.cos(a) * 50, this.pup.y - 170 + Math.sin(a) * 14); }, onComplete: () => st.destroy() }); }
     say(this, W / 2, 570, pick(gold ? LINES.golden : LINES.acornHit), 22, 1100);
     if (s.streak > 0 && s.streak % STREAK_GOLD === 0) this.giveGolden(`streak x${s.streak}`);
@@ -297,8 +311,8 @@ export class AcornScene extends Phaser.Scene {
   finish(win: boolean) {
     const s = this.st; if (s.over) return; s.over = true; s.running = false; this.moveTw?.stop(); this.wadTw?.stop(); this.roamId++; this.dragging = false; this.aim.clear();
     (window as any).__pr.ended = win ? 'win' : 'lose';
-    if (win) { this.pupImg.setTexture('pup_dizzy'); this.tweens.add({ targets: this.pupImg, angle: 90, duration: 500, ease: 'Bounce.Out' }); popBanner(this, 'PUPPY IS BONKED!', 600, 0x2fbf5a, 800); this.cameras.main.shake(300, 0.015); }
-    else { this.pupImg.setTexture('pup_hearts'); if (s.shots < THROWS) popBanner(this, 'TIME!', 600, 0x6b4cc9, 800); }
+    if (win) { this.skin?.win(); this.pupImg.setTexture('pup_dizzy'); this.tweens.add({ targets: this.pupImg, angle: 90, duration: 500, ease: 'Bounce.Out' }); popBanner(this, 'PUPPY IS BONKED!', 600, 0x2fbf5a, 800); this.cameras.main.shake(300, 0.015); }
+    else { this.skin?.lose(); this.pupImg.setTexture('pup_hearts'); if (s.shots < THROWS) popBanner(this, 'TIME!', 600, 0x6b4cc9, 800); }
     this.time.delayedCall(1100, () => endCard(this, 'Nana', 3, win, s.score + Math.round(s.time) * 20 + (THROWS - s.shots) * 100, `${s.hits} acorn hits • ${s.shots}/${THROWS} thrown`));
   }
 }

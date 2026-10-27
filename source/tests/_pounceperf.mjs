@@ -4,7 +4,7 @@ for (const [name, url] of [['before', 'http://localhost:4203/'], ['after', 'http
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const ctx = await b.newContext({ ...devices['iPhone 15 Pro Max'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 1 }); const p = await ctx.newPage();
   console.log(name, 'goto'); await p.goto(url); console.log(name, 'loaded'); await p.waitForFunction(() => window.__game?.scene.isActive('Title'), null, { timeout: 90000 });
-  await p.evaluate(() => { localStorage.setItem('playroom-test.tut.noir1', '1'); const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Pounce'); });
+  await p.evaluate(() => { localStorage.setItem('playroom-test.tut.noir2', '1'); const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start('Pounce'); });
   await p.waitForFunction(() => window.__pr?.st?.running, null, { timeout: 30000 }); console.log(name, 'running');
 
   const r = await p.evaluate(() => new Promise(res => { const S = window.__game.scene.getScene('Pounce'), st = window.__pr.st; const ou = S.sys.sceneUpdate; const ts = [];

@@ -109,6 +109,7 @@ type Phase = 'intro' | 'free' | 'tug' | 'tied' | 'outro' | 'over';
 const ROUND_NAME = ['TROT', 'SNEAKY', 'ZOOMIES'];
 
 export class LassoScene extends Phaser.Scene {
+  private zoom0 = 1; // base camera zoom (hi-DPI RES), read after setupCamera
   st = LassoScene.fresh();
   static fresh() {
     return { time: LK.TIME, ropes: 0, round: 1, throws: 0, misses: 0, slips: 0, dodges: 0, plants: 0, bonks: 0, decoys: 0, score: 0,
@@ -125,7 +126,7 @@ export class LassoScene extends Phaser.Scene {
   private downX = 0; private downY = 0; private downT = 0; private bxOff = 0; private dustT = 0; private lastHud = ''; private stars?: Phaser.GameObjects.Text; private first = { tug: true, plant: true };
   constructor() { super('Lasso'); }
   create() {
-    setupCamera(this); this.cameras.main.fadeIn(250); setPageBg(0x3a1250, 0x8a4a1a);
+    setupCamera(this); this.zoom0 = this.cameras.main.zoom; /* base hi-DPI zoom (RES): the catch punch returns here, not to 1 */ this.cameras.main.fadeIn(250); setPageBg(0x3a1250, 0x8a4a1a);
     this.st = LassoScene.fresh(); const s = this.st;
     (this as any).bunny = undefined; (this as any).hud = undefined; // RETRY restarts this instance: update() must idle until build() re-creates the rig/HUD
     this.girls = []; this.warn = []; this.decoy = undefined; this.tapTxt = undefined; this.hint = undefined; this.stars = undefined; this.pend = false;
@@ -322,7 +323,7 @@ export class LassoScene extends Phaser.Scene {
     this.tweens.add({ targets: this.tiedIn, x: { from: -4, to: 4 }, duration: 70, yoyo: true, repeat: -1 });
     const wl = txt(this, s.px - 96, s.py - 60 * PS, '((', 36, '#fff', '#22252b', 6).setDepth(40), wr = txt(this, s.px + 96, s.py - 60 * PS, '))', 36, '#fff', '#22252b', 6).setDepth(40);
     this.tweens.add({ targets: [wl, wr], alpha: 0.3, duration: 120, yoyo: true, repeat: -1 }); this.warn.push(wl, wr);
-    this.cameras.main.shake(140, 0.008); this.cameras.main.zoomTo(1.05, 90, Phaser.Math.Easing.Quadratic.Out); this.time.delayedCall(160, () => this.cameras.main.zoomTo(1, 220, Phaser.Math.Easing.Quadratic.InOut));
+    this.cameras.main.shake(140, 0.008); const z0 = this.zoom0; this.cameras.main.zoomTo(z0 * 1.05, 90, Phaser.Math.Easing.Quadratic.Out); this.time.delayedCall(160, () => this.cameras.main.zoomTo(z0, 220, Phaser.Math.Easing.Quadratic.InOut));
     Fx.goal(); impact(this, s.px + 40, 600, pick(['YEE-HAW!', 'ROPED!', 'GOTCHA!']), pts, this.freeRope ? 'FREE ROPE!' : this.bigLoop ? 'BIG LOOP!' : '', true);
     this.confetti(s.px, s.py - 120); this.bunny.setFace('laugh'); this.hud.pop(); this.drawHud(true);
     this.time.delayedCall(350, () => this.talk(Math.max(300, s.px), Math.max(840, s.py - 250), pick(LINES.lassoTied), 22, 1700));

@@ -1,7 +1,7 @@
 import {mk,BASE} from './_qc_h18.mjs';
 const MODES=process.argv[2].split(',');const N=+process.argv[3]||5;const PATCH=JSON.parse(process.argv[4]||"{}");
 const o=await mk(1);const {p,L,sleep}=o;
-await p.goto(BASE);await p.evaluate(()=>{localStorage.clear();for(const k of ['noir1','linye1','midnight1','iris1','bunny1'])localStorage.setItem('playroom-test.tut.'+k,'1')});await p.reload();
+await p.goto(BASE);await p.evaluate(()=>{localStorage.clear();for(const k of ['noir2','linye1','midnight1','iris1','bunny1'])localStorage.setItem('playroom-test.tut.'+k,'1')});await p.reload();
 await p.waitForFunction(()=>window.__game&&window.__game.scene.isActive('Title'),null,{timeout:60000});await sleep(800);
 const all={};
 for(const mode of MODES){const res=[];

@@ -252,3 +252,5 @@ function irisMouth(face: IrisFace): string {
     `<path d="M101 127 Q99 146 108 147 Q116 147 113 127 Z" fill="#ff7a8a" stroke="${OUT}" stroke-width="2.6" stroke-linejoin="round"/><path d="M107 130 v9" stroke="#d9546a" stroke-width="1.8" stroke-linecap="round"/>`;
 }
 // ---------- end Trash-Can Drop Puppy faces ----------
+/** Puppy's own part painters + palette, shared read-only with art/pupHang.ts (Lasso hang poses reuse the exact same body/head/leg/ear/face code). */
+export const PUP_PARTS = { OUT, SW, DEFS, head, topTuft, ear, leg, body, eyes, brows, mouth };

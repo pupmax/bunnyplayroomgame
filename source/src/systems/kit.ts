@@ -6,10 +6,12 @@ import { txt, bubble, comic } from './fx';
 import { makeButton } from './ui';
 import { Storage } from './storage';
 import { bakeG } from './bake';
+import { hallDecor, hallFx } from './hallFx';
+import { HALL_PAGE_BG } from '../art/hallLair';
 export { bakeG };
 
 export function hallBg(scene: Phaser.Scene, top = 0x3b1f5e, bot = 0xc76fb0, painted = true): Phaser.GameObjects.GameObject {
-  if (painted) return art(scene, 0, 0, 'bg_hall');
+  if (painted) { const bg = art(scene, 0, 0, 'bg_hall'); hallDecor(scene); return bg; }
   const g = scene.add.graphics();
   g.fillGradientStyle(top, top, bot, bot, 1); g.fillRect(0, 0, W, H);
   g.fillStyle(0xffffff, 0.06); for (let x = 0; x < W; x += 80) g.fillRect(x, 0, 40, H * 0.62);
@@ -123,7 +125,7 @@ function boxingDemo(scene: Phaser.Scene, x: number, y: number) {
 export const DOOR_POS: [number, number][] = [[90, 1080], [270, 1080], [450, 1080], [630, 1080], [630, 750], [450, 750], [270, 750], [90, 750], [W / 2, 300]];
 /** Static hall with doors; returns door containers. state(i) => 'beaten' | 'open' | 'soon' | 'locked'. */
 export function drawHall(scene: Phaser.Scene, cast: { name: string }[], state: (i: number) => string, best: (i: number) => number) {
-  hallBg(scene); dungeonFx(scene);
+  hallBg(scene); hallFx(scene); setPageBg(...HALL_PAGE_BG);
   const doors: Phaser.GameObjects.Container[] = [];
   for (let i = 0; i < 9; i++) {
     const [x, y] = DOOR_POS[i]; const big = i === 8; const st = state(i);
@@ -177,45 +179,6 @@ export function drawHall(scene: Phaser.Scene, cast: { name: string }[], state: (
   return doors;
 }
 
-/** Cute-silly dungeon idle animations layered over bg_hall. */
-export function dungeonFx(scene: Phaser.Scene) {
-  // torch flames
-  for (const [x, y] of [[40, 560], [680, 560], [200, 230], [520, 230]]) {
-    const fg = scene.add.graphics({ x, y: y + 2 }); fg.fillStyle(0xff5a1f, 1).fillEllipse(0, -18, 30, 44); fg.fillStyle(0xffc23a, 1).fillEllipse(0, -12, 18, 28); fg.fillStyle(0xfff3b0, 1).fillEllipse(0, -6, 8, 14);
-    const f = bakeG(scene, fg, 'flame', -17, -42, 34, 48);
-    scene.tweens.add({ targets: f, scaleY: { from: 0.85, to: 1.15 }, scaleX: { from: 1.05, to: 0.9 }, yoyo: true, repeat: -1, duration: Phaser.Math.Between(140, 220) });
-    scene.tweens.add({ targets: f, angle: { from: -6, to: 6 }, yoyo: true, repeat: -1, duration: Phaser.Math.Between(300, 450) });
-  }
-  // dangling spider
-  const sp = scene.add.container(150, 110); const sg = scene.add.graphics();
-  sg.lineStyle(2, 0xe8e4f0, 0.9).lineBetween(0, -400, 0, 0);
-  sg.lineStyle(3, 0x1a1420, 1); for (const k of [-1, 1]) for (let i = 0; i < 4; i++) sg.lineBetween(0, 14, k * (20 + i * 2), 4 + i * 8);
-  sg.fillStyle(0x3a2a4a, 1).fillCircle(0, 14, 14); sg.fillStyle(0xffffff, 1).fillCircle(-5, 12, 4.5).fillCircle(5, 12, 4.5); sg.fillStyle(0x1a1420, 1).fillCircle(-5, 13, 2.2).fillCircle(5, 13, 2.2);
-  sg.fillStyle(0xff7aa0, 0.8).fillCircle(-9, 19, 2.5).fillCircle(9, 19, 2.5);
-  sp.add(sg); bakeG(scene, sg, 'spider', -32, -402, 64, 438); scene.tweens.add({ targets: sp, y: 180, yoyo: true, repeat: -1, duration: 1800, ease: 'Sine.InOut' });
-  scene.tweens.add({ targets: sp, angle: { from: -5, to: 5 }, yoyo: true, repeat: -1, duration: 1300, ease: 'Sine.InOut' });
-  // sleepy bat (upside down) with blinking eyes
-  const bat = scene.add.container(600, 112); const bg = scene.add.graphics();
-  bg.lineStyle(4, 0x1a1420, 1).lineBetween(-4, -16, -4, -8).lineBetween(4, -16, 4, -8);
-  bg.fillStyle(0x4a3a5e, 1).lineStyle(4, 0x1a1420, 1).fillEllipse(0, 14, 34, 44).strokeEllipse(0, 14, 34, 44);
-  bg.fillTriangle(-12, 32, -4, 32, -10, 44).fillTriangle(12, 32, 4, 32, 10, 44);
-  bg.fillStyle(0x3a2c4c, 1).fillEllipse(-20, 10, 16, 40).fillEllipse(20, 10, 16, 40);
-  const eyes = scene.add.graphics(); const eyeOpen = () => { eyes.clear(); eyes.fillStyle(0xffffff, 1).fillCircle(-7, 22, 5).fillCircle(7, 22, 5); eyes.fillStyle(0x1a1420, 1).fillCircle(-7, 23, 2.5).fillCircle(7, 23, 2.5); };
-  const eyeShut = () => { eyes.clear(); eyes.lineStyle(3, 0x1a1420, 1).beginPath(); eyes.arc(-7, 21, 4, 0.2, Math.PI - 0.2); eyes.strokePath(); eyes.beginPath(); eyes.arc(7, 21, 4, 0.2, Math.PI - 0.2); eyes.strokePath(); };
-  eyeShut(); bat.add([bg, eyes]); bakeG(scene, bg, 'bat', -32, -20, 64, 68);
-  const zz = txt(scene, 640, 150, 'z', 22, '#cfc8ff', '#22252b', 4);
-  scene.tweens.add({ targets: zz, y: 110, x: 660, alpha: { from: 1, to: 0 }, repeat: -1, duration: 1600 });
-  scene.time.addEvent({ delay: 2600, loop: true, callback: () => { eyeOpen(); scene.time.delayedCall(450, eyeShut); } });
-  scene.tweens.add({ targets: bat, angle: { from: -4, to: 4 }, yoyo: true, repeat: -1, duration: 1500, ease: 'Sine.InOut' });
-  // slime bubbles
-  scene.time.addEvent({ delay: 380, loop: true, callback: () => {
-    const b = scene.add.circle(Phaser.Math.Between(240, 480), 1228, Phaser.Math.Between(5, 11), 0xc8ff7a).setStrokeStyle(2, 0x2a5a18);
-    scene.tweens.add({ targets: b, y: 1190, scale: 1.4, alpha: 0, duration: 900, onComplete: () => b.destroy() }); } });
-  // ceiling drips
-  scene.time.addEvent({ delay: 700, loop: true, callback: () => {
-    const x = Phaser.Math.Between(1, 17) * 40 - 20; const d = scene.add.ellipse(x, 116, 8, 12, 0x8ad0ff, 0.9);
-    scene.tweens.add({ targets: d, y: Phaser.Math.Between(300, 520), alpha: 0, duration: 1100, ease: 'Quad.In', onComplete: () => d.destroy() }); } });
-}
 /** Most recent hit-word / damage-number objects (replaced on each hit to avoid pile-up). */
 export const lastWord: Phaser.GameObjects.GameObject[] = [];
 

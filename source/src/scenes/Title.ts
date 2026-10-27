@@ -17,7 +17,7 @@ export class TitleScene extends Phaser.Scene {
     this.add.text(W - 12, H - 10, 'build ' + BUILD, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff' }).setOrigin(1, 1).setAlpha(0.5).setDepth(1000);
     diagHotspot(this);
     if (TESTER) { const tag = this.add.text(W / 2, 40, 'TEST – all unlocked', { fontFamily: 'monospace', fontSize: '26px', color: '#ffffff', backgroundColor: '#c0143c', padding: { x: 12, y: 6 } }).setOrigin(0.5, 0).setDepth(1000); tag.setAlpha(0.9); }
-    hallBg(this, 0x5b2a6e, 0xff9fc0); setPageBg(0x2a070d, 0x1a0a0e);
+    hallBg(this, 0x5b2a6e, 0xff9fc0); setPageBg(0x4a2a52, 0x3a1e3a);
     const logo = art(this, W / 2, 210, 'pr_logo_glow', 2.3);
     this.tweens.add({ targets: logo, scale: logo.scale * 1.05, angle: { from: -4, to: 4 }, yoyo: true, repeat: -1, duration: 1100, ease: 'Sine.InOut' });
     const t1 = comic(this, W / 2, 420, 'BUNNY', 112, '#fff6c0', '#ffb21f', '#3a0610');

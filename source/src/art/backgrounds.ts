@@ -1,5 +1,6 @@
 // Painted-style full-screen backgrounds (720x1280 SVG), rasterised at boot.
 import { radial, linear } from './svg';
+import { hallLair } from './hallLair';
 const W = 720, H = 1280;
 const blur = (id: string, s: number) => `<filter id="${id}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${s}"/></filter>`;
 const vignette = (id = 'vg') => radial(id, [[0, 'rgba(0,0,0,0)'], [0.62, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0.55)']], 0.5, 0.5, 0.75);
@@ -57,34 +58,7 @@ export const BACKGROUNDS: Record<string, () => { body: string; defs: string }> =
       + `<rect width="${W}" height="${H}" fill="url(#vg)" opacity="0.7"/>`;
     return { body, defs };
   },
-  hall: () => {
-    const R = rnd(7);
-    const defs = linear('wall', [[0, '#3a3248'], [0.6, '#4a3e52'], [1, '#2e2638']]) + linear('gold', [[0, '#fff2b0'], [0.5, '#e0a82e'], [1, '#8a5a10']])
-      + linear('rug', [[0, '#b0162c'], [1, '#6a0816']]) + linear('slime', [[0, '#b6ff5c'], [1, '#3fae2a']])
-      + radial('glow', [[0, 'rgba(255,170,80,0.55)'], [1, 'rgba(255,140,60,0)']]) + radial('sglow', [[0, 'rgba(160,255,90,0.45)'], [1, 'rgba(120,255,60,0)']]) + vignette()
-      + `<pattern id="brick" width="120" height="64" patternUnits="userSpaceOnUse"><rect width="120" height="64" fill="#4b4258"/>`
-      + `<rect x="3" y="3" width="54" height="26" rx="7" fill="#5d5470"/><rect x="63" y="3" width="54" height="26" rx="7" fill="#585068"/><rect x="-27" y="35" width="54" height="26" rx="7" fill="#544b66"/><rect x="33" y="35" width="54" height="26" rx="7" fill="#615774"/><rect x="93" y="35" width="54" height="26" rx="7" fill="#544b66"/>`
-      + `<rect x="6" y="5" width="30" height="5" rx="2" fill="#fff" opacity="0.10"/><rect x="66" y="37" width="30" height="5" rx="2" fill="#fff" opacity="0.08"/></pattern>`
-      + `<pattern id="flag" width="90" height="90" patternUnits="userSpaceOnUse"><rect width="90" height="90" fill="#2c2634"/><rect x="3" y="3" width="84" height="84" rx="10" fill="#3a3344"/><rect x="8" y="8" width="40" height="8" rx="4" fill="#fff" opacity="0.06"/></pattern>`;
-    let moss = ''; for (let i = 0; i < 26; i++) { const x = R() * 720, y = 120 + R() * 820; moss += `<ellipse cx="${x}" cy="${y}" rx="${14 + R() * 22}" ry="${6 + R() * 6}" fill="#6fae3c" opacity="0.75"/><circle cx="${x - 8}" cy="${y - 4}" r="5" fill="#93d04e"/>`; }
-    let drips = '<path d="M0 0 H720 V96 ' ; for (let x = 720; x >= 0; x -= 40) drips += `Q${x - 10} ${96 + (x % 80 ? 4 : 26)} ${x - 20} 96 `; drips += 'H0Z" fill="#2a2333" stroke="#1a1420" stroke-width="4"/>';
-    const web = (x: number, y: number, sx: number) => `<g transform="translate(${x},${y}) scale(${sx},1)" stroke="#e8e4f0" stroke-width="2.5" fill="none" opacity="0.8"><path d="M0 0 L130 0 M0 0 L0 130 M0 0 L110 70 M0 0 L60 120"/><path d="M40 0 Q34 22 0 40 M80 0 Q70 50 0 80 M120 0 Q100 80 0 120"/></g>`;
-    const skel = `<g transform="translate(600,440)"><rect x="-58" y="10" width="116" height="16" rx="6" fill="#7a4a2a" stroke="#2a1420" stroke-width="4"/><rect x="-50" y="24" width="10" height="40" fill="#5a3418"/><rect x="40" y="24" width="10" height="40" fill="#5a3418"/>`
-      + `<g stroke="#2a2030" stroke-width="4" fill="#f4f0e4"><rect x="-14" y="-40" width="28" height="48" rx="10"/><path d="M-10 6 l-8 54 M10 6 l8 54" fill="none" stroke-width="9" stroke="#f4f0e4"/><circle cx="0" cy="-70" r="30"/></g>`
-      + `<g fill="#2a2030"><ellipse cx="-11" cy="-72" rx="8" ry="9"/><ellipse cx="11" cy="-72" rx="8" ry="9"/><path d="M-3 -60 l3 -6 l3 6z"/><rect x="-12" y="-52" width="24" height="5" rx="2"/></g><circle cx="-9" cy="-74" r="3" fill="#fff"/><circle cx="13" cy="-74" r="3" fill="#fff"/>`
-      + `<g transform="rotate(-8)"><rect x="-70" y="-38" width="62" height="74" rx="4" fill="#fbf6e4" stroke="#2a2030" stroke-width="4"/><text x="-39" y="-20" font-family="Fredoka" font-weight="700" font-size="11" text-anchor="middle" fill="#2a2030">BONE TIMES</text><path d="M-62 -10 h46 M-62 0 h46 M-62 10 h30 M-62 20 h40" stroke="#9a94a0" stroke-width="3"/></g>`
-      + `<g><rect x="22" y="-24" width="26" height="28" rx="5" fill="#fff" stroke="#2a2030" stroke-width="4"/><path d="M48 -16 q12 4 0 14" stroke="#2a2030" stroke-width="4" fill="none"/><rect x="26" y="-20" width="18" height="6" fill="#7a4a2a"/><text x="35" y="-1" font-family="Fredoka" font-weight="700" font-size="9" text-anchor="middle" fill="#d0243a">♥</text></g></g>`;
-    const rat = `<g transform="translate(116,450)"><path d="M34 14 q40 4 46 -18" stroke="#e48aa0" stroke-width="5" fill="none"/><ellipse cx="0" cy="0" rx="44" ry="26" fill="#8a8494" stroke="#2a2030" stroke-width="4"/><circle cx="-34" cy="-14" r="22" fill="#9a94a4" stroke="#2a2030" stroke-width="4"/><circle cx="-30" cy="-36" r="11" fill="#f0a0b8" stroke="#2a2030" stroke-width="4"/><circle cx="-50" cy="-30" r="10" fill="#f0a0b8" stroke="#2a2030" stroke-width="4"/>`
-      + `<circle cx="-42" cy="-14" r="4" fill="#2a2030"/><circle cx="-56" cy="-8" r="5" fill="#ff7aa0"/><path d="M-50 -64 l6 14 l6 -16 l6 16 l6 -16 l6 16 l4 -14 v18 h-34z" fill="url(#gold)" stroke="#8a5a10" stroke-width="3"/><circle cx="-38" cy="-52" r="3" fill="#ff3b5a"/></g>`;
-    const body = `<rect width="${W}" height="${H}" fill="url(#brick)"/><rect width="${W}" height="${H}" fill="url(#wall)" opacity="0.35"/>` + moss
-      + `<rect y="${H * 0.62}" width="${W}" height="${H * 0.38}" fill="url(#flag)"/><rect y="${H * 0.62}" width="${W}" height="18" fill="#000" opacity="0.4"/><rect y="${H * 0.62 - 10}" width="${W}" height="10" fill="url(#gold)" opacity="0.8"/>`
-      + `<path d="M60 1180 H660 V850 H60 V560 L360 470" stroke="#1a0a10" stroke-width="66" fill="none" stroke-linejoin="round"/><path d="M60 1180 H660 V850 H60 V560 L360 470" stroke="url(#rug)" stroke-width="54" fill="none" stroke-linejoin="round"/><path d="M60 1180 H660 V850 H60 V560 L360 470" stroke="#ffcf6b" stroke-width="4" stroke-dasharray="14 10" fill="none" stroke-linejoin="round" opacity="0.7"/>`
-      + [[40, 560], [680, 560], [200, 230], [520, 230]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="120" fill="url(#glow)"/><path d="M${x - 14} ${y + 6} h28 l-8 40 h-12z" fill="#6a4020" stroke="#2a1420" stroke-width="4"/><rect x="${x - 20}" y="${y}" width="40" height="10" rx="4" fill="url(#gold)" stroke="#2a1420" stroke-width="3"/>`).join('')
-      + `<ellipse cx="360" cy="1238" rx="190" ry="44" fill="url(#sglow)"/><path d="M200 1240 Q220 1200 290 1212 Q360 1190 430 1210 Q510 1200 520 1240 Q470 1262 360 1258 Q240 1264 200 1240Z" fill="url(#slime)" stroke="#2a5a18" stroke-width="5"/><ellipse cx="310" cy="1218" rx="40" ry="7" fill="#fff" opacity="0.4"/>`
-      + `<g transform="translate(470,1222)"><circle cx="-10" cy="0" r="7" fill="#fff"/><circle cx="12" cy="0" r="7" fill="#fff"/><circle cx="-8" cy="1" r="3.5" fill="#1a3010"/><circle cx="14" cy="1" r="3.5" fill="#1a3010"/><path d="M-6 12 q8 7 16 0" stroke="#1a3010" stroke-width="3" fill="none"/></g>`
-      + drips + web(0, 96, 1) + web(720, 96, -1) + skel + rat + `<rect width="${W}" height="${H}" fill="url(#vg)"/>`;
-    return { body, defs };
-  },
+  hall: hallLair, // Bunny's cute gothic boudoir lair (src/art/hallLair.ts)
   meadow: () => {
     const R = rnd(11);
     const defs = linear('mSky', [[0, '#7fd3ff'], [0.55, '#c8f0ff'], [1, '#fff4c8']]) + linear('mGr', [[0, '#8ee05a'], [1, '#3f9f2e']]) + linear('mHill', [[0, '#a8e86a'], [1, '#5ab83a']]) + vignette();

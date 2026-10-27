@@ -19,6 +19,7 @@ import { Hud, impact } from '../systems/level';
 import { Storage } from '../systems/storage';
 import { TailPup } from '../systems/tailRigs';
 import { bakeG } from '../systems/bake';
+import { HangPup, ensureHangArt, type HangKind } from '../art/pupHang';
 
 type Mode = 'idle' | 'twirl' | 'hold' | 'walk' | 'dizzy';
 /** Bunny (stays white: same bun_rig body + su_bun limb art as BunnyRig) with a jointed lasso arm.
@@ -107,6 +108,9 @@ const KEYS = ['pt_stand', 'pt_panic', 'pt_dizzy', 'pt_tail', 'pup_box_panic', 'p
 type PupS = 'run' | 'pause' | 'fake' | 'sneak' | 'wind' | 'charge' | 'crash' | 'plant' | 'bonk' | 'tug' | 'tied' | 'drag';
 type Phase = 'intro' | 'free' | 'tug' | 'tied' | 'outro' | 'over';
 const ROUND_NAME = ['TROT', 'SNEAKY', 'ZOOMIES'];
+/** catch hangs (tie-up visuals only, timing is still LK.TIE): A/B dangle from a ceiling-beam hook by one hind ankle, C hangs by his knees from the lamp bar.
+ *  x = the rope / lamp cord column (between the girls' heads), y = the snared ankle (A/B) or the bar (C); land = where he drops to and runs off from. */
+const HANG = { A: { x: 400, y: 868, hookY: 46 }, C: { x: 568, y: 900 }, LAND: 1140, DROP: 0.42 };
 
 export class LassoScene extends Phaser.Scene {
   private zoom0 = 1; // base camera zoom (hi-DPI RES), read after setupCamera
@@ -123,18 +127,20 @@ export class LassoScene extends Phaser.Scene {
   private cx0 = 0; private cy0 = 0; private decoy?: Phaser.GameObjects.Container; private decoyT = 0; private decoyCD = 0; private pend = false;
   private tugStart = { x: 0, y: 0 }; private surgeT = 0; private surgeLeft = 0; private tugShout = 0; private freeRope = false; private bigLoop = false;
   private tapTxt?: Phaser.GameObjects.Text; private warn: Phaser.GameObjects.GameObject[] = []; private hint?: Phaser.GameObjects.Container; private outroT = 0; private heartT = 0;
+  private hang!: HangPup; private hangG!: Phaser.GameObjects.Graphics; private hangTop!: Phaser.GameObjects.Container; private lamp!: Phaser.GameObjects.Container; private lampBar!: Phaser.GameObjects.Graphics;
+  private hanging: HangKind | '' = ''; private hangT = 0; private hangSeq: HangKind[] = []; private hangDrop = false; private hangFx: Phaser.GameObjects.GameObject[] = [];
   private downX = 0; private downY = 0; private downT = 0; private bxOff = 0; private dustT = 0; private lastHud = ''; private stars?: Phaser.GameObjects.Text; private first = { tug: true, plant: true };
   constructor() { super('Lasso'); }
   create() {
     setupCamera(this); this.zoom0 = this.cameras.main.zoom; /* base hi-DPI zoom (RES): the catch punch returns here, not to 1 */ this.cameras.main.fadeIn(250); setPageBg(0x3a1250, 0x8a4a1a);
     this.st = LassoScene.fresh(); const s = this.st;
     (this as any).bunny = undefined; (this as any).hud = undefined; // RETRY restarts this instance: update() must idle until build() re-creates the rig/HUD
-    this.girls = []; this.warn = []; this.decoy = undefined; this.tapTxt = undefined; this.hint = undefined; this.stars = undefined; this.pend = false;
+    this.girls = []; this.warn = []; this.hanging = ''; this.hangT = 0; this.hangSeq = []; this.hangDrop = false; this.hangFx = []; this.decoy = undefined; this.tapTxt = undefined; this.hint = undefined; this.stars = undefined; this.pend = false;
     Object.assign(this, { gx: 480, gy: 1060, pauseT: 1, fakeT: 0, boost: 1, face: -1, chargeT: LK.CHARGE_FIRST, windT: 0, plantT: 0, decoyT: 0, decoyCD: 0, surgeT: 0, surgeLeft: 0, tugShout: 0,
       freeRope: false, bigLoop: false, outroT: 0, heartT: 0, bxOff: 0, dustT: 0, lastHud: '', first: { tug: true, plant: true } });
-    (window as any).__pr = { scene: 'Lasso', st: s, K: LK, force: (win: boolean) => this.finish(win), pup: () => ({ x: s.px, y: s.py }) };
+    (window as any).__pr = { scene: 'Lasso', st: s, K: LK, force: (win: boolean) => this.finish(win), pup: () => ({ x: s.px, y: s.py }), hangs: this.hangSeq, hang: '' };
     const loading = txt(this, W / 2, H / 2, 'Saddling up...', 34, '#fff', '#22252b', 6);
-    ensureArt(this, KEYS).then(() => { if (!this.sys.isActive() && !this.sys.isPaused()) return; loading.destroy(); this.build(); });
+    Promise.all([ensureArt(this, KEYS), ensureHangArt(this)]).then(() => { if (!this.sys.isActive() && !this.sys.isPaused()) return; loading.destroy(); this.build(); });
   }
   private build() {
     const s = this.st;
@@ -142,6 +148,7 @@ export class LassoScene extends Phaser.Scene {
     this.pup = new TailPup(this, s.px, s.py, PM); this.pup.setFrame('stand');
     this.tiedC = this.add.container(0, 0).setVisible(false); this.tiedIn = this.add.container(0, 0); this.tiedC.add([this.add.image(0, 4, 'su_shadow').setScale(artScale('su_shadow', 1.5), artScale('su_shadow', 0.7)), this.tiedIn]);
     this.tiedIn.add([art(this, 0, 0, 'pup_box_panic', PS), this.tiedRopes()]);
+    this.buildHang();
     this.add.ellipse(BX, BY - 4, 190, 40, 0x000000, 0.28).setDepth(19);
     this.bunny = new LassoBunny(this, BX, BY, 0.9).setDepth(20);
     this.fx = this.add.graphics().setDepth(24); this.ropeG = this.add.graphics().setDepth(21); this.meter = this.add.graphics().setDepth(66);
@@ -185,11 +192,14 @@ export class LassoScene extends Phaser.Scene {
   }
   private setGirl(g: { img: Phaser.GameObjects.Image; n: string }, mood: string) { const k = `full_${g.n}_${mood}`; if (this.textures.exists(k)) g.img.setTexture(k).setScale(artScale(k, 0.78)); }
   /** couch reaction: cheer (hop + YAY), gasp (O_O), party (everyone bouncing, keeps going) */
-  private couch(kind: 'cheer' | 'gasp' | 'party', line?: string) {
+  private couch(kind: 'cheer' | 'gasp' | 'party' | 'giggle', line?: string) {
     this.girls.forEach((g, i) => {
       this.tweens.killTweensOf(g.img); g.img.setY(g.y).setAngle(0);
       if (kind === 'gasp') { this.setGirl(g, g.n === 'Glassia' ? 'windup' : 'dizzy'); this.tweens.add({ targets: g.img, y: g.y - 8, angle: i % 2 ? -4 : 4, duration: 120, yoyo: true });
         if (i % 3 === 1) this.pop(g.x + 8, 470, i % 2 ? '!?' : 'O_O', '#fff'); }
+      else if (kind === 'giggle') { this.setGirl(g, 'happy'); // little giggle hops + head tilts at the hanging Puppy
+        this.tweens.add({ targets: g.img, y: g.y - 10, angle: i % 2 ? 5 : -5, duration: 130, delay: i * 45, yoyo: true, repeat: 3, ease: 'Sine.InOut' });
+        if (i % 2 === 1) this.time.delayedCall(i * 60, () => this.pop(g.x + 6, 465, pick(LINES.lassoGiggle), i % 4 === 1 ? '#ffdf6b' : '#fff')); }
       else { this.setGirl(g, 'happy');
         this.tweens.add({ targets: g.img, y: g.y - (i % 2 ? 34 : 22), angle: i % 2 ? 6 : -6, duration: 170, delay: i * 25, yoyo: true, repeat: kind === 'party' ? -1 : 2, ease: 'Quad.Out' });
         if (i % 2 === 0 || kind === 'party') this.pop(g.x + 6, 460, ['YAY!', '♥', '!!'][i % 3], i % 3 === 1 ? '#ff5c8a' : '#ffdf6b'); }
@@ -317,34 +327,129 @@ export class LassoScene extends Phaser.Scene {
   private reeled() {
     const s = this.st; this.endTug(); s.ropes++; s.phase = 'tied'; s.pup = 'tied'; s.tieT = 0; this.heartT = 0.2;
     const pts = 1000 + (this.bigLoop ? 300 : 0) + (this.freeRope ? 500 : 0) + (s.round - 1) * 200; s.score += pts;
-    this.pup.root.setVisible(false); this.tiedC.setVisible(true).setPosition(s.px, s.py).setDepth(this.pup.root.depth);
-    this.tweens.killTweensOf(this.tiedIn); this.tiedIn.setAngle(0).setX(0);
-    this.tweens.add({ targets: this.tiedIn, angle: { from: -7, to: 7 }, duration: 110, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
-    this.tweens.add({ targets: this.tiedIn, x: { from: -4, to: 4 }, duration: 70, yoyo: true, repeat: -1 });
-    const wl = txt(this, s.px - 96, s.py - 60 * PS, '((', 36, '#fff', '#22252b', 6).setDepth(40), wr = txt(this, s.px + 96, s.py - 60 * PS, '))', 36, '#fff', '#22252b', 6).setDepth(40);
-    this.tweens.add({ targets: [wl, wr], alpha: 0.3, duration: 120, yoyo: true, repeat: -1 }); this.warn.push(wl, wr);
+    const cx = s.px, cy = s.py; this.pup.root.setVisible(false); this.startHang(this.nextHang());
     this.cameras.main.shake(140, 0.008); const z0 = this.zoom0; this.cameras.main.zoomTo(z0 * 1.05, 90, Phaser.Math.Easing.Quadratic.Out); this.time.delayedCall(160, () => this.cameras.main.zoomTo(z0, 220, Phaser.Math.Easing.Quadratic.InOut));
-    Fx.goal(); impact(this, s.px + 40, 600, pick(['YEE-HAW!', 'ROPED!', 'GOTCHA!']), pts, this.freeRope ? 'FREE ROPE!' : this.bigLoop ? 'BIG LOOP!' : '', true);
-    this.confetti(s.px, s.py - 120); this.bunny.setFace('laugh'); this.hud.pop(); this.drawHud(true);
-    this.time.delayedCall(350, () => this.talk(Math.max(300, s.px), Math.max(840, s.py - 250), pick(LINES.lassoTied), 22, 1700));
+    Fx.goal(); impact(this, cx + 40, 600, pick(['YEE-HAW!', 'ROPED!', 'GOTCHA!']), pts, this.freeRope ? 'FREE ROPE!' : this.bigLoop ? 'BIG LOOP!' : '', true);
+    this.confetti(cx, cy - 120); this.bunny.setFace('laugh'); this.hud.pop(); this.drawHud(true);
     if (s.ropes < LK.NEED) { this.couch('cheer', Math.random() < 0.4 ? pick(LINES.lassoCouchCheer) : undefined); if (Math.random() < 0.3) this.time.delayedCall(1200, () => this.talk(330, 860, pick(LINES.lassoHit), 22, 900)); }
     else this.win();
   }
   private updTied(dt: number) {
     const s = this.st; s.tieT += dt; this.heartT -= dt;
-    if (this.heartT <= 0) { this.heartT = 0.7; this.hearts(s.px, s.py - 232 * PS, 2); }
+    if (this.hanging) this.updHang(dt);
+    if (this.heartT <= 0) { this.heartT = 0.7; if (this.hanging && !this.hangDrop) { const h = this.hang.head(); this.hearts(h.x, h.y + 10, 2, true); } else if (!this.hanging) this.hearts(s.px, s.py - 232 * PS, 2); } // hearts from his HEAD only
     if (s.phase === 'tied' && !s.over && s.tieT >= LK.TIE) this.untie();
   }
   private untie() {
-    const s = this.st; this.clearWarn(); this.tweens.killTweensOf(this.tiedIn); this.tiedC.setVisible(false); this.pup.root.setVisible(true);
-    Fx.boing(); this.word(s.px, s.py - 200, 'POP!', 50, 300);
-    for (let i = 0; i < 3; i++) { const e = this.add.ellipse(s.px, s.py - 30 - i * 25, 120, 34).setStrokeStyle(7, ROPE).setDepth(30);
-      this.tweens.add({ targets: e, x: e.x + (i - 1) * 140, y: e.y - 60 + i * 30, angle: (i - 1) * 90, alpha: 0, duration: 500, onComplete: () => e.destroy() }); }
+    const s = this.st; this.clearWarn();
+    if (this.hanging) { this.endHang(); this.pup.root.setVisible(true).setPosition(s.px, s.py); this.pup.setFrame('stand'); this.pup.flip(false); }
+    else { this.tweens.killTweensOf(this.tiedIn); this.tiedC.setVisible(false); this.pup.root.setVisible(true);
+      Fx.boing(); this.word(s.px, s.py - 200, 'POP!', 50, 300);
+      for (let i = 0; i < 3; i++) { const e = this.add.ellipse(s.px, s.py - 30 - i * 25, 120, 34).setStrokeStyle(7, ROPE).setDepth(30);
+        this.tweens.add({ targets: e, x: e.x + (i - 1) * 140, y: e.y - 60 + i * 30, angle: (i - 1) * 90, alpha: 0, duration: 500, onComplete: () => e.destroy() }); } }
     s.phase = 'free'; this.bunny.setFace('wink'); this.escape();
     const nr = s.ropes >= LK.ROUND_AT[2] ? 3 : s.ropes >= LK.ROUND_AT[1] ? 2 : 1;
     if (nr !== s.round) { s.round = nr; s.bannerT = LK.BANNER; this.setRoundChip(); popBanner(this, `ROUND ${nr}: ${ROUND_NAME[nr - 1]}!`, 700, nr === 3 ? 0xe0243a : 0x6b4cc9, 900);
       this.time.delayedCall(500, () => this.talk(400, 860, LINES.lassoRound[nr - 2], 22, 1400)); this.chargeT = LK.CHARGE_FIRST; }
     if (s.time <= 0) this.finish(false);
+  }
+  // ---------------------------------------------------------------- caught: the hang (tie-up VISUALS only; timing/clock are untouched)
+  private buildHang() {
+    const hx = HANG.A.x, cx = HANG.C.x, by = HANG.C.y;
+    this.hang = new HangPup(this, PM); this.hangG = this.add.graphics().setDepth(13);
+    const top = this.add.graphics(); // ceiling beam across the top edge + the hook (under the HUD)
+    top.fillStyle(0x6b3f1c, 1).lineStyle(5, COLORS.INK, 1).fillRect(-10, -6, W + 20, 40).strokeRect(-10, -6, W + 20, 40);
+    top.fillStyle(0x8a5a2a, 1).fillRect(-10, 2, W + 20, 10); top.fillStyle(0x3a1e0a, 1); [70, 250, 470, 650].forEach(x => top.fillCircle(x, 18, 5));
+    top.lineStyle(6, COLORS.INK, 1).fillStyle(0xd9a93a, 1).fillRect(hx - 12, 30, 24, 8).strokeRect(hx - 12, 30, 24, 8);
+    top.lineStyle(10, COLORS.INK, 1).strokeCircle(hx, HANG.A.hookY - 2, 9).lineStyle(5, 0xffd36b, 1).strokeCircle(hx, HANG.A.hookY - 2, 9);
+    this.hangTop = this.add.container(0, 0, [top]).setDepth(5).setVisible(false);
+    const l = this.add.graphics(); // the LAMP for hang C: lowered on a long cord so the shade sits below the couch, clear of every girl
+    l.lineStyle(9, COLORS.INK, 1).lineBetween(cx, 0, cx, 800).lineStyle(4, 0x4a3a30, 1).lineBetween(cx, 0, cx, 800);
+    l.fillStyle(0xfff3b0, 0.22).fillEllipse(cx, 880, 300, 120);
+    l.fillStyle(0xffd36b, 1).lineStyle(5, COLORS.INK, 1).fillCircle(cx, 846, 14).strokeCircle(cx, 846, 14);
+    l.fillStyle(0xff8fb6, 1).fillPoints([{ x: cx - 24, y: 798 }, { x: cx + 24, y: 798 }, { x: cx + 56, y: 846 }, { x: cx - 56, y: 846 }], true);
+    l.strokePoints([{ x: cx - 24, y: 798 }, { x: cx + 24, y: 798 }, { x: cx + 56, y: 846 }, { x: cx - 56, y: 846 }], true);
+    l.fillStyle(0xffffff, 0.35).fillRect(cx - 18, 806, 8, 30);
+    l.lineStyle(7, COLORS.INK, 1).lineBetween(cx - 44, 846, cx - 80, by).lineBetween(cx + 44, 846, cx + 80, by).lineStyle(3, 0xc9c9d6, 1).lineBetween(cx - 44, 846, cx - 80, by).lineBetween(cx + 44, 846, cx + 80, by);
+    this.lamp = this.add.container(0, 0, [l]).setDepth(6).setVisible(false);
+    this.lampBar = this.add.graphics().setDepth(14).setVisible(false); // the bar sits IN FRONT of his shins: his knees hook over it
+    this.lampBar.fillStyle(0xd9a93a, 1).lineStyle(5, COLORS.INK, 1).fillRoundedRect(cx - 96, by - 8, 192, 16, 8).strokeRoundedRect(cx - 96, by - 8, 192, 16, 8);
+    this.lampBar.fillStyle(0xffffff, 0.45).fillRect(cx - 86, by - 4, 172, 3);
+  }
+  /** a shuffled A/B/C first, then never the same hang twice in a row */
+  private nextHang(): HangKind {
+    const seq = this.hangSeq, all: HangKind[] = ['A', 'B', 'C'], prev = seq[seq.length - 1];
+    const pool = seq.length < 3 ? all.filter(k => !seq.includes(k)) : all.filter(k => k !== prev);
+    const k = pool[Math.floor(Math.random() * pool.length)]; seq.push(k); (window as any).__pr.hang = k; return k;
+  }
+  private startHang(kind: HangKind) {
+    const s = this.st, C = kind === 'C', x = C ? HANG.C.x : HANG.A.x, y = C ? HANG.C.y : HANG.A.y;
+    this.cloud(s.px, s.py - 80); Fx.whoosh();
+    this.hanging = kind; this.hangT = 0; this.hangDrop = false; this.hangSide = s.px < x ? -1 : 1; // he swings in from the side he was caught on
+    this.hang.start(kind, x, y).root.setDepth(10 + (HANG.LAND - 900) / 100);
+    this.hangAng = 180; this.hangG.clear().setAlpha(1); this.hangTop.setVisible(!C); this.lamp.setVisible(C).setAlpha(1); this.lampBar.setVisible(C).setAlpha(1);
+    s.px = x; s.py = HANG.LAND; // he drops here and runs off from here
+    this.word(x + (C ? -150 : 150), C ? 1000 : 960, kind === 'B' ? 'SPIN!' : 'YOINK!', 46, 450, kind === 'A' ? 6 : -6);
+    if (C) { const coil = this.add.graphics().setDepth(8); // no tie for C: the lasso lies loose on the rug
+      [[0, 0, 110, 34], [8, -4, 84, 26], [-6, 3, 64, 20]].forEach(([dx, dy, w, h]) => coil.lineStyle(11, 0xffffff, 0.9).strokeEllipse(330 + dx, 1180 + dy, w, h).lineStyle(6, ROPE, 1).strokeEllipse(330 + dx, 1180 + dy, w, h));
+      coil.lineStyle(6, ROPE, 1).lineBetween(385, 1180, 430, 1192); this.hangFx.push(coil); }
+    if (kind === 'B') for (let i = 0; i < 3; i++) this.hangFx.push(txt(this, x, y, '★', 30, '#ffdf6b', '#22252b', 5).setDepth(41));
+    const bun = C ? LINES.lassoLampBun : LINES.lassoHangBun, pup = kind === 'A' ? LINES.lassoHangPup : kind === 'B' ? LINES.lassoSpinPup : LINES.lassoLampPup;
+    this.time.delayedCall(350, () => { if (this.hanging === kind) this.talk(230, 860, pick(bun), 22, 1100); });
+    this.time.delayedCall(1250, () => { if (this.hanging === kind && !this.st.over) this.talk(x, 1190, pick(pup), 22, 1150); });
+    this.time.delayedCall(1200, () => { if (this.hanging === kind && this.st.phase === 'tied' && !this.st.over) this.couch('giggle'); }); // (5th catch: the couch is already partying)
+  }
+  private hangSide = 1; private hangAng = 180;
+  private updHang(dt: number) {
+    const s = this.st, k = this.hanging, h = this.hang, t = (this.hangT += dt), g = this.hangG.clear();
+    if (!k) return;
+    h.update(dt, 0.5, 5);
+    if (!this.hangDrop) {
+      if (k === 'C') { // by the knees: swings in, settles into a gentle sway under the bar
+        const th = this.hangSide * (6 + 12 * Math.exp(-1.7 * t)) * Math.cos(t * Math.PI * 2 / 1.15);
+        this.hangAng = 180 - th; h.root.setPosition(HANG.C.x, HANG.C.y).setAngle(this.hangAng);
+      } else { // pendulum on the long rope from the hook; B also spins slowly on it
+        const L = HANG.A.y - HANG.A.hookY, amp = k === 'A' ? 3.5 + 6 * Math.exp(-1.3 * t) : 2 + 4 * Math.exp(-1.5 * t); // long rope: a few degrees is a gentle sway
+        const th = this.hangSide * amp * Math.cos(t * Math.PI * 2 / 1.6), r = Phaser.Math.DegToRad(th);
+        this.hangAng = 180 - th; h.root.setPosition(HANG.A.x + Math.sin(r) * L, HANG.A.hookY + Math.cos(r) * L).setAngle(this.hangAng);
+        if (k === 'B') h.root.scaleX = Math.cos(Math.PI * 2 * (0.42 * t + 0.8 * (1 - Math.exp(-1.6 * t)))); // twirls on the rope, winding down to a lazy spin
+      }
+      if (!s.over && t >= LK.TIE - HANG.DROP) this.dropHang();
+    }
+    if (k !== 'C') { // the rope + the snare loop around ONE hind ankle
+      const a = h.root, top = this.hangDrop ? this.ropeTop : { x: HANG.A.x, y: HANG.A.hookY };
+      const end = this.hangDrop ? this.ropeEnd : { x: a.x, y: a.y };
+      g.lineStyle(10, 0xffffff, 0.95).lineBetween(top.x, top.y, end.x, end.y).lineStyle(5, ROPE, 1).lineBetween(top.x, top.y, end.x, end.y);
+      if (!this.hangDrop) { const w = 30 * Math.max(0.35, Math.abs(a.scaleX)); g.lineStyle(10, 0xffffff, 0.95).strokeEllipse(a.x, a.y + 3, w, 13).lineStyle(5, ROPE, 1).strokeEllipse(a.x, a.y + 3, w, 13); }
+    }
+    if (k === 'B') { const hd = h.head(); this.hangFx.forEach((o, i) => { if (o instanceof Phaser.GameObjects.Text) { const a = t * 4 + i * 2.094; o.setPosition(hd.x + Math.cos(a) * 62, hd.y + 52 + Math.sin(a) * 16).setDepth(Math.sin(a) > 0 ? 41 : 11).setAlpha(this.hangDrop ? 0 : 1); } }); }
+  }
+  private ropeTop = { x: 0, y: 0 }; private ropeEnd = { x: 0, y: 0 };
+  /** the last moment of the tie-up: the snare / his knees let go, he flips over and lands on his feet (swapping to the normal standing frame mid-flip) */
+  private dropHang() {
+    const s = this.st, h = this.hang, k = this.hanging; this.hangDrop = true; Fx.boing();
+    const a = h.root; this.ropeTop = { x: HANG.A.x, y: HANG.A.hookY }; this.ropeEnd = { x: a.x, y: a.y };
+    this.word(Math.min(a.x + 70, W - 120), a.y - 10, k === 'C' ? 'WHOOPS!' : 'POP!', 44, 260);
+    if (k !== 'C') { this.tweens.add({ targets: this.ropeEnd, x: HANG.A.x, y: HANG.A.hookY + 30, duration: 260, ease: 'Quad.In' });
+      const e = this.add.ellipse(a.x, a.y, 34, 14).setStrokeStyle(6, ROPE).setDepth(30); this.tweens.add({ targets: e, x: e.x + 90 * this.hangSide, y: e.y - 70, angle: 200, alpha: 0, duration: 420, onComplete: () => e.destroy() }); }
+    h.pivotTo(100, 166); // spin about his middle
+    const u = PS, p = { a: this.hangAng, x: a.x, y: a.y, sx: a.scaleX }, ty = s.py - (238 - 166) * u; let swapped = false;
+    this.tweens.add({ targets: p, a: this.hangAng > 180 ? 360 : 0, x: s.px, sx: 1, duration: (HANG.DROP - 0.06) * 1000, ease: 'Sine.InOut',
+      onUpdate: () => { a.setAngle(p.a).setX(p.x); a.scaleX = p.sx; if (!swapped && Math.abs(p.a - 180) >= 90) { swapped = true; h.upright(); } } });
+    this.tweens.add({ targets: p, y: ty, duration: (HANG.DROP - 0.06) * 1000, ease: 'Quad.In', onUpdate: () => a.setY(p.y), onComplete: () => this.dust(s.px, s.py, 6) });
+  }
+  private endHang(fade = true) {
+    this.hanging = ''; this.hangDrop = false; this.hang.hide(); this.hangG.clear(); this.hangTop.setVisible(false);
+    const objs = [this.lamp, this.lampBar, ...this.hangFx]; this.hangFx = [];
+    objs.forEach(o => { this.tweens.killTweensOf(o); if (fade && (o === this.lamp || o === this.lampBar) && (o as any).visible) this.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => (o as any).setVisible(false) });
+      else if (o === this.lamp || o === this.lampBar) (o as any).setVisible(false); else if (o instanceof Phaser.GameObjects.Graphics) this.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => o.destroy() }); else o.destroy(); });
+  }
+  /** 5th catch: the outro drag needs the hog-tied bundle, so the hang turns into it in a puff right where he would have landed */
+  private hangToTied() {
+    if (!this.hanging) return; const s = this.st; this.endHang(); this.cloud(s.px, s.py - 70); Fx.boing();
+    this.tiedC.setVisible(true).setPosition(s.px, s.py).setDepth(this.pup.root.depth); this.tweens.killTweensOf(this.tiedIn); this.tiedIn.setAngle(0).setX(0);
+    this.tweens.add({ targets: this.tiedIn, angle: { from: -7, to: 7 }, duration: 110, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
+    this.tweens.add({ targets: this.tiedIn, x: { from: -4, to: 4 }, duration: 70, yoyo: true, repeat: -1 });
   }
   // ---------------------------------------------------------------- Puppy AI
   private spd() { return LK.SPD[this.st.round - 1]; }
@@ -446,7 +551,7 @@ export class LassoScene extends Phaser.Scene {
     if (s.stun > 0) s.stun -= dt; if (s.running || s.phase === 'outro') s.clock += dt; // game-time since the start (tests/tuning)
     if (s.hold) { s.holdT += dt; }
     const knot = this.knot();
-    const mode: Mode = s.phase === 'outro' ? 'walk' : (s.phase === 'tug' || s.phase === 'tied') ? 'hold' : s.stun > 0 ? 'dizzy' : s.hold ? 'twirl' : 'idle';
+    const mode: Mode = s.phase === 'outro' ? 'walk' : (s.phase === 'tug' || (s.phase === 'tied' && !this.hanging)) ? 'hold' : s.stun > 0 ? 'dizzy' : s.hold ? 'twirl' : 'idle';
     this.bunny.root.setX(BX + this.bxOff + (s.phase === 'outro' ? -this.outroWalk() : 0));
     this.bunny.update(dt, mode, s.holdT / LK.SPIN, knot, s.phase === 'tug' ? s.tug : 0.6);
     if (s.running && s.phase === 'free' && s.bannerT <= 0 && !s.over) {
@@ -465,7 +570,7 @@ export class LassoScene extends Phaser.Scene {
   /** where the rope ties onto Puppy (waist loop while tugging, the bow knot when tied) */
   private knot() { const s = this.st; return s.phase === 'tug' ? { x: s.px - 34, y: s.py - 58 } : { x: this.tiedC?.x - 18 * PS, y: this.tiedC?.y - 48 * PS }; }
   private drawRope(k: { x: number; y: number }) {
-    const s = this.st, r = this.ropeG.clear(); const on = s.phase === 'tug' || s.phase === 'tied' || s.phase === 'outro' || (s.phase === 'over' && s.ropes >= LK.NEED);
+    const s = this.st, r = this.ropeG.clear(); const on = s.phase === 'tug' || (s.phase === 'tied' && !this.hanging) || s.phase === 'outro' || (s.phase === 'over' && s.ropes >= LK.NEED);
     this.grip.setVisible(on); if (!on) return;
     const hp = this.bunny.handPos(), tense = s.phase === 'tug' ? 0.4 + 0.6 * s.tug : 0.8, sag = (1 - tense) * 60 + 8;
     const curve = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(hp.x, hp.y), new Phaser.Math.Vector2((hp.x + k.x) / 2, Math.max(hp.y, k.y) + sag), new Phaser.Math.Vector2(k.x, k.y));
@@ -498,6 +603,7 @@ export class LassoScene extends Phaser.Scene {
   }
   private outroWalk() { return Math.max(0, this.outroT - 0.25) * 150; }
   private updOutro(dt: number) {
+    if (this.hanging) this.hangToTied(); // 5th catch: the hang turns into the hog-tie for the drag outro
     const s = this.st; this.outroT += dt; this.updTied(dt);
     const hp = this.bunny.handPos(), tx = hp.x + 175; // he slides along on his bottom, a rope-length behind her paw
     if (this.tiedC.x > tx) { this.tiedC.x += (tx - this.tiedC.x) * (1 - Math.exp(-dt * 5)); this.tiedC.y += (BY - 40 - this.tiedC.y) * (1 - Math.exp(-dt * 3)); }
@@ -516,7 +622,7 @@ export class LassoScene extends Phaser.Scene {
     const score = s.score + Math.round(s.time) * 30; if (this.hud) this.drawHud(true); // HUD shows the final count/time (never frozen a frame early)
     (window as any).__pr.ended = win ? 'win' : 'lose'; (window as any).__pr.score = score;
     if (win) { Storage.submitLevel('Bunny', score); Storage.setBeaten(9); Fx.sting(true); if (s.phase !== 'tied') this.time.delayedCall(10, () => this.toChampion()); return; }
-    s.phase = 'over'; if (this.pup) { this.pup.root.setVisible(true); this.tiedC?.setVisible(false); }
+    s.phase = 'over'; if (this.hanging) this.endHang(); if (this.pup) { this.pup.root.setVisible(true); this.tiedC?.setVisible(false); }
     Fx.sting(false); popBanner(this, 'TIME!', 600, 0x6b4cc9, 700); this.couch?.('gasp');
     this.time.delayedCall(1000, () => this.lossCard(score));
   }
@@ -557,10 +663,10 @@ export class LassoScene extends Phaser.Scene {
     return g;
   }
   /** little hearts float up from Puppy's HEAD only (never heart eyes, never at Bunny) */
-  private hearts(x: number, y: number, n = 2) {
-    for (let i = 0; i < n; i++) { const h = txt(this, x + Phaser.Math.Between(-40, 40), y, '♥', Phaser.Math.Between(28, 40), '#ff5c8a', '#3b1f10', 5).setDepth(41).setAlpha(0);
+  private hearts(x: number, y: number, n = 2, away = false) { // away: upside-down hang, so they burst sideways/down off his head, never across his body
+    for (let i = 0; i < n; i++) { const sd = i % 2 ? 1 : -1; const h = txt(this, x + (away ? sd * Phaser.Math.Between(30, 50) : Phaser.Math.Between(-40, 40)), y, '♥', Phaser.Math.Between(28, 40), '#ff5c8a', '#3b1f10', 5).setDepth(41).setAlpha(0);
       this.tweens.add({ targets: h, alpha: 1, duration: 120, delay: i * 160 });
-      this.tweens.add({ targets: h, y: y - 80 - Math.random() * 40, x: h.x + Phaser.Math.Between(-30, 30), angle: Phaser.Math.Between(-25, 25), delay: i * 160, duration: 1000, ease: 'Sine.Out', onComplete: () => this.tweens.add({ targets: h, alpha: 0, duration: 200, onComplete: () => h.destroy() }) }); }
+      this.tweens.add({ targets: h, y: away ? y + 30 + Math.random() * 30 : y - 80 - Math.random() * 40, x: h.x + (away ? sd * Phaser.Math.Between(50, 80) : Phaser.Math.Between(-30, 30)), angle: Phaser.Math.Between(-25, 25), delay: i * 160, duration: 1000, ease: 'Sine.Out', onComplete: () => this.tweens.add({ targets: h, alpha: 0, duration: 200, onComplete: () => h.destroy() }) }); }
   }
   private talk(x: number, y: number, t: string, sz?: number, ms?: number) {
     const c: any = say(this, x, y, t, sz, ms); const tx: any = c?.list?.find((o: any) => o.type === 'Text');

@@ -10,6 +10,7 @@ import { Fx } from '../systems/audio';
 import { say, setPageBg, comic } from '../systems/kit';
 import { LINES, pick } from '../lines';
 import { koPupFor } from '../systems/koPup';
+import { champHang } from '../art/pupHang';
 
 export class ChampionScene extends Phaser.Scene {
   constructor() { super('Champion'); }
@@ -26,8 +27,7 @@ export class ChampionScene extends Phaser.Scene {
       const h = art(this, x, y, `full_${n}_happy`, 0.62).setDepth(20 + row); this.tweens.add({ targets: h, y: y - 40, yoyo: true, repeat: -1, duration: 260 + i * 25, ease: 'Quad.Out', delay: i * 60 }); });
     const bun = art(this, W / 2, 760, 'bun_full_coolwink', 0.95).setDepth(19); this.tweens.add({ targets: bun, scale: bun.scale * 1.05, yoyo: true, repeat: -1, duration: 500 });
     const tro = txt(this, W / 2, 420, '🏆', 110).setDepth(30); this.tweens.add({ targets: tro, y: 400, yoyo: true, repeat: -1, duration: 400 });
-    const pup = art(this, 615, 630, 'pup_dizzy', 0.6).setDepth(25); koPupFor(this, pup); /* cute dizzy Puppy (Tail Catch rig) */ txt(this, 615, 652, '🥈 best loser', 22, '#fff', '#22252b', 5).setDepth(26);
-    this.tweens.add({ targets: pup, angle: { from: -10, to: 10 }, yoyo: true, repeat: -1, duration: 400 });
+    const pup = champHang(this, 560, 380, 1.2); /* Puppy hangs by one ankle (pupHang.ts); x 560 keeps his tail on screen at 390 wide and the rope clear of the mute button */ txt(this, 560, 650, '🥈 best loser', 22, '#fff', '#22252b', 5).setDepth(26);
     this.time.addEvent({ delay: 60, loop: true, callback: () => { const c = this.add.rectangle(Phaser.Math.Between(0, W), -20, 14, 22, Phaser.Utils.Array.GetRandom([0xff5c8a, 0xffdf6b, 0x7dff9a, 0x3a86ff, 0xb78cff])).setDepth(40);
       this.tweens.add({ targets: c, y: H + 40, x: c.x + Phaser.Math.Between(-120, 120), angle: 720, duration: Phaser.Math.Between(1800, 3000), onComplete: () => c.destroy() }); } });
     if (d?.score) txt(this, W / 2, 330, `Finale score ${d.score}`, 30, '#fff', '#22252b', 6).setDepth(50);

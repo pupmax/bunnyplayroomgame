@@ -145,6 +145,14 @@ export const LINES = {
   // Puppy hog-tied for a moment after each catch (protest bubble)
   lassoTied: ['Puppy: Hey! This is NOT a hug!', 'Puppy: Untie me! I have a NAP booked!', 'Puppy: Rude! I was napping in there!', 'Puppy: I am NOT a pony!',
     'Puppy: This knot is very... knotty.', 'Puppy: Tell my squeaky toy I love it.'],
+  // the catch hang (rotates A / B / C across the catches): A = dangling from the ceiling hook, B = the same but spinning, C = by his knees from the lamp bar
+  lassoHangBun: ['Bunny: Yee-haw! Hang in there, partner!', 'Bunny: Puppy on a string!', 'Bunny: Hold still... for the photo!'],
+  lassoHangPup: ['Puppy: Hmph! ...hehe.', 'Puppy: I meant to do this.', 'Puppy: The view is great from up here!'],
+  lassoSpinPup: ['Puppy: Wheee... the room is spinning~', 'Puppy: Which way is up?', 'Puppy: Again! ...no, wait.'],
+  lassoLampBun: ['Bunny: Nice catch... by the LAMP!', 'Bunny: Look, a Puppy bat!'],
+  lassoLampPup: ['Puppy: Ta-daa...? Hmph.', 'Puppy: Totally planned. Ten out of ten.', 'Puppy: Just hanging out!'],
+  // the couch giggling at the hang (little pops over the girls)
+  lassoGiggle: ['hee hee!', 'tee-hee!', 'hihi!', 'giggle!'],
   // round 3: Puppy charges Bunny. Bunny dodges and he faceplants / or he bonks her
   lassoFaceplant: ['Puppy: Ow, my snoot!', 'Puppy: Who moved the Bunny?!', 'Puppy: The floor came out of nowhere!'],
   lassoBonk: ['Puppy: Beep beep! Coming through!', 'Puppy: Zoomies always win!', 'Puppy: Bonk! Tag, you\'re it!'],

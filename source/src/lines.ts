@@ -88,9 +88,39 @@ export const LINES = {
   tailStart: ['Bunny: Yee-haw! Here, Puppy Puppy!', 'Bunny: That tail is MINE today.', 'Puppy: You will never catch my tail!',
     'Bunny: Tiptoe, tiptoe... fluffy tail ahoy!', 'Puppy: My tail has a mind of its own!', 'Bunny: One little tug never hurt anyone!'],
   shadowMiss: ['Too far, sweetie.', 'Puppy: Ha! I am not there!', '...hm.', 'The lantern spoiled it!'],
-  lassoHit: ['YEE-HAW! Gotcha, Puppy!', 'Round-up!', 'Lasso-tastic!', 'Ride \'em, cowbunny!', 'Bunny is the boss!', 'Puppy wiggled out... after a long sulk!'],
-  lassoMiss: ['Whiff! Spin it faster!', 'Puppy: Nyeh nyeh! Missed!', 'Time that release, cowbunny!', 'The lasso caught... a chair.'],
-  lassoTrick: ['Puppy used a Ruby dodge!', 'Puppy opened Nana\'s umbrella!', 'Puppy grabbed a Bunnycano decoy!', 'Puppy did a Linye shadow step?!', 'Puppy: I learned from the best!'],
+  // ================= EDIT ME, Marc: PLAYROOM RODEO (Lasso finale, rework) =================
+  // Bunny's line when a loop lands on Puppy (shown in a bubble over the rodeo floor)
+  lassoHit: ['YEE-HAW! Gotcha, Puppy!', 'Round-up!', 'Lasso-tastic!', 'Ride \'em, cowbunny!', 'Bunny is the boss!', 'Puppy wiggled out... after a long sulk!'], // Marc's own lines, kept verbatim (finale patch had rewritten them)
+  // a loop lands on the floor (missed)
+  lassoMiss: ['Whiff! Lead him a little!', 'Puppy: Nyeh nyeh! Missed!', 'Throw where he is GOING!', 'The lasso caught... a sock.'],
+  // round 2 decoy: Puppy swaps in a cardboard Puppy and tiptoes off
+  lassoTrick: ['Puppy: Which one is the REAL me? Hehe!', 'Puppy: Cardboard me is a great actor!', 'Puppy: Tiptoe, tiptoe...'],
+  // round banners (Puppy's line under the banner): index 0 = round 2 (SNEAKY), 1 = round 3 (ZOOMIES)
+  lassoRound: ['Puppy: Okay, time to get SNEAKY!', 'Puppy: ZOOMIES MODE! Out of my way!'],
+  // Bunny while she reels him in (tap-fast tug)
+  lassoTug: ['Bunny: Reel him in!', 'Bunny: Heave... HO!', 'Bunny: Come here, you!', 'Bunny: Yee-haw, little doggie!'],
+  // Puppy's shouts while he pulls back on the rope
+  lassoTugPup: ['Grr!', 'Nope!', 'Hnngh!', 'Mine!', 'Not today!'],
+  // the tug failed and the loop slipped off
+  lassoSlip: ['He wriggled free!', 'Slippery Puppy!', 'Slipped the loop!'],
+  // Puppy hog-tied for a moment after each catch (protest bubble)
+  lassoTied: ['Puppy: Hey! This is NOT a hug!', 'Puppy: Untie me! I have a NAP booked!', 'Puppy: Rude! I was napping in there!', 'Puppy: I am NOT a pony!',
+    'Puppy: This knot is very... knotty.', 'Puppy: Tell my squeaky toy I love it.'],
+  // round 3: Puppy charges Bunny. Bunny dodges and he faceplants / or he bonks her
+  lassoFaceplant: ['Puppy: Ow, my snoot!', 'Puppy: Who moved the Bunny?!', 'Puppy: The floor came out of nowhere!'],
+  lassoBonk: ['Puppy: Beep beep! Coming through!', 'Puppy: Zoomies always win!', 'Puppy: Bonk! Tag, you\'re it!'],
+  // the girls on the couch: a whispered tip-off when Puppy pulls a decoy or winds up a charge (light flavour)
+  lassoCouchTip: ['Noir: Psst! That one is cardboard.', 'Iris: The real Puppy has crumbs on him!', 'Midnight: Caw! He is tiptoeing away!', 'Linye: ...the OTHER one, hi hi!'],
+  lassoCouchCharge: ['Ruby: He is charging! Swipe, Bunny!', 'Zoe: Bear-ly in time! DODGE!', 'Nana: Nuts! Here he comes!'],
+  // couch cheers after a catch (sometimes)
+  lassoCouchCheer: ['Ruby: Baa-rilliant!', 'Zoe: Un-BEAR-lievable!', 'Nana: Nuts! Nice throw!', 'Glassia: Yee-HAY!', 'Midnight: Caw-boy... I mean cow-BUNNY!'],
+  // win outro: Bunny drags the hog-tied Puppy off by the rope
+  lassoOutroBun: ['Bunny: Come along, little doggie!', 'Bunny: Off to the winners\' corner, partner!'],
+  lassoOutroPup: ['Puppy: My dignity!', 'Puppy: Not in front of the COUCH!', 'Puppy: I demand a rematch! ...after snacks.'],
+  // loss card (time ran out): Puppy's gloat + Bunny's comeback
+  lassoPupWin: ['Puppy: Wheee! The rope only got my tail!', 'Puppy: Can\'t rope THIS Puppy! ...This time.', 'Puppy: Untied and unstoppable!',
+    'Puppy: I wiggled out! Wiggle power!', 'Puppy: The couch was rooting for me. Secretly.'],
+  lassoBunLose: ['Bunny: One more loop and he was MINE!', 'Bunny: Saddle up, we go again!', 'Bunny: Next time, partner. Next time.'],
   linyeReveal: ['Linye: Hi hi! I\'m Linye — prickly AND adorable!', 'Linye: Puppy, wanna play tag? I\'m SUPER fast!', 'Bunny: Meet Linye the hedgehog, Puppy. Run!'],
   champion: ['Bunny: You did it! PLAYROOM CHAMPION!', 'Puppy: Best of 99 tomorrow?', 'Everyone: Sorry Puppy!'],
   // EDIT ME, Marc: Acorn, golden acorn hit (last 3 are new)

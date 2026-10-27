@@ -35,7 +35,7 @@ async function session(url, standalone) {
     let n = 0; while (Date.now() < end && await p.evaluate(() => !!window.__pr?.__old)) { await tap(...spot); await p.waitForTimeout(++n % 6 ? 50 : 450); }
   };
   for (const level of standalone ? [standalone === 'linye' ? 'Shadow' : standalone === 'tail' ? 'Tail' : 'Boxing'] : LEVELS) {
-    const BY = level === 'Lasso' ? 800 : 1010; // Lasso has its own lose card (RETRY/HALL at y=800)
+    const BY = 1010; // every lose card (incl. Lasso's own) has RETRY/HALL at y=1010
     // 1) first run, card shown — taps start on the title/PLAY (ruby) or right at scene start (main)
     await clearTut(); await mark();
     if (standalone) { const t = Date.now(); while (Date.now() - t < 1500 && await p.evaluate(() => window.__game.scene.isActive('SoloTitle'))) { await tap(360, 1150); await p.waitForTimeout(50); } }

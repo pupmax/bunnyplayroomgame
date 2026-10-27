@@ -21,7 +21,7 @@ import { LINES, pick } from '../lines';
 const RP: Record<string, ArmPose> = { cock: { ex: 230, ey: -190, wx: 200, wy: -270, gs: 1.1 }, idle: { ex: 200, ey: -230, wx: 160, wy: -330, gs: 1 },
   jab: { ex: 90, ey: -380, wx: 20, wy: -560, gs: 0.72 }, dizzy: { ex: 210, ey: -150, wx: 270, wy: -220, gs: 0.95 },
   guard: { ex: 160, ey: -260, wx: 45, wy: -390, gs: 0.95 }, cheer: { ex: 225, ey: -360, wx: 215, wy: -505, gs: 0.92 } }; // dodge tuck, points-win arms up
-const TIME = 60, PUP_HP = 1250, RUBY_HP = 100, GREEN = 0.32, PERF = 0.08, HIT = 10, PERF_BONUS = 6, COMBO_MAX = 4, COUNTER = 12, SUPER_DMG = 24,
+const TIME = 60, PUP_HP = 1250, RUBY_HP = 100, GREEN = 0.32, PERF = 0.08, HIT = 16, PERF_BONUS = 8, COMBO_MAX = 4, COUNTER = 18, SUPER_DMG = 45, // Marc fb 27 Oct: hits 10->16, perfect +6->+8, counter +12->+18, super 24->45 (KO by R2-3)
   PERIOD = [1.7, 1.45, 1.2], ATK_P = [0.3, 0.42, 0.45], WIND = [1.2, 1.15, 1.05], OPEN_T = 1.7, BONK = 15, DIZZY = 1.2, COOL_HIT = 0.22, COOL_MISS = 0.45, PTS = 0.40, // time-up win: bag at 40% or less
   // counter-swing variety (per round): feint chance, double-swing chance after a dodge, mid-swing snap-back chance; dodge only counts in the last DODGE_WIN s
   FEINT_P = [0.05, 0.2, 0.25], DOUBLE_P = [0.05, 0.3, 0.4], SNAP_P = [0.05, 0.12, 0.18], DODGE_WIN = 0.75, DODGE_CD = 0.75, EARLY_CD = 0.2, WIND_MIN = 0.62;
@@ -46,7 +46,7 @@ export class BoxingScene extends Phaser.Scene {
   private bulbs: { x: number; y: number; t: number }[] = []; private hitStop = 0; private ang = 0; private depthK = 1; private koMode = false; private exts = 0; private lastAtk = 0; private timerCol = ''; private lowQ = false; private perfAcc = 0; private perfN = 0; private perfT = 0; private goodWins = 0; private hudStatic?: Phaser.GameObjects.Image; private chainTS?: Phaser.GameObjects.TileSprite; private chainLen = -1; private windT = 1; private feint = false; private spd = 1; private snapArmed = true; private dcd = 0; private followUp = false; private plainAtk = false;
   constructor() { super('Boxing'); }
   create() {
-    this.begun = false; this.lastTalk = -9999;
+    this.begun = false; this.lastTalk = -9999; this.ghostHp = PUP_HP; this.chipT = 0; this.barFlash = 0;
     setupCamera(this); this.cameras.main.fadeIn(250);
     this.st = { pupHp: PUP_HP, rubyHp: RUBY_HP, time: TIME, meter: 0, combo: 0, score: 0, state: 'guard', side: 1, running: false, dodge: 0, hits: 0, landed: 0, dodgeDir: 0, cool: 0, round: 1, x: 0, ph: 0, dizzy: 0, perfects: 0, counters: 0, bonks: 0, atk: 0, feints: 0, doubles: 0, snaps: 0 };
     this.stT = 0; this.lastExt = -9; this.crowd = []; this.ropeWob = 0; this.bulbs = []; this.hitStop = 0; this.tweens.timeScale = 1; this.koMode = false; this.spinPh = 0; this.squish = 0; this.exts = 0; this.lastAtk = 0; this.timerCol = ''; this.chainLen = -1; this.lowQ = LOWQ; this.perfAcc = 0; this.perfN = 0; this.perfT = 0; this.goodWins = 0; this.windT = 1; this.feint = false; this.spd = 1; this.snapArmed = true; this.dcd = 0; this.followUp = false;
@@ -260,6 +260,8 @@ export class BoxingScene extends Phaser.Scene {
     if (!this.st.running || (!force && this.time.now - this.lastTalk < 1200)) return; this.lastTalk = this.time.now; say(this, x, y, line, size, hold);
   }
   private lastTalk = -9999;
+  // energy bar feedback: a white chunk shows the hit's damage, holds briefly, then drains; the bar flashes on every hit
+  private ghostHp = PUP_HP; private chipT = 0; private barFlash = 0;
   private freeze(ms: number) { this.tweens.timeScale = 0.04; this.hitStop = ms / 1000; }
   punch() {
     const s = this.st; if (s.cool > 0) return;
@@ -347,7 +349,7 @@ export class BoxingScene extends Phaser.Scene {
       this.hitFx(bp.x, bp.y - 20, SUPER_DMG, true, 1, 'MEGA POW!'); this.cameras.main.flash(160, 255, 255, 255); this.spinPh += Math.PI * 4; this.hurtPup(SUPER_DMG);
       if (s.running) { this.stT = 0; this.setPup('stun', 1.6); this.chat(RUBY_SAY.x, RUBY_SAY.y, pick(LINES.headbutt), 24, 1100, true); } });
   }
-  private hurtPup(d: number) { const s = this.st; if (!s.running) return; (window as any).__pr.lastDmg = d; s.pupHp = Math.max(0, s.pupHp - d); if (s.pupHp <= 0) this.finish(true); }
+  private hurtPup(d: number) { const s = this.st; if (!s.running) return; (window as any).__pr.lastDmg = d; if (this.chipT <= 0) this.ghostHp = Math.max(this.ghostHp, s.pupHp); s.pupHp = Math.max(0, s.pupHp - d); this.chipT = 0.45; this.barFlash = d >= 30 ? 0.22 : 0.14; floatText(this, 393 + 294 * s.pupHp / PUP_HP, 205, `-${d}`, d >= 30 ? '#ff5c5c' : '#ffdf6b', d >= 30 ? 34 : 24); if (s.pupHp <= 0) this.finish(true); }
   /** Windup tell length: varies around the round's base, never below WIND_MIN so there is always a fair visible tell. */
   private rollWind(r: number) { return Phaser.Math.Clamp(WIND[r] * (0.62 + Math.random() * 0.5), WIND_MIN, 1.3); }
   private startAttack(side: number, wind: number, canFeint: boolean) {
@@ -411,6 +413,8 @@ export class BoxingScene extends Phaser.Scene {
   }
   update(_t: number, dms: number) {
     const dt = Math.min(dms, 250) / 1000, s = this.st, now = this.time.now; this.watchPerf(this.game.loop.rawDelta || dms); // raw frame time: Phaser's smoothed delta hides slow frames (reads ~16.7 ms at 15 fps)
+    if (this.chipT > 0) this.chipT -= dt; else if (this.ghostHp > s.pupHp) this.ghostHp = Math.max(s.pupHp, this.ghostHp - PUP_HP * 0.6 * dt);
+    if (this.barFlash > 0) this.barFlash -= dt;
     if (this.hitStop > 0) { this.hitStop -= dt; if (this.hitStop <= 0) this.tweens.timeScale = 1; }
     this.updateBag(dt, now);
     this.drawHud(); this.drawStage(now); const dz = s.dizzy > 0 && s.running, br = Math.sin(now / (dz ? 120 : 170));
@@ -509,7 +513,9 @@ export class BoxingScene extends Phaser.Scene {
     this.roundT.setText(`PUPPY IN THE BAG!  •  R${s.round}`);
     // Ruby wooziness + bag stuffing bars
     b.fillStyle(0xff5c8a, 1).fillRoundedRect(33, 231, Math.max(12, 294 * s.rubyHp / RUBY_HP), 12, 6);
-    b.fillStyle(0x7dff9a, 1).fillRoundedRect(393, 231, Math.max(12, 294 * s.pupHp / PUP_HP), 12, 6);
+    if (this.ghostHp > s.pupHp) b.fillStyle(0xffffff, 1).fillRoundedRect(393, 229, Math.max(12, 294 * this.ghostHp / PUP_HP), 16, 7); // damage chunk
+    if (this.barFlash > 0) b.fillStyle(0xfff27a, 1).fillRoundedRect(391, 227, Math.max(16, 298 * s.pupHp / PUP_HP), 20, 9); // bar swells + flashes on a hit
+    else b.fillStyle(0x7dff9a, 1).fillRoundedRect(393, 231, Math.max(12, 294 * s.pupHp / PUP_HP), 12, 6);
     // swing meter
     const mx = 360, my = 1060;
     b.fillStyle(0xff4d6d, s.state === 'windup' ? 0.6 + 0.4 * Math.sin(this.time.now / 50) : 1).fillRoundedRect(mx + 170, my - 10, 56, 20, 10).fillRoundedRect(mx - 226, my - 10, 56, 20, 10);

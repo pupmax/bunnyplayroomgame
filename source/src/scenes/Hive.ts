@@ -17,7 +17,9 @@ import { LINES, pick } from '../lines';
 
 // Tuning (checked with pups3-out/zoe/sim.mjs): higher target, more decoys, shorter windows, harsher penalties and
 // Bunny's drink is "disguised" for CANO_HIDE s (Puppy pops up empty-pawed, then whips it out). ~64% wins for a decent player (sim).
-const TIME = 45, TARGET = 2500, CANO_HIDE = 0, CANO_PEN = 100, BEE_PEN = 150, MIN_STAY = 600, STAY_K = 1300;
+const TIME = 45, TARGET = 2500, CANO_HIDE = 0, CANO_PEN = 100, BEE_PEN = 150, MIN_STAY = 800, STAY_K = 1700;
+// Marc fb 27 Oct (too fast on iPhone): ~25-30% slower pacing. Up time STAY_K 1300->1700 / MIN_STAY 600->800, spawn gap 0.72-1.17->0.95-1.5 s,
+// late ramp +90%->+55% (combo +2%->+1.5%/step), pop/hide 140->190 ms, fewer decoys, bees jitter slower, swarm 105-147->75-105 px/s.
 const PHASE2 = 15, PHASE3 = 30, FEVER_AT = 10, FEVER_T = 5, FEVER_MULT = 1.5, GOLD_PTS = 300, HELM_CHIP = 50;
 // Zoe's speech bubble: bottom-right, beside her (it used to sit at 400,960 right on top of her face)
 const SAY = { x: 500, y: 1170 };
@@ -68,7 +70,7 @@ export class HiveScene extends Phaser.Scene {
     popBanner(this, 'BONK THAT PUPPY!', 700, 0xff9a1f);
     this.time.delayedCall(600, () => { say(this, SAY.x, SAY.y, pick(LINES.start.Zoe), 24); this.st.running = true; });
   }
-  private get speed() { return 1 + (TIME - this.st.time) / TIME * 0.9 + Math.min(this.st.combo, 10) * 0.02; }
+  private get speed() { return 1 + (TIME - this.st.time) / TIME * 0.55 + Math.min(this.st.combo, 10) * 0.015; }
   update(_t: number, dms: number) {
     const s = this.st; if (!s.running || s.over) return;
     const dt = Math.min(dms, 250) / 1000;
@@ -81,7 +83,7 @@ export class HiveScene extends Phaser.Scene {
     this.updateSwarm(dt); this.drawFever(); this.updateParallax(dt);
     for (const p of this.pops) if (p) { if (p.hat?.active) p.hat.setPosition(p.img.x, p.img.y - p.img.displayHeight * 0.36).setAngle(p.img.angle); p.obj.list.forEach(o => { if ((o as any).getData?.('follow')) (o as any).y = p.img.y - 120; }); }
     this.spawnT -= dt * this.speed * (s.fever > 0 ? 1.3 : 1);
-    if (this.spawnT <= 0) { this.spawnT = Phaser.Math.FloatBetween(0.72, 1.17); this.spawn(); if (this.speed > 1.8 && Math.random() < 0.35) this.spawn(); }
+    if (this.spawnT <= 0) { this.spawnT = Phaser.Math.FloatBetween(0.95, 1.5); this.spawn(); if (this.speed > 1.5 && Math.random() < 0.25) this.spawn(); }
     this.updateHud();
   }
   // ---------- parallax meadow ----------
@@ -125,7 +127,7 @@ export class HiveScene extends Phaser.Scene {
   private launchSwarm() {
     if (this.st.over) return; this.swarm?.destroy();
     const dir = Math.random() < 0.5 ? 1 : -1, row = HIVES[Math.random() < 0.5 ? 0 : 3][1] - 90;
-    const c = this.swarm = this.add.container(dir > 0 ? -120 : W + 120, row).setDepth(50); this.swarmV = dir * Phaser.Math.Between(105, 147);
+    const c = this.swarm = this.add.container(dir > 0 ? -120 : W + 120, row).setDepth(50); this.swarmV = dir * Phaser.Math.Between(75, 105);
     const halo = this.add.graphics(); halo.fillStyle(0xffdf6b, 0.18).fillCircle(0, 0, 95).lineStyle(4, 0xe0243a, 0.5).strokeCircle(0, 0, 95); c.add(halo);
     for (let k = 0; k < 7; k++) c.add(txt(this, 0, 0, '🐝', 34));
     Sushi.toss();
@@ -133,14 +135,14 @@ export class HiveScene extends Phaser.Scene {
   private updateSwarm(dt: number) {
     const c = this.swarm; if (!c?.active) return; c.x += this.swarmV * dt; c.y += Math.sin(this.time.now / 300) * 40 * dt;
     c.list.forEach((o, k) => { if (k === 0) return; const a = this.time.now / (180 + k * 20) + k; (o as Phaser.GameObjects.Text).setPosition(Math.cos(a) * 60, Math.sin(a * 1.3) * 40); });
-    if (c.x < -200 || c.x > W + 200) { c.destroy(); this.swarm = undefined; this.time.delayedCall(Phaser.Math.Between(1500, 3000), () => this.st.phase === 3 && this.launchSwarm()); }
+    if (c.x < -200 || c.x > W + 200) { c.destroy(); this.swarm = undefined; this.time.delayedCall(Phaser.Math.Between(2200, 4000), () => this.st.phase === 3 && this.launchSwarm()); }
   }
   private inSwarm(x: number, y: number) { const c = this.swarm; return !!c?.active && Phaser.Math.Distance.Between(x, y, c.x, c.y) < 95; }
   private spawn() {
     const free = this.pops.map((p, i) => p ? -1 : i).filter(i => i >= 0); if (!free.length) return;
     const i = Phaser.Utils.Array.GetRandom(free); const [x, y] = HIVES[i];
     const r = Math.random(); const late = this.st.time < TIME * 0.7;
-    const kind: Kind = r < (late ? 0.52 : 0.62) ? 'pup' : r < (late ? 0.76 : 0.82) ? 'cano' : 'bees';
+    const kind: Kind = r < (late ? 0.62 : 0.70) ? 'pup' : r < (late ? 0.82 : 0.86) ? 'cano' : 'bees'; // decoys 38/48% -> 30/38%
     const ph = this.st.phase, vr = Math.random();
     const variant: Variant = kind !== 'pup' || ph < 2 ? null : vr < (ph === 3 ? 0.24 : 0.22) ? 'helm' : vr < (ph === 3 ? 0.40 : 0.34) ? 'gold' : null;
     const obj = this.add.container(x, y + 20).setDepth(11 + i * 3);
@@ -157,15 +159,15 @@ export class HiveScene extends Phaser.Scene {
     const hv = this.hives[i], hb = hv.getData('b'); this.tweens.add({ targets: hv, scaleX: hb * 1.06, duration: 50, yoyo: true });
     const ib = img.scaleX; if (kind !== 'bees') img.setScale(ib * 0.85, ib * 1.2);
     this.tweens.add({ targets: img, scaleX: ib, scaleY: ib, delay: 140, duration: 260, ease: 'Elastic.Out', easeParams: [1.1, 0.45] });
-    this.tweens.add({ targets: img, y: kind === 'bees' ? -20 : -40, duration: 140, ease: 'Back.Out', onComplete: () => { pop.up = true;
+    this.tweens.add({ targets: img, y: kind === 'bees' ? -20 : -40, duration: 190, ease: 'Back.Out', onComplete: () => { pop.up = true;
       if (kind === 'cano') this.time.delayedCall(CANO_HIDE * 1000, () => { if (pop.done) return; img.setTexture('pup_cano');
         img.setScale(ib * 1.15, ib * 0.9); this.tweens.add({ targets: img, scaleX: ib, scaleY: ib, duration: 180, ease: 'Back.Out' });
         const g = txt(this, x + 60, y - 170, '✨', 34).setDepth(70); this.tweens.add({ targets: g, alpha: 0, y: g.y - 30, duration: 400, onComplete: () => g.destroy() }); });
-      if (kind === 'bees') this.tweens.add({ targets: img, x: { from: -6, to: 6 }, yoyo: true, repeat: -1, duration: 60 });
+      if (kind === 'bees') this.tweens.add({ targets: img, x: { from: -6, to: 6 }, yoyo: true, repeat: -1, duration: 90 });
       else if (kind === 'pup' && Math.random() < 0.25) img.setTexture('pup_hearts');
       const leave = () => { if (pop.done || this.pops[i] !== pop) return; if (pop.extend > 0) { const e = pop.extend; pop.extend = 0; this.time.delayedCall(e, leave); return; } pop.done = true;
         if (kind === 'pup' && this.st.running) { this.escape(x, y); }
-        this.tweens.add({ targets: img, y: hid, duration: 140, onComplete: () => this.clear(i, pop) }); };
+        this.tweens.add({ targets: img, y: hid, duration: 190, onComplete: () => this.clear(i, pop) }); };
       this.time.delayedCall(stay, leave);
     } });
   }

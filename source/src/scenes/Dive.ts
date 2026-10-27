@@ -18,8 +18,10 @@ import { Hud, impact } from '../systems/level';
 import { HeroRig, pupFlail } from '../systems/rigs';
 
 // Tuning (sim-checked in pups3-out/midnight/sim.mjs: avg bot ~66%; eased in audit27: NEED 7->5, CHIM_P .55->.40, chimney stun 1.0->0.7 s, -2 s->-1 s, 0.8 s immunity)
-const TIME = 50, NEED = 5, SPEED = 280, RAMP = 0.3, MX = 190;
-const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.40;
+const TIME = 50, NEED = 6, // Marc fb 27 Oct ('a bit too easy'): NEED 5->6, CHIM_P .40->.45 (0.8 s post-stun immunity kept)
+  SPEED = 280, RAMP = 0.3, MX = 190;
+const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.45;
+const CARRY_T = 2.6; // after a snatch Midnight carries the crying Puppy through the air for CARRY_T s; the clock + hazards pause meanwhile
 const STUN = 0.7, BONK_S = 1, IMMUNE = 0.8; // audit27: shorter chimney stun, -1 s, then 0.8 s chimney immunity (blinking) so bonks can't chain
 const MOON_SNATCH = 35, MOON_CLOSE = 15, MOON_T = 5, HIGH_DIVE_Y = 470, CHAIN_T = 7;
 const MOON_X = 540, MOON_Y = 260;
@@ -29,7 +31,7 @@ interface Streak { x: number; y: number; len: number; a: number }
 interface Pigeon { img: Phaser.GameObjects.Image; x: number; y: number; hit: boolean }
 
 export class DiveScene extends Phaser.Scene {
-  st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
+  st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, carry: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
   private roofs: Roof[] = []; private g!: Phaser.GameObjects.Graphics; private beams!: Phaser.GameObjects.Graphics; private fx!: Phaser.GameObjects.Graphics;
   private bird!: Phaser.GameObjects.Container; private rig!: HeroRig; private flapT = 0; private wings!: Phaser.GameObjects.Graphics; private aura!: Phaser.GameObjects.Image;
   private pup?: { c: Phaser.GameObjects.Container; img: Phaser.GameObjects.Image; shadow: Phaser.GameObjects.Ellipse; x: number; roof: Roof; done: boolean; hop: number; hopT: number; hopS: number; carry?: number; cx0?: number; cy0?: number };
@@ -39,7 +41,7 @@ export class DiveScene extends Phaser.Scene {
   constructor() { super('Dive'); }
   create() {
     setupCamera(this); this.zoom0 = this.cameras.main.zoom; this.cameras.main.fadeIn(250); setPageBg(0x0b0a24, 0x241f4a);
-    this.st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
+    this.st = { time: TIME, catches: 0, score: 0, running: false, over: false, y: 520, vy: 0, hold: false, stun: 0, immune: 0, carry: 0, spotted: 0, pupT: 1.5, combo: 0, phase: 1, moon: 0, moonT: 0, speed: SPEED, diveFrom: 520 };
     this.makeTextures();
     art(this, 0, 0, 'bg_night'); this.pup = undefined; this.pigeons = []; this.pigT = 3; this.freeze = 0; this.lastSnatch = -99; this.streaks = [];
     this.moonGlow = this.add.image(MOON_X, MOON_Y, 'dv_glow').setDepth(1).setScale(2.2).setAlpha(0.25).setBlendMode(Phaser.BlendModes.ADD);
@@ -117,9 +119,13 @@ export class DiveScene extends Phaser.Scene {
   }
   update(t: number, dms: number) {
     const s = this.st; const dt = Math.min(dms, 100) / 1000;
-    this.flapT = t / (s.hold ? 50 : 140); this.drawWings(this.flapT);
-    if (!s.running || s.over) { this.render(dt, false); return; }
+    this.flapT = t / (s.hold || this.carrying() ? 55 : 140); this.drawWings(this.flapT);
+    if (!s.running || s.over) { if (this.carrying()) this.carryFly(dt); this.render(dt, false); return; }
     if (this.freeze > 0) { this.freeze -= dms; this.render(0, false); return; } // snatch hit-stop
+    if (s.carry > 0) { // talon carry: clock, spawns and hazards pause; the city keeps drifting by
+      s.carry -= dt; this.carryFly(dt);
+      if (s.carry <= 0) { s.carry = 0; s.immune = IMMUNE; s.vy = 0; this.lastSnatch = this.time.now / 1000; this.dropPup(); }
+      this.render(dt, false); this.hud.set(`CATCHES ${s.catches}/${NEED}`, s.time, s.catches / NEED); this.drawMeter(); return; }
     s.time -= dt; if (s.time <= 0) { s.time = 0; return this.finish(s.catches >= NEED); }
     const el = TIME - s.time;
     const phase = (s.catches >= 3 || s.time < 18) ? 3 : (s.catches >= 1 || s.time < 35) ? 2 : 1;
@@ -165,13 +171,39 @@ export class DiveScene extends Phaser.Scene {
     this.render(dt, true);
     this.hud.set(`CATCHES ${s.catches}/${NEED}`, s.time, s.catches / NEED); this.drawMeter();
   }
+  private carrying() { const p = this.pup; return !!(p && p.done && p.carry); }
+  /** Carry flight: Midnight swoops along on her own (player input ignored), city + pigeons drift past, Puppy cries tears. */
+  private carryFly(dt: number) {
+    const s = this.st, p = this.pup!, el = (this.time.now - p.carry!) / 1000, sp = s.speed * 0.6;
+    for (const r of this.roofs) r.x -= sp * dt; this.far.tilePositionX += sp * dt * 0.18; this.mid.tilePositionX += sp * dt * 0.4;
+    while (this.roofs.length && this.roofs[0].x + this.roofs[0].w < -60) this.roofs.shift();
+    const last = this.roofs[this.roofs.length - 1]; if (last.x + last.w < W + 300) this.addRoof(last.x + last.w + Phaser.Math.Between(0, 60));
+    for (const g of this.pigeons) { g.x -= (sp + 160) * dt; g.img.setPosition(g.x, g.y); }
+    const ty = 470 + Math.sin(el * 2.6) * 55 - Math.min(1, el * 2) * 20, vy = (ty - s.y) * 5; s.vy += (vy - s.vy) * Math.min(1, dt * 8); s.y += s.vy * dt;
+    this.tearT -= dt; if (this.tearT <= 0 && p.c.active) { this.tearT = 0.09; this.tear(p); }
+  }
+  private tearT = 0; private pupS = 1;
+  private tear(p: NonNullable<DiveScene['pup']>) {
+    const mt = p.img.getWorldTransformMatrix(), h = p.img.displayHeight, w = p.img.displayWidth;
+    for (const side of [-1, 1]) { if (Math.random() < 0.35) continue; const a = Phaser.Math.DegToRad(p.c.angle), ox = side * w * 0.17, oy = -h * 0.62;
+      const x = mt.tx + ox * Math.cos(a) - oy * Math.sin(a), y = mt.ty + ox * Math.sin(a) + oy * Math.cos(a);
+      const d = this.add.ellipse(x, y, 11, 16, 0x8fd8ff).setStrokeStyle(2, 0x2a6a9a).setDepth(33);
+      this.tweens.add({ targets: d, x: x + side * Phaser.Math.Between(50, 100) - 40, duration: 520, ease: 'Sine.Out' });
+      this.tweens.add({ targets: d, y: y + Phaser.Math.Between(70, 140), alpha: 0, scale: 0.6, duration: 520, ease: 'Quad.In', onComplete: () => d.destroy() }); }
+  }
+  /** End of the carry: Midnight lets go and Puppy tumbles away off-screen (cartoon fling), then play resumes. */
+  private dropPup() {
+    const p = this.pup; if (!p || !p.carry) return; p.carry = 0; const s = this.st; Fx.boing?.();
+    this.tweens.add({ targets: p.c, x: -150, y: 380, angle: -360, duration: 600, ease: 'Quad.In', onComplete: () => { p.c.destroy(); if (this.pup === p) this.pup = undefined; s.pupT = 1.2; } });
+  }
   private render(dt: number, live: boolean) {
     const s = this.st, now = this.time.now; const moonOn = s.moonT > 0;
     this.bird.setAlpha(s.immune > 0 ? 0.45 + 0.55 * Math.abs(Math.cos(now / 60)) : 1).setPosition(MX, s.y).setAngle(Phaser.Math.Clamp(s.vy / 14, -20, 40) + (s.stun > 0 ? Math.sin(now / 40) * 20 : 0));
     if (this.rig.mood !== (s.stun > 0 ? 'dizzy' : 'smug')) this.rig.setMood(s.stun > 0 ? 'dizzy' : 'smug');
     // limbs: arms beat with the wings; diving = arms swept back + talons thrust forward-down; stunned = floppy
     if (!this.rig.busy) { const f = Math.sin(this.flapT), dive = s.vy > 220, P = this.rig.pose as Record<string, number>;
-      const T: Record<string, number> = s.stun > 0 ? { ls: -60 + Math.sin(now / 60) * 40, le: 40, rs: 60 - Math.sin(now / 60) * 40, re: -40, lh: -30, lk: 20, rh: 30, rk: -20, lean: 0, sq: 0, dy: 0, tilt: Math.sin(now / 80) * 12 }
+      const T: Record<string, number> = this.carrying() ? { ls: -95 - f * 45, le: -20 + f * 20, rs: 95 + f * 45, re: 20 - f * 20, lh: 55, lk: 100, rh: 70, rk: 105, lean: 2, sq: f * 0.03, dy: -f * 3, tilt: 0 }
+        : s.stun > 0 ? { ls: -60 + Math.sin(now / 60) * 40, le: 40, rs: 60 - Math.sin(now / 60) * 40, re: -40, lh: -30, lk: 20, rh: 30, rk: -20, lean: 0, sq: 0, dy: 0, tilt: Math.sin(now / 80) * 12 }
         : dive ? { ls: -25, le: -30, rs: 25, re: 30, lh: 55, lk: -25, rh: 75, rk: -35, lean: 8, sq: 0.06, dy: 0, tilt: 6 }
         : { ls: -95 - f * 45, le: -20 + f * 20, rs: 95 + f * 45, re: 20 - f * 20, lh: -8, lk: 45, rh: 8, rk: 45, lean: 0, sq: f * 0.03, dy: -f * 3, tilt: 0 };
       const k = 1 - Math.exp(-dt * 16), nx: Record<string, number> = {}; for (const key in T) nx[key] = P[key] + (T[key] - P[key]) * k; this.rig.setPose(nx); }
@@ -247,8 +279,8 @@ export class DiveScene extends Phaser.Scene {
     const r = Phaser.Math.DegToRad(this.bird.angle * 0.3), tx = gx + HANG.x * Math.cos(r) - HANG.y * Math.sin(r), ty = gy + HANG.x * Math.sin(r) + HANG.y * Math.cos(r);
     const k = Math.min(1, (now - p.carry) / 110), e = 1 - (1 - k) * (1 - k);
     p.cx0! += (tx - p.cx0!) * 0.35 * e; p.cy0! += (ty - p.cy0!) * 0.35 * e; if (k < 1) { p.cx0! += (tx - p.cx0!) * e * 0.3; p.cy0! += (ty - p.cy0!) * e * 0.3; }
-    p.c.setPosition(p.cx0!, p.cy0!).setAngle(Math.sin(now / 85) * 10 * k); // legs dangle-swing under the grip
-    if (now - p.carry > 420) { p.carry = 0; this.tweens.add({ targets: p.c, x: -150, y: 380, angle: -360, duration: 600, ease: 'Quad.In', onComplete: () => { p.c.destroy(); if (this.pup === p) this.pup = undefined; s.pupT = 1.2; } }); }
+    p.c.setPosition(p.cx0!, p.cy0!).setAngle(Math.sin(now / 85) * 10 * k + Math.sin(now / 230) * 8 * k); // dangles + swings under the grip
+    p.img.setScale(this.pupS * (1 + Math.sin(now / 70) * 0.04), this.pupS * (1 - Math.sin(now / 70) * 0.04)); // wriggling
   }
   private snatch() {
     const s = this.st, p = this.pup!; p.done = true; s.catches++;
@@ -266,13 +298,15 @@ export class DiveScene extends Phaser.Scene {
     this.tweens.add({ targets: beam, alpha: 0, duration: 500, onComplete: () => beam.destroy() });
     flashVignette(this, 0xfff4c0, high ? 0.5 : 0.3);
     const cam = this.cameras.main; cam.zoomTo(this.zoom0 * 1.05, 90, 'Sine.easeOut', true); this.time.delayedCall(160, () => cam.zoomTo(this.zoom0, 260, 'Sine.easeInOut', true));
-    this.tweens.killTweensOf(p.img); p.img.setTexture('pup_panic').setAngle(0); p.shadow.destroy(); pupFlail(this, p.img, 1000);
+    this.tweens.killTweensOf(p.img); p.img.setTexture('pup_panic').setAngle(0).setY(0); this.pupS = p.img.scaleX; p.shadow.destroy(); pupFlail(this, p.img, CARRY_T * 1000 + 300); // legs kick the whole carry
     // talon grab: legs snap forward and clench shut around him, wings/arms flare
     this.rig.act([{ dur: 0.05, to: { lh: 80, lk: -10, rh: 95, rk: -15, ls: -130, rs: 130 } }, { dur: 0.08, to: { lh: 60, lk: 95, rh: 75, rk: 100, sq: -0.06 }, ease: Phaser.Math.Easing.Back.Out },
       { dur: 0.45, to: { lh: 55, lk: 100, rh: 70, rk: 105, ls: -110, rs: 110 } }], false, 0.25);
     p.c.setDepth(31); p.carry = this.time.now; p.cx0 = p.c.x; p.cy0 = p.c.y; // carried in the talons for a beat (render() keeps him there), then flung off-screen
-    s.vy = -500; say(this, 420, 520, pick(LINES.dive), 22, 1200);
-    if (s.catches >= NEED) this.time.delayedCall(700, () => this.finish(true));
+    s.vy = -500; s.carry = CARRY_T; this.tearT = 0.2;
+    this.time.delayedCall(250, () => { if (p.carry) { say(this, 450, 520, pick(LINES.diveCarry), 22, 1150); } }); // Puppy wails
+    this.time.delayedCall(1550, () => { if (p.carry && !s.over) say(this, 450, 520, pick(LINES.dive), 22, 850); });
+    if (s.catches >= NEED) this.time.delayedCall(1500, () => this.finish(true)); // the final catch is carried on into the win
   }
   private closeCall(x: number, y: number) {
     const s = this.st; s.moon = Math.min(100, s.moon + MOON_CLOSE); s.score += 50;

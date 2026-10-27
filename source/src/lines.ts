@@ -32,6 +32,8 @@ export const LINES = {
   acornBlock: ['PING! Off the umbrella!', 'He is hiding under a leaf! Cheeky!', 'Puppy: Umbrella! Genius move!', 'Wait for the umbrella to close, sweetie!'],
   acornMiss: ['Puppy: Missed me! Missed me!', 'That acorn is a tree now.', 'Lead your shot, Nana!', 'Puppy did a little dance. Ugh.'],
   dive: ['SNATCH! Caw-ght you!', 'Air mail Puppy!', 'Swoop-de-doo!', 'Feather-weight champion!', 'Puppy is going on a little flight!', 'Midnight delivery!', 'Bunny approves of that swoop!'],
+  // EDIT ME: Puppy's wail while Midnight carries him in her talons after a snatch (one random line per catch, no repeats)
+  diveCarry: ['Puppy: Waaah! Put me down!', 'Puppy: Too high! Too HIGH!', 'Puppy: I want my mommy... and a biscuit!', 'Puppy: Puppies are NOT supposed to fly!'],
   diveBonk: ['BONK! Chimney!', 'Ow, my beak!', 'That chimney came out of nowhere!', 'Puppy: Hah! Watch the bricks!'],
   // EDIT ME, Marc: Dive, caught in a flashlight beam (last 3 are new)
   diveSpot: ['SPOTTED! Flashlight!', 'Puppy: I see you, birdie!', 'Stay out of the light, sweetie!',

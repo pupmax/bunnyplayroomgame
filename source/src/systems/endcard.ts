@@ -8,7 +8,7 @@ import { makeButton } from './ui';
 import { Fx } from './audio';
 import { Storage } from './storage';
 import { LINES, pick, CHEEKY, mix } from '../lines';
-import { pupHearts, blush, bunTease, winkSparkle, headOf } from './cheeky';
+import { pupHearts, blush, bunTease, winkSparkle, headOf, ptOn, pupNeck } from './cheeky';
 import { STANDALONE } from '../standalone';
 import { koPupFor } from './koPup';
 
@@ -94,8 +94,8 @@ function cheekyCouple(scene: Phaser.Scene, c: Phaser.GameObjects.Container, pup:
   scene.time.delayedCall(700, wink);
   scene.time.delayedCall(1300, () => { if (!bun.active) return; const b = bun.getBounds();
     let mode: 'kiss' | 'tug' | '' = ''; // the smug-kiss variant lands on his cheek; the rope goes to his neck
-    mode = bunTease(scene, () => { const q = bun.getBounds(); return { x: q.left + 26, y: q.bottom - 10 }; }, // her paw, at the bust's lower left
-      () => { const h = head(); if (!win) return { x: h.x, y: h.y + 72 }; if (mode === 'kiss') return { x: h.x, y: h.y + 4 }; const pb = pup.getBounds(); return { x: h.x + pb.width * 0.4, y: h.y + pb.height * 0.11 }; } /* his neck (win card: he lies on his side, so the collar sits down and back where his chin meets his body, clear of his face) */, () => {
+    mode = bunTease(scene, () => ({ ...ptOn(bun, 0.1, 1.06), r: 11, arm: ptOn(bun, 0.24, 0.9) }) /* the bust has no paws: her sleeve reaches out of its lower left to the paw holding the rope */,
+      () => { if (mode === 'kiss') { const h = head(); return win ? { x: h.x, y: h.y + 4 } : { x: h.x, y: h.y + 72 }; } return pupNeck(pup); } /* tug: the collar sits on his neck (win card: the hidden pup_dizzy image carries the KO rig's exact position + angle) */, () => {
       scene.tweens.add({ targets: pup, x: pup.x - 18, duration: 90, yoyo: true, ease: 'Quad.Out' }); // the tug yanks him a bit toward her
       blush(scene, cheeks, 50, 966, c); pupHearts(scene, head().x - (win ? 0 : 30), head().y - 30, 3, 966, c); // (loss card: drift left, away from her)
       // tail wag: a quick happy wiggle (around his flop angle on the win card)

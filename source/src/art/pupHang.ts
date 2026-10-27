@@ -16,45 +16,77 @@ import { txt } from '../systems/fx';
 import { GAME_W } from '../config';
 
 export type HangKind = 'A' | 'B' | 'C';
-/** padded viewBox: puppy.ts art unit (x, y) sits at (x + dx, y + dy) (room for the flopped ears) */
-export const HANG_VB = { w: 280, h: 340, dx: 40, dy: 80 };
+// 28 Oct (Marc: "squashed blob"): NORMAL proportions. Same puppy.ts painters (head/tuft/body/ear/face, same fur + outline), but gravity now
+// STRETCHES him the way a hanging pup reads: the head hangs a neck-length away from the torso (so the whole pear torso shows and there is a
+// real neck for the leash collar), the snared leg is a straight two-segment leg with an ankle, the free leg bends at the knee, the ears flop
+// toward the floor, and the arms are crossed in a pout over his chest. Upright art units (feet origin, like pt_*); the scene flips the rig.
+/** padded viewBox: puppy.ts art unit (x, y) sits at (x + dx, y + dy) (room for the flopped ears + longer legs) */
+export const HANG_VB = { w: 300, h: 420, dx: 50, dy: 130 };
 const FEET = { x: PUP_VB.w / 2, y: PUP_VB.feetY };      // same anchor as the pt_* frames (origin 0.5, feetY/h)
-export const HANG_ANKLE = { x: 115, y: 226 };            // snared hind paw (the front hind leg, x 113), just above the toes
-export const HANG_KNEE = { x: 98.5, y: 222 };            // C: where the bar crosses both hind legs
-export const HANG_HEAD = { x: 100, y: 94 };              // head centre (HX, HY in puppy.ts)
+const NECK_GAP = 30;                                     // head hangs this far off the torso (art units)
+export const HANG_ANKLE = { x: 113, y: 255 };            // snared ankle (front hind leg, straight), just above the paw
+export const HANG_KNEE = { x: 98.5, y: 250 };            // C: where the bar crosses both knees
+export const HANG_HEAD = { x: 100, y: 94 - NECK_GAP };   // head centre
+export const HANG_NECK = { x: 100, y: 130 };             // collar line: between the head and the torso
 const HANG_K = 0.78 * TEX_RES * 1.35 * Math.max(0.6, Math.min(1, RES / 2)); // raster px per art unit (same budget as pt_*)
 
-interface HangPose { face: { eyes: PupFace; brows: PupFace; mouth: PupFace; sweat?: boolean }; arm: number; legBack: number; legFront: number; earL: number; earR: number }
+interface HangPose { face: { eyes: PupFace; brows: PupFace; mouth: PupFace; sweat?: boolean }; ears: number; arms: 'cross' | 'dangle'; legs: 'snare' | 'knees' }
 const POSES: Record<HangKind, HangPose> = {
-  // A: snared front hind leg straight (it points UP to the rope once flipped), free hind leg flops out sideways, paws dangle by his cheeks
-  A: { face: { eyes: 'taunt', brows: 'normal', mouth: 'happy', sweat: true }, arm: 145, legBack: 42, legFront: 0, earL: 34, earR: 28 },
-  // B: same snare, spinning: paws and ears flung out a little by the twirl, swirly eyes + wobbly mouth (puppy.ts 'dizzy')
-  B: { face: { eyes: 'dizzy', brows: 'dizzy', mouth: 'dizzy' }, arm: 128, legBack: 55, legFront: 0, earL: 52, earR: 46 },
-  // C: both hind legs up to the bar (knees hooked over it), paws dangle, closed-eye grin (puppy.ts Acorn 'happy')
-  C: { face: { eyes: 'happy', brows: 'happy', mouth: 'happy' }, arm: 148, legBack: -5, legFront: 5, earL: 30, earR: 30 },
+  // A: sheepish wink, arms crossed in a pout
+  A: { face: { eyes: 'taunt', brows: 'normal', mouth: 'happy', sweat: true }, ears: 98, arms: 'cross', legs: 'snare' },
+  // B: dizzy + flustered (swirly eyes, wobbly mouth, blush + a sweat drop), arms crossed in a pout
+  B: { face: { eyes: 'dizzy', brows: 'dizzy', mouth: 'dizzy', sweat: true }, ears: 104, arms: 'cross', legs: 'snare' },
+  // C: knees hooked over the lamp bar, paws dangle past his head, closed-eye grin
+  C: { face: { eyes: 'happy', brows: 'happy', mouth: 'happy' }, ears: 96, arms: 'dangle', legs: 'knees' },
 };
+const OUT = P.OUT, SW = P.SW;
+/** a limb segment: a rounded capsule from (x1,y1) to (x2,y2), width w (same fill/outline style as puppy.ts legs) */
+const seg = (x1: number, y1: number, x2: number, y2: number, w: number, fill: string) => {
+  const len = Math.hypot(x2 - x1, y2 - y1), a = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI - 90;
+  return `<g transform="translate(${x1} ${y1}) rotate(${a.toFixed(1)})"><rect x="${-w / 2}" y="${-w / 2}" width="${w}" height="${(len + w).toFixed(1)}" rx="${w / 2}" fill="${fill}" stroke="${OUT}" stroke-width="${SW}"/></g>`;
+};
+/** a paw at (x, y) pointing along angle a (deg, 0 = down), with the two toe lines of puppy.ts legs */
+const paw = (x: number, y: number, a: number, fill: string) => `<g transform="translate(${x} ${y}) rotate(${a})"><ellipse cx="0" cy="4" rx="15" ry="11" fill="${fill}" stroke="${OUT}" stroke-width="${SW}"/>` +
+  `<path d="M-4 9 v4 M4 9 v4" stroke="${OUT}" stroke-width="2" stroke-linecap="round"/></g>`;
 
-/** an arm: the exact back-arm capsule of puppySVG (23 x 34, pivot 62,156), mirrored for the front one */
-const arm = (x: number, rot: number, fill: string) => `<g transform="rotate(${rot} ${x} 156)"><rect x="${x - 12}" y="150" width="23" height="34" rx="11.5" fill="${fill}" stroke="${P.OUT}" stroke-width="${P.SW}"/></g>`;
+function legs(kind: 'snare' | 'knees'): string {
+  const BK = '#a85d24', FR = '#c27230';
+  if (kind === 'snare') // free (back) leg: thigh out to the side, shin folded back at the knee; snared (front) leg dead straight
+    return seg(84, 204, 52, 246, 26, BK) + seg(52, 246, 30, 214, 24, BK) + paw(28, 210, 145, BK)
+      + seg(113, 200, 113, 232, 26, FR) + seg(113, 232, 113, 256, 24, FR) + paw(113, 260, 0, FR);
+  // knees: both thighs up to the bar, shins fold back over it, paws peek out
+  return seg(84, 200, 90, 250, 26, BK) + seg(90, 250, 62, 228, 24, BK) + paw(59, 225, 130, BK)
+    + seg(113, 200, 107, 250, 26, FR) + seg(107, 250, 136, 228, 24, FR) + paw(139, 225, -130, FR);
+}
+function arms(kind: 'cross' | 'dangle'): string {
+  if (kind === 'cross') // crossed in a pout over his chest (back arm under, front arm over)
+    return seg(72, 148, 118, 164, 20, 'url(#furDark)') + `<ellipse cx="121" cy="165" rx="10.5" ry="9.5" fill="#b8692b" stroke="${OUT}" stroke-width="${SW}"/>`
+      + seg(128, 148, 82, 166, 20, 'url(#fur)') + `<ellipse cx="79" cy="167" rx="10.5" ry="9.5" fill="#c7772f" stroke="${OUT}" stroke-width="${SW}"/>`;
+  // dangle: straight down past his head (toward local-up = the floor once flipped)
+  return seg(62, 150, 40, 70, 23, 'url(#furDark)') + seg(138, 150, 160, 70, 23, 'url(#fur)');
+}
 
 export function hangSVG(kind: HangKind, k: number): string {
   const p = POSES[kind], f = p.face;
   let s = `<g transform="translate(${HANG_VB.dx} ${HANG_VB.dy})">`;
-  s += P.leg(84, p.legBack, 0, '#a85d24');
+  s += `<rect x="80" y="${HANG_NECK.y - 22}" width="40" height="44" rx="14" fill="url(#furBody)" stroke="${OUT}" stroke-width="${SW}"/>`; // neck (collar spot)
+  s += legs(p.legs);
   s += P.body(0);
-  s += P.leg(113, p.legFront, 0, '#c27230');
+  if (p.arms === 'dangle') s = s.replace(`<g transform="translate(${HANG_VB.dx} ${HANG_VB.dy})">`, `<g transform="translate(${HANG_VB.dx} ${HANG_VB.dy})">` + arms('dangle'));
+  // head group, hanging a neck-length off the torso
+  s += `<g transform="translate(0 ${-NECK_GAP})">`;
+  s += P.ear('L', p.ears, 0) + P.ear('R', p.ears, 0);                    // ears flop toward local-up = DOWN once flipped (behind the head)
   s += P.topTuft(0) + P.head(0);
-  s += arm(62, p.arm, 'url(#furDark)') + arm(138, -p.arm, 'url(#fur)');   // paws dangle beside his cheeks (over the head edge, clear of the face)
   // face: same painters and order as puppySVG, turned 180 about the head centre so it reads upright once the rig is flipped
-  s += `<g transform="rotate(180 ${HANG_HEAD.x} ${HANG_HEAD.y})">`;
+  s += `<g transform="rotate(180 100 94)">`;
   s += `<ellipse cx="100" cy="118" rx="30" ry="20" fill="url(#glow)"/>`;
-  s += `<ellipse cx="58" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="${f.sweat ? 1 : 0.8}"/><ellipse cx="142" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="${f.sweat ? 1 : 0.8}"/>`;
+  s += `<ellipse cx="58" cy="122" rx="14" ry="9" fill="url(#blush)"/><ellipse cx="142" cy="122" rx="14" ry="9" fill="url(#blush)"/>`;
   s += P.brows(f.brows) + P.eyes(f.eyes);
   s += `<path d="M91 112 Q100 106 109 112 Q108 120 100 121 Q92 120 91 112 Z" fill="#24130b"/><ellipse cx="97" cy="112" rx="2.6" ry="1.5" fill="#fff" opacity="0.7"/>`;
   s += P.mouth(f.mouth);
-  if (f.sweat) s += `<path d="M160 58 q-7 12 0 16 q7 -4 0 -16 Z" fill="#7fd4ff" stroke="${P.OUT}" stroke-width="2.6"/>`; // one sheepish sweat drop
-  s += `</g>`;
-  s += P.ear('L', p.earL, 0) + P.ear('R', p.earR, 0);                     // ears flop toward local-up = DOWN once flipped
+  if (f.sweat) s += `<path d="M160 58 q-7 12 0 16 q7 -4 0 -16 Z" fill="#7fd4ff" stroke="${OUT}" stroke-width="2.6"/>`; // one flustered sweat drop
+  s += `</g></g>`;
+  if (p.arms === 'cross') s += arms('cross');
   s += `</g>`;
   return svgDoc(HANG_VB.w, HANG_VB.h, HANG_VB.w * k, HANG_VB.h * k, s, P.DEFS);
 }
@@ -136,6 +168,9 @@ export function champHang(scene: Phaser.Scene, x: number, ankleY = 380, m = 1.3,
   };
   const stop = () => { dead = true; scene.events.off('update', upd); };
   scene.events.on('update', upd); scene.events.once('shutdown', stop);
+  // the leash collar spot: his neck between head and torso, following the sway every frame (cheeky.ts Neck)
+  anchor.setData('neck', () => { if (!hp) return { x: anchor.x, y: anchor.y - 60 * m }; const n = hp.world(HANG_NECK.x, HANG_NECK.y);
+    return { x: n.x, y: n.y, w: 46 * u, a: Phaser.Math.RadToDeg(hp.img.getWorldTransformMatrix().rotationNormalized) }; });
   ensureHangArt(scene).then(() => { if (dead || !anchor.active) return;
     hp = new HangPup(scene, m).start('B', x, ankleY); hp.root.setDepth(depth);
     for (let i = 0; i < 2; i++) stars.push(txt(scene, 0, 0, '★', 30, '#ffdf6b', '#22252b', 4).setDepth(depth + 0.5)); }).catch(() => { /* no hang art: nothing drawn */ });

@@ -9,7 +9,7 @@ import { Fx } from '../systems/audio';
 import { hallBg, say, drawHall, DOOR_POS, setPageBg } from '../systems/kit';
 import { CAST } from '../art/chibi';
 import { LINES, pick, CHEEKY, mix } from '../lines';
-import { pupHearts, blush, bunTease, winkSparkle, headOf } from '../systems/cheeky';
+import { pupHearts, blush, bunTease, winkSparkle, headOf, ptOn, pupNeck } from '../systems/cheeky';
 import { doorState } from './Hub';
 import { Storage } from '../systems/storage';
 import { koPupFor } from '../systems/koPup';
@@ -94,8 +94,8 @@ export class InterludeScene extends Phaser.Scene {
     const pup = this.add2(art(this, from[0], from[1] + 150, 'pup_idle', 0.7));
     this.tweens.add({ targets: pup, x: to[0], y: to[1] + (idx + 1 >= 8 ? 200 : 150), duration: 2300, ease: 'Sine.InOut' });
     const wob = this.tweens.add({ targets: pup, angle: { from: -8, to: 8 }, yoyo: true, repeat: -1, duration: 160, onYoyo: () => Fx.step() });
-    const bun = this.add2(art(this, 600, 520, 'bun_sip_smile', 0.7));
-    this.tweens.add({ targets: bun, y: 505, yoyo: true, repeat: -1, duration: 400 });
+    const bun = this.add2(art(this, 618, 605, 'bun_sip_smile', 0.7)); /* 28 Oct: down 85 + right 18 so her ears clear the BUNNY'S RULES plaque (ends y 346) */
+    this.tweens.add({ targets: bun, y: 590, yoyo: true, repeat: -1, duration: 400 });
     this.walkFlirt(name, bun, pup, wob);
     const nextName = idx + 1 < 8 ? CAST[idx + 1].name : 'Bunny';
     this.add2(txt(this, W / 2, 70, `NEXT: ${nextName.toUpperCase()}`, 44, '#ffdf6b', '#22252b', 8));
@@ -119,7 +119,7 @@ export class InterludeScene extends Phaser.Scene {
    *  The carrot gag: when Puppy asks about the carrot in her pocket, it really is a carrot. */
   private walkFlirt(name: string, bun: Phaser.GameObjects.Image, pup: Phaser.GameObjects.Image, wob: Phaser.Tweens.Tween) {
     const pair = pick(mix<[string, string]>(CHEEKY.walkBy[name], CHEEKY.walkAny, LINES.walk.map(l => [l, ''] as [string, string])));
-    const at = (who: string) => who.startsWith('Puppy:') ? { x: Phaser.Math.Clamp(pup.x, 220, W - 220), y: pup.y - 150 } : { x: 420, y: 590 };
+    const at = (who: string) => who.startsWith('Puppy:') ? { x: Phaser.Math.Clamp(pup.x, 220, W - 220), y: pup.y - 150 } : { x: 320, y: 600 }; /* Bunny's line sits left of her bust (bubble max 420 wide) */
     this.add2(say(this, at(pair[0]).x, at(pair[0]).y, pair[0], 22, 1250));
     if (pair[1]) this.time.delayedCall(1300, () => { if (!this.done) this.add2(say(this, at(pair[1]).x, at(pair[1]).y, pair[1], 22, 1300)); });
     if (/carrot in your pocket/i.test(pair.join(' '))) this.time.delayedCall(1150, () => { if (this.done) return;
@@ -128,7 +128,7 @@ export class InterludeScene extends Phaser.Scene {
       this.tweens.add({ targets: c, angle: -20, yoyo: true, repeat: 3, duration: 160, delay: 300 }); });
     this.time.delayedCall(700, () => { if (this.done || !bun.active) return; bun.setTexture('bun_sip_wink');
       const b = bun.getBounds(); winkSparkle(this, b.centerX + b.width * 0.1, b.top + b.height * 0.3, 0, this.layer, '');
-      bunTease(this, () => { const q = bun.getBounds(); return { x: q.left + q.width * 0.24, y: q.top + q.height * 0.68 }; } /* her free paw */, () => { const q = headOf(pup, 0.3); return { x: q.x, y: q.y + 40 }; }, () => {
+      bunTease(this, () => ({ ...ptOn(bun, 0.2, 0.84), r: 9 }) /* her free (left) paw, in the art */, () => pupNeck(pup) /* collar on his neck, follows the wobble-walk */, () => {
         if (this.done) return; this.add2(blush(this, () => { const q = headOf(pup, 0.3); return { x: q.x, y: q.y + 22 }; }, 34, 0, this.layer));
         pupHearts(this, headOf(pup, 0.2).x, headOf(pup, 0.2).y, 3, 0, this.layer); wob.timeScale = 1.8; // happy wag-walk
         this.time.addEvent({ delay: 700, repeat: 3, callback: () => { if (!this.done && pup.active) pupHearts(this, headOf(pup, 0.2).x, headOf(pup, 0.2).y, 1, 0, this.layer); } });

@@ -13,7 +13,7 @@ import { pointerInMute, makeMuteButton, makeButton } from '../systems/ui';
 import { txt, comic } from '../systems/fx';
 import { Fx, Sfx } from '../systems/audio';
 import { popBanner, say, floatText, tutorialCard, makePauseButton, pointerInPause, setPageBg } from '../systems/kit';
-import { LINES, pick } from '../lines';
+import { LINES, pick, CHEEKY, mix } from '../lines';
 import { TESTER } from '../standalone';
 import { Hud, impact } from '../systems/level';
 import { Storage } from '../systems/storage';
@@ -599,7 +599,7 @@ export class LassoScene extends Phaser.Scene {
     const s = this.st; this.finish(true);
     this.couch('party'); popBanner(this, 'PUPPY ROUNDED UP!', 600, 0x2fbf5a, 1600); this.cameras.main.flash(300, 255, 240, 200);
     this.time.delayedCall(1300, () => { if (!this.scene.isActive()) return; s.phase = 'outro'; this.outroT = 0; this.bunny.setFace('wink');
-      this.talk(260, 860, pick(LINES.lassoOutroBun), 22, 1300); this.time.delayedCall(1300, () => this.talk(420, 860, pick(LINES.lassoOutroPup), 22, 1400)); });
+      this.talk(260, 860, pick(mix(LINES.lassoOutroBun, CHEEKY.lassoOutroBun)), 22, 1300); this.time.delayedCall(1300, () => this.talk(420, 860, pick(mix(LINES.lassoOutroPup, CHEEKY.lassoOutroPup)), 22, 1400)); });
   }
   private outroWalk() { return Math.max(0, this.outroT - 0.25) * 150; }
   private updOutro(dt: number) {
@@ -638,8 +638,8 @@ export class LassoScene extends Phaser.Scene {
     const pup = art(this, 500, 790, 'pup_idle', 1.1);
     const loop = this.add.graphics(); loop.lineStyle(10, 0xffffff, 1).strokeEllipse(540, 800, 150, 40).lineStyle(6, ROPE, 1).strokeEllipse(540, 800, 150, 40); // the loop he wriggled out of
     this.tweens.add({ targets: pup, y: '-=30', yoyo: true, repeat: -1, duration: 260, ease: 'Quad.Out' });
-    const q1 = txt(this, W / 2, 850, pick(LINES.lassoBunLose), 28, '#22252b', '#fff', 0).setWordWrapWidth(540).setAlign('center');
-    const q2 = txt(this, W / 2, 905, pick(LINES.lassoPupWin), 24, '#7a3f8a', '#fff', 0).setWordWrapWidth(540).setAlign('center');
+    const q1 = txt(this, W / 2, 850, pick(mix(LINES.lassoBunLose, CHEEKY.lassoBunLose)), 28, '#22252b', '#fff', 0).setWordWrapWidth(540).setAlign('center');
+    const q2 = txt(this, W / 2, 905, pick(mix(LINES.lassoPupWin, CHEEKY.lassoPupWin)), 24, '#7a3f8a', '#fff', 0).setWordWrapWidth(540).setAlign('center');
     c.add([dim, g, t, sc, floor, loop, hero, pup, q1, q2]);
     // buttons arm only after the fade-in plus a 300 ms tap-free gap (same rule as the shared end card)
     const t0 = this.time.now; let last = -1e9, armed = false, downOk = false;

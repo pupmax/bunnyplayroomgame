@@ -11,7 +11,7 @@ import { TailPup } from './tailRigs';
 export const ACORN_PUP_KEYS = ['pt_stand', 'pt_hearts', 'pt_dizzy', ...[0, 1, 2, 3, 4, 5].map(i => 'pt_run' + i),
   ...['blink', 'worry', 'ouch', 'taunt', 'happy', 'jump', 'fall', 'flop'].map(k => 'pa_' + k)];
 
-type Mode = 'idle' | 'run' | 'stop' | 'hop' | 'hit' | 'hide' | 'umb' | 'gag' | 'win' | 'lose';
+type Mode = 'idle' | 'run' | 'stop' | 'hop' | 'hit' | 'hide' | 'umb' | 'gag' | 'win' | 'lose' | 'ready' | 'swat' | 'munch' | 'flinch';
 
 /** a damped spring (value, velocity) for squash / tilt */
 class Spring { v = 0; x = 0; constructor(public k = 260, public d = 14) {}
@@ -50,6 +50,13 @@ export class AcornPup {
   win() { this.set('win'); this.root.setAlpha(1); this.sq.x = 0.35; this.showBump(true); }
   lose() { this.set('lose'); this.root.setAlpha(1); }
   freeze(ms: number) { this.frozen = ms / 1000; } // hit-stop, in sync with the scene's
+  // twists (Marc fb 27 Oct): the TAIL WHACK tell + swing, munching a stolen acorn, a flinch at a near miss
+  ready() { this.root.setAlpha(1); this.set('ready'); this.sq.v += 3; }                                 // crouch, smug grin, tail cocked + wiggling
+  swat(dir: number) { this.root.setAlpha(1); this.dir = -dir; this.set('swat'); this.sq.v -= 4; this.tilt.v += 220 * dir; this.puff(2); } // turns his rump to the acorn and whips the tail through it
+  munch() { this.root.setAlpha(1); this.set('munch'); this.sq.v += 2; }
+  flinch(from: number) { if (['hit', 'hide', 'win', 'lose', 'munch', 'ready', 'swat', 'umb'].includes(this.mode)) return; this.set('flinch'); this.sq.v += 3.5; this.tilt.v -= 200 * from; }
+  /** where his mouth is (root space), for the acorn he munches */
+  mouthPos() { const h = this.headPos(); return { x: h.x + this.dir * 40 * this.m, y: h.y + 34 * this.m }; }
   // ---- fx ----
   private puff(n: number) { for (let i = 0; i < n; i++) { const d = this.dust.find(o => !o.visible) ?? this.dust[0]; const s = (i % 2 ? 1 : -1);
     d.setPosition(s * 22 * this.m, -4).setVisible(true).setAlpha(0.8).setScale(artScale('su_dust', 0.5 * this.m));
@@ -101,6 +108,13 @@ export class AcornPup {
       else this.set('idle'); }                                                                                                                // recover
     else if (M === 'gag') { f = 'pa_taunt'; ang = Math.sin(this.t * 14) * 6; p.wagSpd = 20; p.wagAmp = 26; y = -Math.abs(Math.sin(this.t * 7)) * 8 * this.m; }
     else if (M === 'umb') { f = 'pa_happy'; ang = Math.sin(this.t * 2.5) * 3; }
+    else if (M === 'ready') { f = 'pa_taunt'; sx = 1.05; sy = 0.92; ang = Math.sin(this.t * 16) * 3; p.wagSpd = 34; p.wagAmp = 36; p.tailStretch = 1.15; }   // the tell: low crouch, tail whipping
+    else if (M === 'swat') { const q = Math.min(1, k / 0.3); wag = 0;
+      if (k < 0.3) { f = 'pa_jump'; y = -Math.sin(q * Math.PI) * 30 * this.m; tailAng = -70 + 140 * q; p.tailStretch = 1.2; ang = -10 + 20 * q; }       // tail sweeps through the acorn
+      else if (k < 1.0) { f = 'pa_taunt'; wag = 1; p.wagSpd = 26; p.wagAmp = 30; ang = Math.sin(this.t * 12) * 5; }                                      // smug little shimmy
+      else this.set('idle'); }
+    else if (M === 'munch') { f = Math.floor(this.t * 7) % 3 === 2 ? 'pa_blink' : 'pa_happy'; sy = 1 + Math.sin(this.t * 22) * 0.035; sx = 1 - Math.sin(this.t * 22) * 0.02; p.wagSpd = 16; p.wagAmp = 26; }
+    else if (M === 'flinch') { f = 'pa_worry'; ang = -6; if (k > 0.45) this.set('idle'); }
     else if (M === 'hide') f = blink ? 'pa_blink' : 'pa_happy';
     else if (M === 'win') { f = 'pa_flop'; ang = -84 * Phaser.Math.Easing.Bounce.Out(Math.min(1, k / 0.5)); wag = 0.1; tailAng = 20; }
     else if (M === 'lose') { f = Math.floor(this.t * 3) % 2 ? 'pa_taunt' : 'pa_happy'; y = -Math.abs(Math.sin(this.t * 6)) * 22 * this.m; ang = Math.sin(this.t * 6) * 8; p.wagSpd = 22; p.wagAmp = 28;

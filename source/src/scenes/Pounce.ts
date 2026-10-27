@@ -17,6 +17,7 @@ import { Fx } from '../systems/audio';
 import { popBanner, say, floatText, makePauseButton, pointerInPause, setPageBg, comic, flashVignette, sparks } from '../systems/kit';
 import { endCard } from '../systems/endcard';
 import { LINES, pick } from '../lines';
+import { CHEEKY, mix } from '../lines'; // cheeky pass
 import { Hud, impact } from '../systems/level';
 import { HeroRig } from '../systems/rigs';
 import { TailPup } from '../systems/tailRigs';
@@ -655,7 +656,7 @@ export class PounceScene extends Phaser.Scene {
           this.time.delayedCall(350, () => { const m = makeReturnMark(this, 372, BB - 30).setDepth(27).setScale(3).setAngle(-10).setAlpha(0);
             this.tweens.add({ targets: m, scale: 0.55, alpha: 1, duration: 200, ease: 'Quad.In', onComplete: () => { Fx.punch(); this.cameras.main.shake(200, 0.015); sparks(this, 372, BB - 30, 14); } }); });
           this.time.delayedCall(800, () => this.talk(360, 600, pick(LINES.boxWin), 24, 1800));
-          this.time.delayedCall(1700, () => this.talk(360, 1150, pick(LINES.boxWinPup), 22, 1500));
+          this.time.delayedCall(1700, () => this.talk(360, 1150, pick(mix(LINES.boxWinPup, CHEEKY.boxWinPup)), 22, 1500));
           this.time.delayedCall(2900, () => this.finish(true)); } });
     };
     if (this.flopBox === i) { this.tweens.add({ targets: box.c, y: BB - BOX_H, duration: 180, ease: 'Quad.In', onComplete: toParcel }); return; }
@@ -777,7 +778,7 @@ export class PounceScene extends Phaser.Scene {
   finish(win: boolean) {
     const s = this.st; if (s.over) return; s.over = true; s.running = false; s.phase = 'end'; (window as any).__pr.ended = win ? 'win' : 'lose'; this.hideHint(''); this.endTugSafe(); this.guide?.setVisible(false); this.anim = undefined;
     if (!win && this.pup) { this.pup.root.setVisible(true).setAngle(0); this.pup.setDepth(20).setFrame('stand'); this.tweens.add({ targets: this.pup.root, y: LANE - 50, duration: 180, yoyo: true, repeat: 3, ease: 'Quad.Out' });
-      this.talk(360, 770, pick(LINES.boxLose), 22, 1400); }
+      this.talk(360, 770, pick(mix(LINES.boxLose, CHEEKY.boxLose)), 22, 1400); }
     popBanner(this, win ? 'RETURN TO SENDER!' : 'TIME!', 600, win ? 0x2fbf5a : 0x6b4cc9, 800);
     this.time.delayedCall(1100, () => endCard(this, 'Noir', 5, win, s.score + Math.round(s.time) * 20, `${s.boops} catches • ${s.busts} busts`));
   }

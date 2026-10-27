@@ -245,6 +245,25 @@ export const LINES = {
   penLose: ['So close! Wait for the dive, then shoot!', 'Puppy read your hooves this time!', 'Shake out that mane and try again!'],
   penLosePup: ['Puppy: Paws of steel! Undefeated!', 'Puppy: Best keeper in the Playroom!', 'Puppy: Come back when you can wiggle-read!'],
   // ================= end GLASSIA "PENALTY PUP" =================
+  // ================= NANA "ACORN BARRAGE" twists: tail whack, snack thief, seeing stars, K.O. =================
+  // EDIT ME: Puppy/Nana banter for the new Acorn Barrage moments (smug + sneaky, the odd sweet one). Hints are the one-line tutorials.
+  acornHint: { swat: '❗ Tail wiggle = he WHACKS it back. WAIT!', munch: 'He\'s eating your acorn! BONK him first!', stars: '⭐ Seeing stars: every hit counts DOUBLE!' },
+  // the tell: he crouches, tail cocked
+  acornTell: ['Puppy: Go on. Throw it. I dare you.', 'Puppy: My tail is loaded, sweetie.', 'Puppy: Try me, squirrel girl~', 'Puppy: Batter up!'],
+  // Nana threw into it: he whacks it back up at her
+  acornSwat: ['Puppy: Return to sender, cutie!', 'Puppy: Tail-whack! Did you SEE that?', 'Puppy: Black belt in tail, babe.', 'Puppy: Fetch! Oh wait, that is MY line.', 'Puppy: Home run! I am a legend.'],
+  acornNanaBonk: ['Nana: OW! My own acorn?!', 'Nana: Okay. Rude. Noted.', 'Nana: That tail is getting confiscated.', 'Nana: Seeing... squirrels...'],
+  // he grabbed a missed acorn and is munching it
+  acornMunch: ['Puppy: Free snack! Thanks, babe.', 'Puppy: Mmm... crunchy AND disrespectful.', 'Puppy: Finders keepers, nutcase.', 'Puppy: Nom nom. Don\'t mind me.'],
+  acornGulp: ['Puppy: GULP! Ooh, sugar rush!', 'Puppy: Delicious. Throw me another, cutie.', 'Puppy: Healed! Acorns are a superfood.', 'Puppy: Zoomies unlocked!'],
+  acornSnack: ['Nana: Paws off my acorns, Puppy!', 'Nana: That was MY lunch!', 'Puppy: Mmf! Rude! I was CHEWING!', 'Nana: Spit it out, cheeky.'],
+  // near miss: whooshed past his ear
+  acornNear: ['Puppy: Whoa! That one parted my fur!', 'Puppy: Close... but not close enough, sweetheart.', 'Puppy: I felt the breeze. Thrilling.', 'Nana: Next one has your name on it.'],
+  // hits while he is seeing stars (count double)
+  acornStars: ['Puppy: Wheee... pretty stars...', 'Puppy: Who turned the forest upside down?', 'DOUBLE TONK! He did not even see it!', 'Puppy: Five Nanas?! That is not fair!'],
+  // the winning K.O. beat
+  acornKO: ['Puppy: I regret... nothing... ugh.', 'Nana: Nuts to you, cutie.', 'Puppy: Okay, you win... can I keep ONE acorn?', 'Nana: Sleep tight, fluffball. Mwah!'],
+  // ================= end NANA "ACORN BARRAGE" twists =================
 };
 /** Shared no-repeat picker (audit27): every pool gets its own shuffle-bag, so no line repeats until the whole pool has been
  *  used, and the same line never plays twice in a row (also across a refill). Keyed by the pool's contents, so LINES pools and
@@ -262,3 +281,131 @@ export function pick<T>(a: readonly T[]): T {
 export function countLines(): number {
   let n = 0; for (const v of Object.values(LINES)) n += Array.isArray(v) ? v.length : Object.values(v).flat().length; return n;
 }
+
+// ================= EDIT ME, Marc: cheeky Bunny & Puppy =================
+// Cheeky pass (27 Oct, take 2: "sneaky" rewrite): Bunny is the smug little schemer who loves catching, tying up and bossing her Puppy
+// around; Puppy is the flustered, half-willing captive. Mostly sneaky / smug / teasing, with about 1 in 5 lines a halfway-sweet sneaky
+// one (marked "// sweet-ish"). PG-13 winks only: every joke should read innocent on the surface. Nothing above was changed: each scene
+// mixes its old pool with the matching pool below, so the shared no-repeat picker shuffles old and new lines together. Add, remove or
+// reword lines freely (keep the "Name: " prefix, it decides who says it). Card lines: about 45 characters fit. Bubble lines: about 36.
+export const CHEEKY = {
+  // ---- level end card (shared card in systems/endcard.ts) ----
+  // a girl WON: Bunny's line on the card (mixed with LINES.win) ...
+  cardWin: ['Bunny: Caught again? You make it too easy.', 'Bunny: Flat on your back. Right where I want you.', 'Bunny: Lose for them, Puppy. Get caught for me.',
+    'Bunny: Bad boy. Tickle punishment later. Hehe.', "Bunny: Struggle more, Puppy. It's cuter.", 'Bunny: Every door leads back to me, Puppy.',
+    'Bunny: Sit. Stay. Stay caught.',
+    'Bunny: Poor thing. Fine, one kiss. Then the leash.'], // sweet-ish
+  // ... and Puppy's reply under it (mixed with LINES.puppyLose; also used on the interlude flop)
+  cardWinPup: ["Puppy: I wasn't caught! I was... resting.", 'Puppy: Why is everyone carrying rope today?!', 'Puppy: Please not the tickles. ...Okay, maybe.',
+    "Puppy: I can escape anytime. I just... don't.", 'Puppy: Who keeps putting collars on me?!', 'Puppy: This is fine. I am a very free dog.',
+    "Puppy: Bunny's grinning. That's never good.",
+    "Puppy: If someone keeps me, I hope it's you."], // sweet-ish
+  // Puppy WON: Bunny's line (mixed with LINES.lose) ...
+  cardLose: ["Bunny: Enjoy your freedom. It's a loan.", "Bunny: Run, Puppy. I'll get the long rope.", "Bunny: Cute escape. I'm counting them, you know.",
+    'Bunny: Wag while you can, Puppy.', 'Bunny: Every escape adds one tickle. Hehe.', 'Bunny: Lucky. Next round, the leash comes out.',
+    'Bunny: Go on. Sleep with one eye open.',
+    "Bunny: Fine, you win. Come here, I'll reward you."], // sweet-ish
+  // ... and Puppy's gloat (mixed with LINES.puppyWin)
+  cardLosePup: ['Puppy: Free! Free! ...Why is Bunny smiling?', 'Puppy: Not caught! Write that down, Bunny!', 'Puppy: No collar today, thank you very much!',
+    'Puppy: I am un-catchable! Mostly. Sometimes.', 'Puppy: Untied, unbagged, un-tickled! Woof!', 'Puppy: Victory lap! ...Away from Bunny.',
+    'Puppy: Ha! Your knots need practice, Bunny.',
+    "Puppy: Won it for you, Bunny. Don't tell anyone."], // sweet-ish
+  // level-aware win lines (about half of all wins use one). A "Puppy:" line goes in his slot, a "Bunny:" line in hers. Last one is sweet-ish.
+  cardWinBy: {
+    Ruby: ["Bunny: Ruby bagged you? The bag's mine next.", 'Puppy: Bagged. Again. Is this a theme?', 'Bunny: Ruby softens him up. I collect.',
+      "Puppy: Ruby punches. Bunny plans. I'm doomed.", 'Bunny: Knocked out? Perfect time for the leash.', "Bunny: Bruised? Aww. I'll kiss it. Then tie it."],
+    Glassia: ["Bunny: Netted! Hold still, I'm keeping this one.", 'Puppy: Caught in a net. Again. By a pony.', 'Bunny: Nice dive. Straight into my trap.',
+      'Bunny: Keeper? No. Kept? Yes.', 'Puppy: Why do all goals lead to Bunny?', 'Bunny: So brave. My brave little hostage.'],
+    Zoe: ['Bunny: Bonked and sticky. Easy to carry off.', "Puppy: Zoe's pan was the warm-up, wasn't it?", 'Bunny: Ding dong! Who ordered one Puppy?',
+      'Bunny: Honey trap worked. Of course it did.', "Puppy: I'm stuck. Literally. Honey. Help.", 'Bunny: Sticky AND dizzy. Cute. Hold my paw.'],
+    Nana: ['Bunny: Umbrella down? Nowhere to hide now.', 'Puppy: Acorns from above. Bunny from behind.', 'Bunny: Nana bonks. I keep. Teamwork.',
+      'Bunny: Seeing stars? Count them while I tie.', 'Puppy: My noggin hurts. Please, no tickles.', "Bunny: Poor noggin. One smug kiss. That's all."],
+    Midnight: ['Bunny: She flew you to my door. Good bird.', "Puppy: Kidnapped by a raven. Bunny, jealous?", 'Bunny: Air mail Puppy. Signed for. Mine.',
+      'Bunny: Nobody steals my Puppy. Except me.', 'Puppy: I hate heights. I hate rope more. Maybe.', 'Bunny: You came back to me. Even by talon.'],
+    Noir: ["Bunny: Boxed up for me? You shouldn't have.", "Puppy: I'm a parcel now. Return to sender!", 'Bunny: Fragile. This side up. Property of Bunny.',
+      'Bunny: Head in a box. Tail in my paw.', 'Puppy: The kitty tricked me. Bunny trained her.', 'Bunny: Gift-wrapped Puppy. Best present ever.'],
+    Iris: ["Bunny: Taken out with the trash? I'll take you in.", 'Puppy: Iris dumped me. Bunny picked me up. Uh-oh.', 'Bunny: Smelly and caught. Bath time. No escape.',
+      "Bunny: One raccoon's trash, one Bunny's captive.", 'Puppy: Bunny, why do you have soap AND rope?', 'Bunny: Stinky. Still mine. Come here.'],
+    Linye: ['Bunny: Sat on by a hedgehog. Warm-up done.', 'Puppy: Linye uses me as a chair. Bunny, a toy.', "Bunny: Tag, you're it. Then you're mine.",
+      'Bunny: Shadow caught. The real thing is next.', 'Puppy: Just me and Bunny now. Gulp.', 'Bunny: Brave boy. You earned a kiss. And a knot.'],
+    // bonus Tail Catch (Bunny herself won)
+    Bunny: ['Bunny: Got your tail. The Puppy comes with it.', "Bunny: Tug tug. Who's following who now?", "Puppy: Gentle! That's attached!",
+      'Bunny: Heel, Puppy. Good boy. Finally.', 'Bunny: Caught by the tail. Leash next. Hehe.', "Puppy: Pull gently... I'm not complaining."],
+  } as Record<string, string[]>,
+  // ---- interlude, beat 3: Puppy walks to the next door, Bunny sips and tugs his leash. [first line, reply]; either can be Bunny or Puppy.
+  //      Last pair per girl is sweet-ish. ----
+  walkBy: {
+    Ruby: [['Bunny: Ruby bagged you. I tie the bow.', 'Puppy: Why does it need a bow?!'], ['Bunny: You got punched right into my plan.', "Puppy: There's a PLAN?!"],
+      ['Bunny: Ding ding! Round two is mine.', 'Puppy: Can I tap out? ...No?'], ['Bunny: Wobbly legs? Easier to catch.', 'Puppy: Stop grinning like that!'],
+      ['Bunny: Ruby softened you up. Thanks, Ruby!', "Puppy: I'm not a steak!"], ['Bunny: Bruised? Here. One kiss. Shh.', 'Puppy: ...Can I get bruised again?']],
+    Glassia: [['Bunny: Caught in her net, were we?', 'Puppy: That net was your idea, right?'], ["Bunny: You're a keeper. So I'm keeping you.", "Puppy: That's not what keeper means!"],
+      ['Bunny: Dive left, dive right. Land on me.', 'Puppy: Is this still football?'], ['Bunny: Hold your horses, Puppy.', 'Puppy: Hold your lasso, Bunny!'],
+      ['Bunny: Whistle! Penalty: tickles.', 'Puppy: That rule is NOT real!'], ['Bunny: Nice saves. My hero. My hostage.', 'Puppy: Pick ONE, Bunny!']],
+    Zoe: [['Bunny: Honey, you got bonked.', 'Puppy: You say honey like a threat.'], ['Bunny: Sticky paws? Rope sticks better.', 'Puppy: Why do you know that?!'],
+      ["Bunny: Zoe's pan rang the dinner bell.", "Puppy: Who's dinner? ...Oh no."], ['Bunny: In and out of that hive all day.', 'Puppy: Hiding. From you. Mostly.'],
+      ['Bunny: Buzz buzz. Caught in my web.', "Puppy: Bees don't even have webs!"], ['Bunny: Sticky and sweet. Like me.', "Puppy: You're sneaky. Sweet is a stretch."]],
+    Nana: [['Bunny: Umbrella up? Cute. Useless.', "Puppy: It's a shield! From acorns. And you."], ['Bunny: She saved acorns all autumn.', "Puppy: You saved rope all year, didn't you?"],
+      ['Bunny: Bonk count: a lot.', 'Puppy: Tickle count: please zero.'], ['Bunny: Seeing stars? Follow the pretty one.', 'Puppy: The pretty one has a rope!'],
+      ['Bunny: Squirrels hoard nuts. I hoard Puppies.', 'Puppy: Just one Puppy, right? RIGHT?'], ['Bunny: Poor noggin. Fine. Kiss.', 'Puppy: ...Ow. Wait. Again?']],
+    Midnight: [['Bunny: Flying with other girls now?', "Puppy: She grabbed ME! I'm the victim!"], ['Bunny: Up all night, Puppy?', 'Puppy: Who can sleep with you watching?'],
+      ['Bunny: She swept you off your feet.', "Puppy: You'll do it with a lasso."], ['Bunny: Air mail Puppy. Delivered to me.', 'Puppy: I did NOT sign for this!'],
+      ['Bunny: Feathers in your fur? Explain.', "Puppy: It's not what it looks like!"], ['Bunny: Missed you up there. A little.', 'Puppy: Wait, really? ...A little?']],
+    Noir: [['Bunny: Did the kitty play with you?', "Puppy: She played me. There's a difference."], ['Bunny: You got packed and shipped.', 'Puppy: To who?! ...Oh. To you.'],
+      ['Bunny: Peekaboo! Found you. Always.', "Puppy: That's the scary part!"], ['Bunny: Stamped, sealed, mine.', 'Puppy: Where do I file a complaint?'],
+      ['Bunny: Head in a box, tail in my paw.', 'Puppy: Let go! ...Okay, hold it gently.'], ['Bunny: Best parcel I ever got.', "Puppy: I'm blushing. In a box."]],
+    Iris: [['Bunny: You stink, Puppy. Bath time.', 'Puppy: Why are you holding rope AND soap?'], ["Bunny: Garbage day. I'll take you out.", 'Puppy: That sounds like a threat!'],
+      ['Bunny: She stole your snacks, huh?', "Puppy: And you'll steal the rest of me."], ['Bunny: Banana peel hat. Captive chic.', 'Puppy: Stop saying captive chic!'],
+      ['Bunny: Trashed by a raccoon. Tsk tsk.', "Puppy: You're taking notes. I see you."], ['Bunny: Stinky. Still my favourite.', 'Puppy: ...Say that again. Slower.']],
+    Linye: [['Bunny: Did a hedgehog sit on you?', 'Puppy: Is everyone just sitting on me now?'], ["Bunny: Tag! You're it. Then you're mine.", "Puppy: That's not how tag works!"],
+      ['Bunny: Shadow caught. You next.', 'Puppy: Can my shadow go instead?'], ['Bunny: Comfy chair, are we?', 'Puppy: Comfy captive. Apparently.'],
+      ["Bunny: Now it's just you and me.", 'Puppy: Gulp. Lasso time?'], ['Bunny: Last door. Then you rest. With me.', 'Puppy: Rest, or REST rest?']],
+  } as Record<string, [string, string][]>,
+  // any level (mixed into every walk, together with Marc's LINES.walk). The carrot gag needs "carrot in your pocket" in the line.
+  walkAny: [['Bunny: Next door, Puppy. Walkies!', 'Puppy: Why do walkies need a leash?!'], ['Puppy: Is that a carrot in your pocket or...', "Bunny: It IS a carrot. It's bait."],
+    ["Bunny: Who's a good boy? Not you. Good.", 'Puppy: Bad boys get chased. Uh-oh.'], ['Puppy: Careful, I bite!', 'Bunny: Cute. I tickle.'],
+    ['Bunny: Struggle harder. It helps. Me.', "Puppy: That's... not encouraging!"], ['Bunny: Collar or bow tie? Pick one.', "Puppy: Can I pick 'run'?"],
+    ['Bunny: Psst. You look cute caught.', 'Puppy: Stop it! ...No, keep going.']] as [string, string][], // last pair sweet-ish
+  // ---- interlude, beat 2: under "Bunny is watching..." (mixed with LINES.teaser) ----
+  teaser: ['My lasso is warming up. Hehe.', 'Run all you want, Puppy. I like a chase.', 'Round nine, Puppy. Wear something tie-able.',
+    "I don't chase boys. I lasso them.", 'Rope? Check. Hat? Check. Puppy? Soon.', 'Every door you open leads back to me.',
+    'Save your last wag for me, Puppy.'], // sweet-ish
+  // ---- interlude, Linye's reveal (mixed with LINES.linyeReveal) ----
+  linyeReveal: ['Linye: Hi hi! Puppy, you look... sit-able.', 'Bunny: Linye catches shadows. I catch the rest.', "Linye: Bunny says you're hers. Tag anyway?",
+    'Linye: Comfy chair spotted! Hi hi!', 'Bunny: Wear him out, Linye. I want him tired.',
+    'Bunny: Be nice, Linye. Only I get to tease him.'], // sweet-ish
+  // ---- hall greeting bubble (mixed with LINES.hub) ----
+  hub: ["Bunny: Pick a door. Puppy's behind all of them.", "Bunny: Welcome! Puppy's my favourite toy.", "Bunny: Play nice, girls. He's MY chew toy.",
+    "Bunny: Puppy's been a bad boy. Go catch him.", 'Bunny: Catch him, wrap him, bring him to me.', 'Bunny: No biting. Unless he asks nicely.',
+    'Puppy: Bunny, why is everyone holding rope?!',
+    'Bunny: Bring him back in one piece. I like him.'], // sweet-ish
+  // ---- hall, tapping the locked finale door (mixed with LINES.finale) ----
+  finale: ['Saving my lasso for last. Hehe.', 'Patience. The boss always goes last.', 'Rope practice later. Puppy volunteered.',
+    'Not yet! Wear him out behind the other doors.', "My door opens when he's nice and tired.",
+    "Last door's mine. So is he. Eventually."], // sweet-ish
+  // ---- Champion ending bubble (mixed with LINES.champion) ----
+  champion: ['Bunny: Champion! Now come here, my prize.', 'Puppy: Roped, wrapped, bonked... and kept.', 'Bunny: Won the trophy. The Puppy was a bonus.',
+    "Bunny: Who's a good boy? ...Fine. You. Today.", 'Puppy: Best loser! Does that mean I can go?', 'Bunny: Go? Oh, Puppy. Cute.',
+    'Everyone: Get a room, you two!',
+    'Bunny: Hold still. The champion gets one kiss.'], // sweet-ish
+  // the couch girls reacting on the Champion stage (little floating words)
+  couchFan: ['phew~', 'is it hot in here?', '*fans self*', 'oh my~', 'so bold!'],
+  couchRoll: ['ugh, you two', 'get a room!', 'so cute. ew.', '*eye roll*', 'again?!'],
+  // ---- Lasso finale: win drag-off (mixed with LINES.lassoOutroBun / lassoOutroPup) ----
+  lassoOutroBun: ['Bunny: All tied up and nowhere to go. Perfect.', 'Bunny: Come along, my little prize.', "Bunny: Hush, Puppy. Bunny's driving.",
+    'Bunny: Shh. Good boy. You can keep the bow.'], // sweet-ish
+  lassoOutroPup: ['Puppy: Gentle with the knots, Bunny!', "Puppy: I'm not complaining. Just saying.", 'Puppy: Where are we going?! ...Snacks?', 'Puppy: Help! ...Not too fast, though.'],
+  // ---- Lasso finale: loss card (mixed with LINES.lassoBunLose / lassoPupWin) ----
+  lassoBunLose: ['Bunny: Run, Puppy. I love a chase.', "Bunny: Enjoy your freedom. It's temporary.", 'Bunny: Next time, I tie a double knot.', 'Bunny: Slipped my loop? Cute. Again.'],
+  lassoPupWin: ['Puppy: Catch me if you can, cowgirl!', 'Puppy: Untied! ...Wait, I kinda liked it.', "Puppy: You'll have to work for it, Bunny!", "Puppy: Free! Nobody look at Bunny's face."],
+  // ---- Tail Catch (bonus): Puppy while Bunny leads him off by the tail (mixed with the old inline lines), and his gloat on the loss card ----
+  tailOutroPup: ["Puppy: Where are we going? ...I don't mind.", 'Puppy: Gentle! That tail is attached!', 'Puppy: Is this walkies or a kidnapping?', 'Puppy: Lead on, Bunny. I guess.'],
+  tailLosePup: ['Puppy: Want my tail? Ask nicely, Bunny.', "Puppy: Tail's still mine! For now!", "Puppy: Chase me again. I'll... go slower.", "Puppy: Wag wag! Can't catch it, can you?"],
+  // ---- Noir (Box Bandit) win/lose outro (mixed with LINES.boxWinPup / boxLose) ----
+  boxWinPup: ['Puppy: Do NOT deliver me to Bunny!', 'Puppy: Unwrap me? No! FREE me!', 'Puppy: Fragile! Handle with less rope!', "Puppy: Gift-wrapped?! Who's the gift for?!"],
+  boxLose: ["Puppy: Found the kitty! Bunny's spy is caught!", "Puppy: Woof! Can't box this Puppy!", 'Puppy: Found you! Bunny next. Hehe.'],
+  // ---- Glassia (Penalty Pup) loss card: Puppy's line (mixed with LINES.penLosePup) ----
+  penLosePup: ['Puppy: Nothing gets past me. Except Bunny.', 'Puppy: Saved it! Bunny, stop taking notes!', "Puppy: I'm a keeper! Not KEPT. Big difference."],
+};
+/** One of Marc's pools + its cheeky add-on (the shared no-repeat bag remembers the combined pool by its contents). */
+export function mix<T>(...pools: (readonly T[] | undefined)[]): T[] { return pools.flatMap(p => (p ?? []) as T[]); }
+// ================= end cheeky Bunny & Puppy =================

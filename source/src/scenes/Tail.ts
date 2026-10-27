@@ -11,6 +11,7 @@ import { Fx } from '../systems/audio';
 import { popBanner, floatText, tutorialCard, makePauseButton, pointerInPause, setPageBg, sparks } from '../systems/kit';
 import { endCard } from '../systems/endcard';
 import { LINES, pick } from '../lines';
+import { CHEEKY, mix } from '../lines'; // cheeky pass
 import { Hud } from '../systems/level';
 import { bakeG } from '../systems/bake';
 import { TailBunny, TailPup, TAIL_FLAT } from '../systems/tailRigs';
@@ -424,7 +425,7 @@ export class TailScene extends Phaser.Scene {
       s.face = -s.face; this.pup.flip(s.face < 0); const mx = (s.bx + s.px) / 2; for (let i = 0; i < 9; i++) this.puff(mx + (Math.random() - 0.5) * 170, s.py - 10 - Math.random() * 90, -i * 0.015); Fx.whoosh(); } this.bun.setFace('sneaky'); this.input.on('pointerdown', skip);
     this.events.once('shutdown', () => this.input.off('pointerdown', skip));
     this.outroEv = [this.time.delayedCall(700, () => this.outroLine('Come, Puppy, follow me!')),
-      this.time.delayedCall(1500, () => { const b = this.pupSay(pick(['Not again!', 'My dignity!', 'Wheee- I mean, HEY!', 'So undignified!'])); b.setY(Math.min(b.y, 700)); }),
+      this.time.delayedCall(1500, () => { const b = this.pupSay(pick(mix(['Not again!', 'My dignity!', 'Wheee- I mean, HEY!', 'So undignified!'], CHEEKY.tailOutroPup.map(l => l.replace(/^Puppy: /, ''))))); b.setY(Math.min(b.y, 700)); }),
       this.time.addEvent({ delay: 450, loop: true, callback: () => { if (this.outro) this.puppyHearts(Phaser.Math.Clamp(this.st.px, 60, W - 60), this.st.py - 195, 2, 76); } }),
       this.time.delayedCall(2800, card)];
   }
@@ -453,6 +454,6 @@ export class TailScene extends Phaser.Scene {
     this.time.addEvent({ delay: 16, loop: true, callback: () => p.update(0.016, 0, 1) });
     this.tweens.add({ targets: p.root, y: old.y - 24, yoyo: true, repeat: -1, duration: 220, ease: 'Quad.Out' });
     const sub = c.list.find((o: any) => o.type === 'Text' && /^Puppy:/.test(o.text)) as Phaser.GameObjects.Text | undefined;
-    sub?.setText(pick(['Puppy: Still got my tail! Nyoom!', 'Puppy: Tail 1, Bunny 0!', 'Puppy: Zoomies win again!']));
+    sub?.setText(pick(mix(['Puppy: Still got my tail! Nyoom!', 'Puppy: Tail 1, Bunny 0!', 'Puppy: Zoomies win again!'], CHEEKY.tailLosePup)));
   }
 }

@@ -4,7 +4,7 @@ const [game,mode,N,RAD]=[process.argv[2],process.argv[3],+process.argv[4],+(proc
 const b=await chromium.launch({args:['--use-gl=swiftshader','--enable-unsafe-swiftshader']});
 const p=await (await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1,hasTouch:true,isMobile:true})).newPage();
 await p.goto('http://localhost:4199/',{timeout:90000});
-await p.evaluate(()=>{for(const k of ['ruby2','glassia3','zoe1','nana1'])localStorage.setItem('playroom.tut.'+k,'1');localStorage.setItem('playroom.beaten','4')});
+await p.evaluate(()=>{for(const k of ['ruby2','glassia3','zoe1','nana2'])localStorage.setItem('playroom.tut.'+k,'1');localStorage.setItem('playroom.beaten','4')});
 await p.reload(); await p.waitForFunction(()=>window.__game&&window.__game.scene.isActive('Title')&&window.__artReady,null,{timeout:30000});
 const res=[];
 for(let g=0;g<N;g++){

@@ -9,7 +9,7 @@ import { txt } from '../systems/fx';
 import { Sfx } from '../systems/audio';
 import { drawHall, say, DOOR_POS, setPageBg } from '../systems/kit';
 import { CAST, BUNNY_INFO } from '../art/chibi';
-import { LINES, pick } from '../lines';
+import { LINES, pick, CHEEKY, mix } from '../lines';
 import { Storage } from '../systems/storage';
 
 export const PLAYABLE = ['Ruby', 'Glassia', 'Zoe', 'Nana', 'Midnight', 'Noir', 'Iris', 'Linye'];
@@ -55,7 +55,7 @@ export class HubScene extends Phaser.Scene {
       const bonus = makeButton(this, W / 2, 578, 400, 88, 'BONUS: TAIL CATCH 🐾', () => { if (!leaveOnce(this)) return; this.cameras.main.fadeOut(200); this.time.delayedCall(220, () => this.scene.start('Tail')); }, 0x2fbf71, 30).setDepth(6);
       this.tweens.add({ targets: bonus, scale: 1.04, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.InOut' });
     }
-    this.time.delayedCall(500, () => say(this, W / 2, 545, pick(LINES.hub), 19, 2000));
+    this.time.delayedCall(500, () => say(this, W / 2, 545, pick(mix(LINES.hub, CHEEKY.hub)), 19, 2000));
     makeButton(this, 64, 64, 96, 96, '⌂', () => leaveOnce(this) && this.scene.start('Title'), 0x3a86ff, 46).setDepth(905);
     makeMuteButton(this);
     (window as any).__pr = { scene: 'Hub', beaten };
@@ -65,7 +65,7 @@ export class HubScene extends Phaser.Scene {
     const st = doorState(i); const [x, y] = DOOR_POS[i];
     const by = i === 8 ? y + 210 : y - 150;
     if (i === 8 && (st === 'open' || st === 'beaten')) { if (!leaveOnce(this)) return; this.cameras.main.fadeOut(200); this.time.delayedCall(220, () => this.scene.start('Lasso')); return; }
-    if (i === 8) { say(this, x, by, `Bunny: "${st === 'locked' ? pick(LINES.finale) : BUNNY_INFO.quip}"`, 24); return; }
+    if (i === 8) { say(this, x, by, `Bunny: "${st === 'locked' ? pick(mix(LINES.finale, CHEEKY.finale)) : BUNNY_INFO.quip}"`, 24); return; }
     const c = CAST[i];
     if (st === 'open' || st === 'beaten') {
       if (PLAYABLE.includes(c.name)) { if (!leaveOnce(this)) return; this.cameras.main.fadeOut(200); this.time.delayedCall(220, () => this.scene.start(LEVEL_SCENE[c.name])); return; }

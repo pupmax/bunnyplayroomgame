@@ -4,7 +4,7 @@ const URL = process.env.URL || 'http://localhost:4199/';
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ ...devices['iPhone 15 Pro Max'], viewport: { width: 440, height: 956 }, deviceScaleFactor: 3 })).newPage();
 await p.goto(URL); await p.waitForFunction(() => window.__game?.scene.getScenes(true).length && window.__artReady, null, { timeout: 120000 });
-await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes('.tut.')) localStorage.removeItem(k); for (const k of ['rubybag','glassia3','zoe1','nana1','midnight1','noir3','iris1','linye1','bunny1']) localStorage.setItem('playroom.tut.' + k, '1'); });
+await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes('.tut.')) localStorage.removeItem(k); for (const k of ['rubybag','glassia3','zoe1','nana2','midnight1','noir3','iris1','linye1','bunny1']) localStorage.setItem('playroom.tut.' + k, '1'); });
 for (const SK of (process.env.SCENES || 'Hive,Acorn').split(',')) {
   await p.evaluate(k => { const G = window.__game; G.scene.getScenes(true).forEach(s => s.scene.stop()); G.scene.start(k); }, SK); await p.waitForTimeout(2500);
   const r = await p.evaluate(() => new Promise(res => { const G = window.__game; const proto = Object.getPrototypeOf(G.scene.getScenes(true)[0].add.graphics()); const oc = proto.clear; const cnt = new Map();

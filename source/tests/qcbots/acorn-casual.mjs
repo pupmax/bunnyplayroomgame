@@ -6,7 +6,7 @@ const b = await chromium.launch(); const errs = [];
 const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 })).newPage();
 p.on('pageerror', e => errs.push(String(e))); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
 await p.goto('http://localhost:4199/', { timeout: 90000 });
-await p.evaluate(() => { localStorage.setItem('playroom.tut.nana1', '1'); localStorage.setItem('playroom.beaten', '3'); });
+await p.evaluate(() => { localStorage.setItem('playroom.tut.nana2', '1'); localStorage.setItem('playroom.beaten', '3'); });
 await p.reload(); await p.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 60000 });
 let wins = 0; const t0 = Date.now();
 for (let g = 0; g < N; g++) {

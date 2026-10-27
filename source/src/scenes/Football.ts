@@ -15,6 +15,7 @@ import { popBanner, say, floatText, tutorialCard, makePauseButton, pointerInPaus
 import { impact } from '../systems/level';
 import { endCard } from '../systems/endcard';
 import { LINES, pick } from '../lines';
+import { CHEEKY, mix } from '../lines'; // cheeky pass
 import { HeroRig } from '../systems/rigs';
 
 // ---------------- tuning (iPhone real-touch, ~100 ms input latency; see tests/glassia_realtouch.mjs) ----------------
@@ -614,7 +615,7 @@ export class FootballScene extends Phaser.Scene {
     const texts = c.list.filter((o: any) => o.type === 'Text') as Phaser.GameObjects.Text[];
     texts.find(t => t.text === 'PUPPY GOT LUCKY!')?.setText('PUPPY SAVED IT!');
     const quote = texts.find(t => Math.round(t.y) === 830), sub = texts.find(t => Math.round(t.y) === 885);
-    quote?.setText(pick(LINES.penLose)); sub?.setText(pick(LINES.penLosePup));
+    quote?.setText(pick(LINES.penLose)); sub?.setText(pick(mix(LINES.penLosePup, CHEEKY.penLosePup)));
     (window as any).__pr.lossCard = { opaque: dim?.fillAlpha, quote: quote?.text, sub: sub?.text, pup: pup?.texture.key };
   }
 }

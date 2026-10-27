@@ -16,7 +16,7 @@ const mk = async (route) => {
   return { ctx, p, errs, P, start, navs: () => navs };
 };
 { const T = await mk(); const { p, P } = T;
-  await p.evaluate(() => { localStorage.setItem('playroom.beaten', '8'); for (const k of ['rubybag','glassia3','zoe1','nana1','midnight1','noir3','iris1','linye1','bunny1','glassia_pen1','bunny2']) localStorage.setItem('playroom.tut.' + k, '1'); });
+  await p.evaluate(() => { localStorage.setItem('playroom.beaten', '8'); for (const k of ['rubybag','glassia3','zoe1','nana2','midnight1','noir3','iris1','linye1','bunny1','glassia_pen1','bunny2']) localStorage.setItem('playroom.tut.' + k, '1'); });
   // (1) lose Hive, hammer HALL (505,1010) for 600 ms: Hub once, no level started from leftover taps
   let leaks = 0;
   for (let r = 0; r < 5; r++) {
@@ -36,7 +36,7 @@ const mk = async (route) => {
   const pc = await p.evaluate(() => window.__creates.Pause || 0);
   ok(pc === 1, `(2) 2-finger pause burst: Pause created ${pc}x`); ok(T.errs.length === 0, '(1-2) errors ' + T.errs.length + ' ' + (T.errs[0] || ''));
   // (3) lockout real-time after a heavy load: 6x CPU throttle during scene start, burst taps, measure close gap
-  await p.evaluate(() => { localStorage.removeItem('playroom.tut.nana1'); localStorage.removeItem('playroom.tut.midnight1'); });
+  await p.evaluate(() => { localStorage.removeItem('playroom.tut.nana2'); localStorage.removeItem('playroom.tut.midnight1'); });
   for (const lv of ['Acorn', 'Dive']) {
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 }); await T.start(lv);
     await p.waitForFunction(() => window.__tutorialOpen === true, null, { timeout: 30000 });

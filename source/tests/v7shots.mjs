@@ -4,7 +4,7 @@ const b = await chromium.launch(); const errs = [];
 const page = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
 page.on('pageerror', e => errs.push(String(e)));
 await page.goto('http://localhost:4199/');
-await page.evaluate(() => { for (const k of ['bunny1','rubybag','midnight1','noir2','nana1','linye1','glassia3','zoe1','iris1']) localStorage.setItem('playroom.tut.' + k, '1'); localStorage.setItem('playroom.beaten', '8'); });
+await page.evaluate(() => { for (const k of ['bunny1','rubybag','midnight1','noir3','nana1','linye1','glassia3','zoe1','iris1']) localStorage.setItem('playroom.tut.' + k, '1'); localStorage.setItem('playroom.beaten', '8'); });
 await page.reload();
 await page.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 60000 });
 const bx = await page.locator('canvas').boundingBox(); const P = (x, y) => [bx.x + x * bx.width / 720, bx.y + y * bx.height / 1280];

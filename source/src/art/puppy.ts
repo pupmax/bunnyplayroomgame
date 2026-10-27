@@ -11,7 +11,7 @@ const SW = 4.2;            // main outline
 const SW2 = 3.6;           // details
 const EYE = '#160c07';
 
-export type PupFace = 'normal' | 'hearts' | 'dizzy' | 'panic' | AcornFace;
+export type PupFace = 'normal' | 'hearts' | 'dizzy' | 'panic' | AcornFace | IrisFace;
 
 export interface PupPose {
   bob: number; legBack: number; legFront: number; legLift: number; armBack: number;
@@ -69,6 +69,7 @@ const EYES: [number, number][] = [[73, 103], [127, 103]];
 
 function eyes(face: PupFace): string {
   if (isAcornFace(face)) return acornEyes(face); // Acorn Puppy faces (block at the end of this file)
+  if (isIrisFace(face)) return irisEyes(face); // Trash-Can Drop faces (block at the end of this file)
   // 'hearts' frame = starry-eyed / stunned (Marc: no heart eyes on Puppy; little hearts or stars may pop from his HEAD instead)
   if (face === 'hearts') return EYES.map(([x, y]) => star(x, y, 15.5, '#ffd84d', OUT, 3) +
     `<circle cx="${x - 3.5}" cy="${y - 5}" r="2.4" fill="#fff" opacity="0.9"/>`).join('');
@@ -86,6 +87,7 @@ function eyes(face: PupFace): string {
 
 function brows(face: PupFace): string {
   if (isAcornFace(face)) return acornBrows(face);
+  if (isIrisFace(face)) return irisBrows(face);
   if (face === 'dizzy') return '';
   const lift = face === 'panic' ? -6 : 0;
   return `<path d="M66 ${84 + lift} Q74 ${79 + lift} 82 ${83 + lift}" fill="none" stroke="${OUT}" stroke-width="3.4" stroke-linecap="round"/>` +
@@ -94,6 +96,7 @@ function brows(face: PupFace): string {
 
 function mouth(face: PupFace): string {
   if (isAcornFace(face)) return acornMouth(face);
+  if (isIrisFace(face)) return irisMouth(face);
   if (face === 'panic') return `<ellipse cx="100" cy="133" rx="9" ry="11" fill="#5a1d14" stroke="${OUT}" stroke-width="3"/>` +
     `<ellipse cx="100" cy="138" rx="5.5" ry="4" fill="#ff7a8a"/>`;
   if (face === 'dizzy') return `<path d="M89 130 q3.5 -4 7 0 q3.5 4 7 0 q3.5 -4 7 0" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`;
@@ -191,13 +194,14 @@ export function puppyFrames(): Record<string, Partial<PupPose>> {
 
 // ---------- Acorn Barrage Puppy faces (Pups 3, option A "Tail Catch rig"). Self-contained block: only the type union above and one
 // line at the top of eyes()/brows()/mouth() point here. No heart eyes: hearts/stars only ever pop from his HEAD (scene fx). ----------
-export type AcornFace = 'blink' | 'happy' | 'ouch' | 'taunt' | 'worry';
-const ACORN_FACES = new Set<string>(['blink', 'happy', 'ouch', 'taunt', 'worry']);
+export type AcornFace = 'blink' | 'happy' | 'ouch' | 'taunt' | 'worry' | 'ko';
+const ACORN_FACES = new Set<string>(['blink', 'happy', 'ouch', 'taunt', 'worry', 'ko']);
 function isAcornFace(f: PupFace): f is AcornFace { return ACORN_FACES.has(f); }
 const arcEye = (x: number, y: number, up: boolean) => `<path d="M${x - 10} ${y + (up ? 3 : 1)} Q${x} ${y + (up ? -9 : 7)} ${x + 10} ${y + (up ? 3 : 1)}" fill="none" stroke="${EYE}" stroke-width="${up ? 4 : 3.6}" stroke-linecap="round"/>`;
 const dotEye = (x: number, y: number) => `<circle cx="${x}" cy="${y}" r="11.2" fill="${EYE}"/><circle cx="${x + 4}" cy="${y - 4}" r="4.2" fill="#fff"/><circle cx="${x - 4.5}" cy="${y + 5}" r="1.9" fill="#fff" opacity="0.9"/>`;
 function acornEyes(face: AcornFace): string {
   if (face === 'blink') return EYES.map(([x, y]) => arcEye(x, y, false)).join('');
+  if (face === 'ko') return EYES.map(([x, y], i) => arcEye(x, y + (i ? 2 : -1), false) + `<path d="M${x - 4} ${y + 12} q4 3 8 0" fill="none" stroke="${EYE}" stroke-width="2.2" stroke-linecap="round" opacity="0.5"/>`).join(''); // KO'd (end cards): cute, comfy closed eyes, no spirals
   if (face === 'happy') return EYES.map(([x, y]) => arcEye(x, y, true)).join('');
   if (face === 'ouch') return EYES.map(([x, y], i) => { const d = i ? -1 : 1; // > <  squeezed shut
     return `<path d="M${x - 9 * d} ${y - 8} L${x + 8 * d} ${y} L${x - 9 * d} ${y + 8}" fill="none" stroke="${EYE}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`; }).join('');
@@ -208,6 +212,7 @@ function acornEyes(face: AcornFace): string {
 const brow = (d: string) => `<path d="${d}" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>`;
 function acornBrows(face: AcornFace): string {
   if (face === 'ouch') return brow('M64 80 L83 88') + brow('M136 80 L117 88');
+  if (face === 'ko') return brow('M66 80 Q74 76 82 79') + brow('M118 80 Q126 75 134 79');
   if (face === 'worry') return brow('M64 82 Q72 80 82 74') + brow('M118 74 Q128 80 136 82');
   if (face === 'taunt') return brow('M66 82 Q74 76 82 80') + brow('M118 76 Q126 72 134 78');
   return brow('M66 84 Q74 79 82 83') + brow('M118 83 Q126 79 134 84');
@@ -215,6 +220,8 @@ function acornBrows(face: AcornFace): string {
 function acornMouth(face: AcornFace): string {
   if (face === 'ouch') return `<path d="M86 124 Q100 120 114 124 Q113 146 100 147 Q87 146 86 124 Z" fill="#5a1d14" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>` +
     `<path d="M89 125 h22 v4 q-11 3 -22 0 Z" fill="#fff"/><ellipse cx="100" cy="141" rx="7" ry="4" fill="#ff7a8a"/>`; // big "YOWCH" with teeth
+  if (face === 'ko') return `<path d="M88 124 q6 6 12 0.5 q6 5.5 12 -0.5" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>` + // silly 'w' smile, tongue flopped out to one side
+    `<path d="M101 127 Q99 143 108 144 Q116 144 113 126 Z" fill="#ff7a8a" stroke="${OUT}" stroke-width="2.6" stroke-linejoin="round"/><path d="M107.5 130 v8" stroke="#d9546a" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="105" cy="133" rx="2" ry="3" fill="#fff" opacity="0.55"/>`;
   if (face === 'happy') return `<path d="M90 124 Q100 122 110 124 Q108 137 100 137 Q92 137 90 124 Z" fill="#5a1d14" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/><ellipse cx="100" cy="133" rx="5" ry="3" fill="#ff7a8a"/>`;
   if (face === 'taunt') return `<path d="M93 124 q3.5 5 7 0.5 q3.5 4.5 7 -0.5" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>` +
     `<path d="M96 127 Q95 140 102 140 Q109 140 107 127 Z" fill="#ff7a8a" stroke="${OUT}" stroke-width="2.6" stroke-linejoin="round"/><path d="M101.5 129 v7" stroke="#d9546a" stroke-width="1.8" stroke-linecap="round"/>`; // tongue out: nyah!
@@ -223,3 +230,25 @@ function acornMouth(face: AcornFace): string {
   return `<path d="M93 124 q3.5 5 7 0.5 q3.5 4.5 7 -0.5" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`;
 }
 // ---------- end Acorn Barrage Puppy faces ----------
+
+// ---------- Trash-Can Drop Puppy faces (Iris level: hit reactions + the Bunny-photo daydream). Self-contained block: only the type
+// union above and one line at the top of eyes()/brows()/mouth() point here. 'lovey' heart eyes are ONLY for the Bunny-photo daydream
+// (Marc asked for it, 2026-10-27); everywhere else hearts only pop from his head. ----------
+export type IrisFace = 'lovey' | 'xeyes'; // NB: 'ko' is taken by the Acorn block (end-card KO face)
+const IRIS_FACES = new Set<string>(['lovey', 'xeyes']);
+function isIrisFace(f: PupFace): f is IrisFace { return IRIS_FACES.has(f); }
+function irisEyes(face: IrisFace): string {
+  if (face === 'lovey') return EYES.map(([x, y]) => heart(x, y + 1, 30, '#ff4f86', OUT, 3)).join('');
+  return EYES.map(([x, y]) => `<path d="M${x - 9} ${y - 9} L${x + 9} ${y + 9} M${x + 9} ${y - 9} L${x - 9} ${y + 9}" fill="none" stroke="${EYE}" stroke-width="4.6" stroke-linecap="round"/>`).join(''); // xeyes: X X
+}
+function irisBrows(face: IrisFace): string {
+  if (face === 'lovey') return brow('M64 80 Q72 72 82 76') + brow('M118 76 Q128 72 136 80'); // raised, dreamy
+  return '';
+}
+function irisMouth(face: IrisFace): string {
+  if (face === 'lovey') return `<path d="M90 124 Q100 134 110 124" fill="none" stroke="${OUT}" stroke-width="3.2" stroke-linecap="round"/>` + // soppy smile + big blush
+    `<ellipse cx="60" cy="124" rx="15" ry="9" fill="#ff7a9a" opacity="0.55"/><ellipse cx="140" cy="124" rx="15" ry="9" fill="#ff7a9a" opacity="0.55"/>`;
+  return `<path d="M88 128 Q100 122 112 128" fill="none" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>` + // xeyes: tongue lolling out the side
+    `<path d="M101 127 Q99 146 108 147 Q116 147 113 127 Z" fill="#ff7a8a" stroke="${OUT}" stroke-width="2.6" stroke-linejoin="round"/><path d="M107 130 v9" stroke="#d9546a" stroke-width="1.8" stroke-linecap="round"/>`;
+}
+// ---------- end Trash-Can Drop Puppy faces ----------

@@ -1,0 +1,23 @@
+// 390x844 phone shots for the Midnight art patch: Dive win card, Interlude after it, Lasso couch (Midnight's new body), Champion card.
+import { chromium, devices } from 'playwright';
+const OUT = process.env.OUT || '/workspace/playtest-bpg/audit27/final/diveart/', URL_ = process.env.URL || 'http://localhost:4201/';
+const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+const p = await (await b.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })).newPage();
+const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+await p.goto(URL_); await p.waitForFunction(() => window.__game?.scene.isActive('Title'), null, { timeout: 120000 });
+const bx = await p.locator('canvas').boundingBox(); const P = (x, y) => [bx.x + x * bx.width / 720, bx.y + y * bx.height / 1280];
+const tap = (x, y) => p.touchscreen.tap(...P(x, y)); const wait = ms => p.waitForTimeout(ms);
+const start = k => p.evaluate(k => { const g = window.__game; g.scene.getScenes(true).forEach(s => s.scene.stop()); g.scene.start(k); }, k);
+const tut = async () => { for (let i = 0; i < 40 && !(await p.evaluate(() => !!window.__pr?.st?.running)); i++) { if (await p.evaluate(() => !!window.__tutorialOpen)) await p.mouse.click(...P(360, 860)); await wait(400); } };
+await p.evaluate(() => localStorage.setItem('playroom.beaten', '4'));
+await start('Dive'); await p.waitForFunction(() => window.__pr?.scene === 'Dive', null, { timeout: 15000 }); await tut(); await wait(2500);
+await p.evaluate(() => window.__pr.force(true)); await p.waitForFunction(() => window.__pr.ended === 'win', null, { timeout: 20000 }).catch(() => {}); await wait(7000); await p.screenshot({ path: OUT + '1_midnight_win_card.png' });
+await p.waitForFunction(() => !window.__cardArmed || window.__cardArmed(), null, { timeout: 15000 }).catch(() => {}); await wait(500); await tap(360, 1000); const inter = await p.waitForFunction(() => window.__game.scene.isActive('Interlude'), null, { timeout: 40000 }).then(() => true, () => false);
+for (const [i, ms] of [[0, 300], [1, 900], [2, 1200], [3, 1500]]) { await wait(ms); await p.screenshot({ path: OUT + `2_interlude_${i}.png` }); } await wait(600); await p.screenshot({ path: OUT + '2_interlude_after_midnight.png' });
+await p.evaluate(() => localStorage.setItem('playroom.beaten', '8'));
+await start('Lasso'); await p.waitForFunction(() => window.__pr?.scene === 'Lasso', null, { timeout: 15000 }); await tut(); await wait(2500);
+await p.screenshot({ path: OUT + '3_lasso_couch_midnight.png' });
+await p.waitForFunction(() => window.__pr.st.phase === 'free', null, { timeout: 10000 }).catch(() => {});
+await p.evaluate(() => window.__pr.force(true)); const champ = await p.waitForFunction(() => window.__game.scene.isActive('Champion'), null, { timeout: 30000 }).then(() => true, () => false);
+await wait(3000); await p.screenshot({ path: OUT + '4_champion.png' });
+console.log(JSON.stringify({ inter, champ, errs })); await b.close();

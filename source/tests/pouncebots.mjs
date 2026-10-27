@@ -12,7 +12,7 @@ const MODES = (process.argv[2] || 'ignore,walk,spam,lookaway,sneaky,noob').split
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ viewport: { width: 360, height: 640 } })).newPage(); const errs = [];
 p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-await p.goto(URL); await p.evaluate(() => { for (const k of ['noir2']) { localStorage.setItem('playroom-test.tut.' + k, '1'); localStorage.setItem('playroom.tut.' + k, '1'); } });
+await p.goto(URL); await p.evaluate(() => { for (const k of ['noir3']) { localStorage.setItem('playroom-test.tut.' + k, '1'); localStorage.setItem('playroom.tut.' + k, '1'); } });
 await p.reload(); await p.waitForFunction(() => window.__game?.scene.isActive('Title'), null, { timeout: 90000 }); await p.waitForTimeout(500);
 const table = [];
 for (const mode of MODES) { const res = [];

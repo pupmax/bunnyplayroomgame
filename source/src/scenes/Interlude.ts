@@ -11,6 +11,7 @@ import { CAST } from '../art/chibi';
 import { LINES, pick } from '../lines';
 import { doorState } from './Hub';
 import { Storage } from '../systems/storage';
+import { koPupFor } from '../systems/koPup';
 
 export class InterludeScene extends Phaser.Scene {
   private layer!: Phaser.GameObjects.Container; private done = false;
@@ -38,7 +39,7 @@ export class InterludeScene extends Phaser.Scene {
     ko.setScale(0); this.tweens.add({ targets: ko, scale: 1, angle: -6, duration: 400, ease: 'Back.Out' });
     const hero = this.add2(art(this, 230, 1050, `full_${name}_happy`, 1.3));
     this.tweens.add({ targets: hero, y: 990, angle: { from: -8, to: 8 }, yoyo: true, repeat: -1, duration: 260, ease: 'Quad.Out' });
-    const pup = this.add2(art(this, 560, 1000, 'pup_panic', 1.2));
+    const pup = this.add2(art(this, 560, 1000, 'pup_panic', 1.2)); koPupFor(this, pup, { stars: false }); // after the flop he's the cute KO'd rig (this scene already orbits stars)
     // Puppy's dramatic flop: wobble, spin, plop.
     this.tweens.chain({ targets: pup, tweens: [
       { angle: 15, duration: 150, yoyo: true, repeat: 2 },

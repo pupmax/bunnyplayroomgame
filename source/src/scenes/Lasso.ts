@@ -80,21 +80,21 @@ class LassoBunny {
 const TW_SH = 235, TW_EL = -25; // twirl arm: shoulder/elbow angles (180 = straight up, bigger = out to her right)
 /** Tuning (real touch on a phone). Times in seconds, distances in game px (720 x 1280). */
 export const LK = {
-  TIME: 36,            // clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
+  TIME: 26,            // clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
   NEED: 5,             // catches to win: 1 TROT warm-up, 2 SNEAKY, 2 ZOOMIES
   ROUND_AT: [0, 1, 3], // catches at which rounds 1/2/3 start
   SPIN: 0.45,          // one twirl of the loop
   HOLD_MAX: 0.9,       // hold this long for the BIG loop
-  R_MIN: 62, R_MAX: 104, HIT_PAD: 32, // loop radius (small tap -> full twirl) + forgiveness around Puppy's body
+  R_MIN: 62, R_MAX: 90, HIT_PAD: 26, // loop radius (small tap -> full twirl) + forgiveness around Puppy's body
   FLY: 0.42,           // loop flight time (so you LEAD him)
-  SPD: [165, 235, 290],                           // Puppy run speed per round
-  PAUSE: [[0.9, 1.5], [0.55, 1.0], [0.45, 0.8]], // Puppy stands still this long between dashes
-  FAKE_P: [0, 0.3, 0.2], FAKE: 0.4,               // fake stop mid-dash (R2/R3), then he darts on 30% faster
+  SPD: [200, 280, 340],                           // Puppy run speed per round
+  PAUSE: [[0.7, 1.1], [0.45, 0.8], [0.35, 0.6]], // Puppy stands still this long between dashes
+  FAKE_P: [0, 0.4, 0.35], FAKE: 0.4,               // fake stop mid-dash (R2/R3), then he darts on 30% faster
   DECOY_P: 0.35, DECOY_CD: 5, DECOY_LIFE: 4,    // R2: chance per wind-up that he swaps in a cardboard Puppy
   CHARGE_FIRST: 1.2, CHARGE_EVERY: [3.2, 5.0],    // R3: Puppy charges Bunny this often (free-time seconds)
   CHARGE_WIND: 1.0, CHARGE_RUN: 0.5,              // warning (paw scrape + red ring) then the dash; swipe any time in between
-  PLANT: 2.6, BONK: 0.9, FREE_PAD: 120,           // faceplant (free rope: any loop within FREE_PAD extra px hits) / Bunny bonked
-  TUG0: 0.35, TUG_TAP: 0.1, TUG_PULL: [0.08, 0.11, 0.14], TUG_SURGE: 0.09, TUG_GRACE: 0.6, TUG_MIN: 1.8, // tap-fast reel-in
+  PLANT: 2.6, BONK: 0.9, FREE_PAD: 60,           // faceplant (free rope: any loop within FREE_PAD extra px hits) / Bunny bonked
+  TUG0: 0.25, TUG_TAP: 0.1, TUG_PULL: [0.13, 0.17, 0.21], TUG_SURGE: 0.14, TUG_GRACE: 0.6, TUG_MIN: 1.8, // tap-fast reel-in
   TIE: 2.5,            // hog-tied moment after each catch (clock paused)
   BANNER: 1.3,         // round banner (clock paused)
 };
@@ -310,7 +310,7 @@ export class LassoScene extends Phaser.Scene {
     const b = comic(this, W / 2, 600, pick(LINES.lassoSlip), 60).setDepth(66).setAngle(-6).setScale(0.3);
     this.tweens.add({ targets: b, scale: 1, duration: 170, ease: 'Back.Out' }); this.tweens.add({ targets: b, alpha: 0, y: b.y - 50, delay: 900, duration: 300, onComplete: () => b.destroy() });
     this.floorLoop(s.px, s.py, 60); this.couch('gasp');
-    s.phase = 'free'; this.escape(); this.time.delayedCall(700, () => this.bunny.setFace('wink'));
+    s.phase = 'free'; this.escape(); this.fakeT = -1; /* wriggled free: a real dash-off, no fake stop */ this.time.delayedCall(700, () => this.bunny.setFace('wink'));
     if (s.time <= 0) this.finish(false);
   }
   // ---------------------------------------------------------------- caught: hog-tied

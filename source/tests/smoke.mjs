@@ -1,5 +1,5 @@
 // Headless smoke test (390x844 phone): title -> hub -> Ruby boxing fixes (fast/directional dodge, early-punch whiff,
-// pause, corner tap, points win) -> interlude -> Glassia Ball Bonk (tap hint, real kicks, lose, win) -> hub.
+// pause, corner tap, points win) -> interlude -> Glassia Penalty Pup (real swipe shots, lose, win) -> hub.
 import { chromium } from 'playwright';
 const URL_ = process.env.URL || 'http://localhost:4199/';
 const S = new URL('../screenshots/v1/', import.meta.url).pathname;
@@ -59,7 +59,7 @@ await tap(360, 1060); await wait(330); await shot('08_ruby_headbutt_hit'); await
 await page.evaluate(() => window.__game.events.emit('hidden')); await wait(200);
 check(await page.evaluate(() => window.__game.scene.isActive('Pause')), 'auto-pause on hidden'); await tap(360, 670); await wait(300);
 // lose
-await page.evaluate(() => window.__pr.force(false)); await wait(6000); await shot('09_ruby_lose');
+await page.evaluate(() => { window.__cardArmed = undefined; window.__pr.force(false); }); await wait(6000); await shot('09_ruby_lose');
 await tap(215, 1010); await active('Boxing'); await wait(800);
 // 7. timeout -> win on points
 await page.evaluate(() => { window.__pr.st.pupHp = 60; window.__pr.st.time = 0.05; }); await wait(600); await shot('10_ruby_points_banner');
@@ -73,20 +73,19 @@ await active('Hub'); await wait(800); await shot('15_hub_after_ruby');
 // Glassia
 await tap(270, 1080); await active('Football'); await wait(800); await shot('16_glassia_tutorial');
 await tap(360, 860); await wait(1200);
-await tap(360, 950); await wait(150); check(await page.evaluate(() => window.__pr.hint === 1), 'plain tap shows Swipe UP hint'); await shot('17_glassia_swipe_hint');
-const aim = async () => { const p = await page.evaluate(() => window.__pr.pup()); const dx = p.x - 400, dy = p.y - 70 - 1100, L = Math.hypot(dx, dy), k = 260 / L;
-  await swipe([[400, 1100], [400 + dx * k * 0.5, 1100 + dy * k * 0.5], [400 + dx * k, 1100 + dy * k]]); };
+// Penalty Pup (replaces Ball Bonk): take 3 real swipe shots at alternating corners; each must advance the shot counter
 let shotDone = false;
-for (let i = 0; i < 6; i++) { await until(() => window.__pr.st.ready || window.__pr.ended, null, 8000); if (await page.evaluate(() => window.__pr.ended)) break; await aim();
-  const before = (await st()).hits; await wait(450); if ((await st()).hits > before && !shotDone) { await shot('18_glassia_bonk'); shotDone = true; }
-  await wait(1700); console.log('kick', i + 1, await page.evaluate(() => window.__pr.last), JSON.stringify(await st())); }
-const ended = await page.evaluate(() => window.__pr.ended); console.log('real Ball Bonk result:', ended, (await st()).hits, 'hits');
+for (let i = 0; i < 3; i++) { await until(() => window.__pr.st.ready || window.__pr.st.over, null, 10000); if (await page.evaluate(() => window.__pr.st.over)) break;
+  const before = (await st()).shot; await wait(700); const tx = i % 2 ? 470 : 250; await swipe([[360, 1150], [(360 + tx) / 2, 950], [tx, 760]]);
+  await wait(500); if (!shotDone) { await shot('18_penalty_shot'); shotDone = true; }
+  check(await until((b) => window.__pr.st.shot > b || window.__pr.st.over, before, 8000).then(() => true, () => false), 'penalty shot ' + (i + 1) + ' counted'); console.log('shot', i + 1, JSON.stringify(await st()).slice(0, 160)); }
+console.log('real Penalty Pup state:', JSON.stringify(await st()).slice(0, 160));
 await wait(1200); await shot('19_glassia_endcard_real');
 await page.evaluate(() => { window.__game.scene.getScene('Football').scene.restart(); }); await wait(1000);
-await page.evaluate(() => window.__pr.force(false)); await wait(1600); await shot('20_glassia_lose');
-await tap(215, 1010); await active('Football'); await wait(800);
-await page.evaluate(() => window.__pr.force(true)); await wait(1600); await shot('21_glassia_win');
-await tap(360, 1010); await active('Interlude'); await wait(1800); await shot('22_interlude_victory_glassia');
+await page.evaluate(() => { window.__cardArmed = undefined; window.__pr.force(false); }); await wait(1600); await shot('20_glassia_lose');
+await until(() => window.__cardArmed?.() === true, null, 30000); await wait(300); await tap(215, 1010); await active('Football'); await wait(800);
+await page.evaluate(() => { window.__cardArmed = undefined; window.__pr.force(true); }); await wait(1600); await shot('21_glassia_win');
+await until(() => window.__cardArmed?.() === true, null, 30000); await wait(300); await tap(360, 1010); await active('Interlude'); await wait(1800); await shot('22_interlude_victory_glassia');
 await tap(360, 640); await active('Hub'); await wait(1200); await shot('23_hub_after_glassia');
 console.log('storage', await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.entries(localStorage)))));
 console.log('ERRORS', errors, 'FAILS', fails); await b.close();

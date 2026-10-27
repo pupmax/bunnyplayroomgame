@@ -18,9 +18,9 @@ import { Hud, impact } from '../systems/level';
 import { HeroRig, pupFlail } from '../systems/rigs';
 
 // Tuning (sim-checked in pups3-out/midnight/sim.mjs: avg bot ~66%; eased in audit27: NEED 7->5, CHIM_P .55->.40, chimney stun 1.0->0.7 s, -2 s->-1 s, 0.8 s immunity)
-const TIME = 50, NEED = 6, // Marc fb 27 Oct ('a bit too easy'): NEED 5->6, CHIM_P .40->.45 (0.8 s post-stun immunity kept)
-  SPEED = 280, RAMP = 0.3, MX = 190;
-const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.45;
+const TIME = 50, NEED = 7, // Marc fb 27 Oct ('a bit too easy'): NEED 5->6, CHIM_P .40->.45; 2nd pass ('still a bit easy'): NEED 6->7, CHIM_P .45->.48, SPEED 280->308, hop gaps 1.2-2.0->0.9-1.5 s
+  SPEED = 308, RAMP = 0.3, MX = 190;
+const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.48;
 const CARRY_T = 2.6; // after a snatch Midnight carries the crying Puppy through the air for CARRY_T s; the clock + hazards pause meanwhile
 const STUN = 0.7, BONK_S = 1, IMMUNE = 0.8; // audit27: shorter chimney stun, -1 s, then 0.8 s chimney immunity (blinking) so bonks can't chain
 const MOON_SNATCH = 35, MOON_CLOSE = 15, MOON_T = 5, HIGH_DIVE_Y = 470, CHAIN_T = 7;
@@ -101,15 +101,17 @@ export class DiveScene extends Phaser.Scene {
   }
   private begin() { popBanner(this, 'SWOOP!', 700, 0x6b4cc9); this.time.delayedCall(600, () => { say(this, 400, 470, pick(LINES.start.Midnight), 22); this.st.running = true; }); }
   private drawWings(t: number) {
-    const f = Math.sin(t) * 0.6; const g = this.wings.clear(); const moon = this.st.moonT > 0;
+    // wings grow out of her SHOULDERS (rig shoulders sit at about (±22, 10) in bird space), drawn behind the body so the roots tuck under it
+    const f = Math.sin(t) * 0.6; const g = this.wings.clear(); const moon = this.st.moonT > 0; const V = (x: number, y: number) => new Phaser.Math.Vector2(x, y);
     for (const s of [-1, 1]) {
-      const pts = [new Phaser.Math.Vector2(s * 20, -70), new Phaser.Math.Vector2(s * 150, -110 - f * 70), new Phaser.Math.Vector2(s * 120, -40 - f * 30), new Phaser.Math.Vector2(s * 70, -30)];
+      const tip = V(s * 150, -34 - f * 78), elb = V(s * 82, -6 - f * 30);
+      const pts = [V(s * 10, -6), elb, tip, V(s * 128, 10 - f * 40), V(s * 100, 22 - f * 18), V(s * 70, 34 - f * 6), V(s * 34, 36)];
       g.fillStyle(0x1d1f33, 1).lineStyle(5, 0x0d0a18, 1).fillPoints(pts, true);
       // mid-tone + rim light from the moon (upper right)
-      g.fillStyle(0x3b3f5c, 1).fillTriangle(s * 22, -66, s * 140, -106 - f * 66, s * 72, -36);
-      g.fillStyle(moon ? 0xfff4c0 : 0xa9b4ff, moon ? 0.9 : 0.55).fillTriangle(s * 24, -70, s * 150, -110 - f * 70, s * 60, -64 - f * 20);
-      g.lineStyle(3, 0x0d0a18, 0.8); for (let k = 0; k < 3; k++) { const tx = s * (95 + k * 18), ty = -88 - f * (45 + k * 8) + k * 6; g.lineBetween(s * 70, -40, tx, ty); }
-      g.fillStyle(0x6b4cc9, 0.55).fillTriangle(s * 30, -64, s * 130, -100 - f * 60, s * 90, -46);
+      g.fillStyle(0x3b3f5c, 1).fillTriangle(s * 18, 0, tip.x - s * 10, tip.y + 6, s * 74, 26 - f * 6);
+      g.fillStyle(moon ? 0xfff4c0 : 0xa9b4ff, moon ? 0.9 : 0.55).fillTriangle(s * 14, -4, elb.x, elb.y + 2, s * 40, 4).fillTriangle(elb.x, elb.y, tip.x, tip.y, elb.x + s * 14, elb.y + 10);
+      g.lineStyle(3, 0x0d0a18, 0.8); for (let k = 0; k < 3; k++) { const tx = s * (104 + k * 16), ty = 18 - f * (24 + k * 12) - k * 10; g.lineBetween(elb.x, elb.y + 8, tx, ty); }
+      g.fillStyle(0x6b4cc9, 0.55).fillTriangle(s * 26, 8, tip.x - s * 22, tip.y + 16, s * 90, 20 - f * 14);
       g.lineStyle(5, 0x0d0a18, 1).strokePoints(pts, true);
     }
   }
@@ -161,7 +163,7 @@ export class DiveScene extends Phaser.Scene {
     // Puppy
     s.pupT -= dt; if (!this.pup && s.pupT <= 0) this.spawnPup();
     if (this.pup && !this.pup.done) { const p = this.pup; p.x += (-s.speed + 70) * dt; if (p.x > p.roof.x + p.roof.w - 20) { const nx = this.roofs.find(r => r.x > p.roof.x); if (nx) { p.roof = nx; Fx.boing?.(); } }
-      if (phase >= 2) { p.hopT -= dt; if (p.hopT <= 0) { p.hopT = Phaser.Math.FloatBetween(1.2, 2.0); p.hopS = this.time.now; } const k = (this.time.now - p.hopS) / 500; p.hop = k >= 0 && k < 1 ? Math.sin(k * Math.PI) * HOP_H : 0; }
+      if (phase >= 2) { p.hopT -= dt; if (p.hopT <= 0) { p.hopT = Phaser.Math.FloatBetween(0.9, 1.5); p.hopS = this.time.now; } const k = (this.time.now - p.hopS) / 500; p.hop = k >= 0 && k < 1 ? Math.sin(k * Math.PI) * HOP_H : 0; }
       p.c.setPosition(p.x, p.roof.top - p.hop); p.img.setAngle(p.hop > 5 ? -15 : 0);
       p.shadow.setPosition(p.x, p.roof.top - 4).setScale(1 - p.hop / HOP_H * 0.5).setAlpha(0.45 - p.hop / HOP_H * 0.25);
       if (p.x < -80) { p.c.destroy(); p.shadow.destroy(); this.pup = undefined; s.pupT = 0.6; }

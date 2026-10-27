@@ -197,20 +197,37 @@ export function chibiHeadSVG(c: Chibi, mood: Mood, k: number): string {
 /** Full chibi: big head on a small bean body. kit: 'box' (gloves+robe) | 'ball' (jersey) | 'plain'. 240x340 box, feet at 334. */
 export function chibiFullSVG(c: Chibi, mood: Mood, kit: 'box' | 'ball' | 'plain' | 'flop', k: number): string {
   const o = c.outfit;
+  // torso top tucks up under the head (y 222, was 240) so every girl's body joins her head on the end cards (no gap at the neck)
   let body = `<path d="M70 300 L82 250 Q120 236 158 250 L170 300Z" fill="${o}" stroke="${OUT}" stroke-width="6"/>`
     + `<ellipse cx="94" cy="318" rx="20" ry="14" fill="${c.furD}" stroke="${OUT}" stroke-width="6"/><ellipse cx="146" cy="318" rx="20" ry="14" fill="${c.furD}" stroke="${OUT}" stroke-width="6"/>`
-    + `<rect x="82" y="240" width="76" height="66" rx="30" fill="${o}" stroke="${OUT}" stroke-width="6"/>`
-    + `<rect x="85" y="243" width="70" height="60" rx="27" fill="url(#out_${c.name})" opacity="0.35"/>`
-    + `<path d="M92 252 Q100 246 112 246" stroke="#fff" stroke-opacity="0.6" stroke-width="4" fill="none" stroke-linecap="round"/>`
+    + `<rect x="82" y="222" width="76" height="84" rx="30" fill="${o}" stroke="${OUT}" stroke-width="6"/>`
+    + `<rect x="85" y="225" width="70" height="78" rx="27" fill="url(#out_${c.name})" opacity="0.35"/>`
+    + `<path d="M90 246 Q94 236 106 234" stroke="#fff" stroke-opacity="0.6" stroke-width="4" fill="none" stroke-linecap="round"/>`
     + `<ellipse cx="120" cy="330" rx="70" ry="8" fill="#000" opacity="0.2"/>`;
   if (kit === 'ball') body += `<text x="120" y="292" font-family="Arial Black" font-size="34" text-anchor="middle" fill="#fff" stroke="${OUT}" stroke-width="2">7</text>`;
   const glove = (x: number, y: number) => `<circle cx="${x}" cy="${y}" r="30" fill="#e0243a" stroke="${OUT}" stroke-width="6"/><circle cx="${x + 4}" cy="${y + 5}" r="22" fill="#9a0f22" opacity="0.45"/><ellipse cx="${x - 9}" cy="${y - 11}" rx="11" ry="7" fill="#fff" opacity="0.7"/><rect x="${x - 18}" y="${y + 22}" width="36" height="14" rx="5" fill="#fff" stroke="${OUT}" stroke-width="5"/>`;
   let arms = '';
-  if (kit === 'box') arms = mood === 'windup' ? glove(40, 150) + glove(200, 250) : glove(64, 236) + glove(176, 236);
+  if (c.animal === 'raven' && kit === 'plain') { // Midnight: soft round body tucked up under her head, little wing-arms at her sides, cute bird feet
+    const feet = [96, 144].map((x, i) => { const s = i ? 1 : -1; return `<g transform="translate(${x} 318)"><path d="M0 -14 L0 -2" stroke="${OUT}" stroke-width="11" stroke-linecap="round"/><path d="M0 -14 L0 -2" stroke="#ffb02e" stroke-width="5" stroke-linecap="round"/>`
+      + `<path d="M${-17 + s * 2} 8 Q-10 -6 0 -4 Q10 -6 ${17 + s * 2} 8 Q9 4 6 10 Q0 3 -6 10 Q-9 4 ${-17 + s * 2} 8Z" fill="url(#bk)" stroke="${OUT}" stroke-width="4.5" stroke-linejoin="round"/>`
+      + `<path d="M-9 0 Q-4 -3 1 -2" fill="none" stroke="#fff" stroke-opacity="0.7" stroke-width="2.5" stroke-linecap="round"/></g>`; }).join('');
+    body = `<ellipse cx="120" cy="332" rx="62" ry="8" fill="#000" opacity="0.2"/>` + feet
+      + `<path d="M120 204 C170 204 184 246 180 274 C176 304 152 320 120 320 C88 320 64 304 60 274 C56 246 70 204 120 204Z" fill="url(#hf_${c.name})" stroke="${OUT}" stroke-width="6"/>`
+      + `<path d="M120 236 C146 236 158 256 156 278 C154 298 140 310 120 310 C100 310 86 298 84 278 C82 256 94 236 120 236Z" fill="${c.inner}" opacity="0.85"/>`
+      + `<path d="M120 232 C150 232 162 250 160 262 L80 262 C78 250 90 232 120 232Z" fill="${o}" stroke="${OUT}" stroke-width="4.5"/>` // little purple moon cape-collar
+      + `<circle cx="120" cy="262" r="7" fill="url(#ac_${c.name})" stroke="${OUT}" stroke-width="3"/>`
+      + `<path d="M98 284 q6 5 12 0 M120 292 q6 5 12 0" fill="none" stroke="${c.furD}" stroke-width="3" stroke-linecap="round" opacity="0.6"/>`
+      + `<path d="M74 262 Q78 236 98 228" stroke="#fff" stroke-opacity="0.45" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+    const up = mood === 'happy' || mood === 'windup', wing = (s: number) => { const x = 120 + s * 56, r = s * (up ? -38 : -10);
+      return `<g transform="translate(${x} 250) rotate(${r})"><path d="M0 0 C${s * 26} 2 ${s * 34} 30 ${s * 30} 52 C${s * 26} 62 ${s * 20} 56 ${s * 16} 50 C${s * 14} 60 ${s * 6} 60 ${s * 4} 50 C${s * -2} 56 ${s * -8} 50 ${s * -6} 40 C${s * -10} 22 ${s * -8} 6 0 0Z" fill="${c.fur}" stroke="${OUT}" stroke-width="5.5" stroke-linejoin="round"/>`
+        + `<path d="M${s * 4} 10 C${s * 16} 14 ${s * 22} 30 ${s * 22} 44" fill="none" stroke="${c.inner}" stroke-width="3.5" stroke-linecap="round" opacity="0.8"/><path d="M${s * 2} 8 C${s * 10} 6 ${s * 16} 10 ${s * 20} 16" fill="none" stroke="#fff" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round"/></g>`; };
+    arms = wing(-1) + wing(1);
+  } else if (kit === 'box') arms = mood === 'windup' ? glove(40, 150) + glove(200, 250) : glove(64, 236) + glove(176, 236);
   else arms = `<ellipse cx="72" cy="270" rx="14" ry="24" fill="${c.fur}" stroke="${OUT}" stroke-width="6"/><ellipse cx="168" cy="270" rx="14" ry="24" fill="${c.fur}" stroke="${OUT}" stroke-width="6"/>`;
   let stars = '';
   if (mood === 'dizzy') stars = [[60, 20], [120, 0], [180, 20]].map(([x, y]) => star(x, y + 20, 14)).join('');
   const head = `<g transform="translate(16 46) scale(1.04)">${headBody(c, mood)}</g>`;
+  if (c.animal === 'raven' && kit === 'plain') return svgDoc(240, 340, 240 * k, 340 * k, body + arms + head + stars, headDefs(c)); // her wings sit at her sides, under the head
   const inner = kit === 'flop' ? `<g transform="rotate(-80 120 300) translate(0 40)">${body}${arms}${head}</g>` : body + head + arms;
   return svgDoc(240, 340, 240 * k, 340 * k, inner + stars, headDefs(c));
 }

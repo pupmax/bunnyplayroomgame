@@ -8,6 +8,7 @@ import { Fx } from './audio';
 import { Storage } from './storage';
 import { LINES, pick } from '../lines';
 import { STANDALONE } from '../standalone';
+import { koPupFor } from './koPup';
 
 /** Win/lose card. idx = level index (0 Ruby, 1 Glassia). */
 export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boolean, score: number, detail: string, extra: object = {}) {
@@ -30,6 +31,7 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
   const sub = txt(scene, W / 2, 885, win ? pick(LINES.puppyLose) : pick(LINES.puppyWin), 24, '#7a3f8a', '#fff', 0).setWordWrapWidth(540);
   const sc = txt(scene, W / 2, 345, `${detail}\nScore ${score}${newBest ? '  ★ NEW BEST!' : ''}`, 30, '#22252b', '#fff', 0);
   c.add([dim, g, t, hero, pup, quote, sub, sc]);
+  if (win && name !== 'Bunny') koPupFor(scene, pup); // cute KO'd Puppy (Tail Catch rig); Tail Catch's own card (Bunny) swaps this image itself
   // buttons arm only after the 300 ms fade-in PLUS a 300 ms gap with no taps (a tap burst that ended the level can't fire them); armed stays armed
   const t0 = scene.time.now; let last = -1e9, armed = false, downOk = false;
   // the quiet gap is measured up to each pointerdown (never across the press itself), so a deliberate press after arming fires however long it is held

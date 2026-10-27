@@ -49,8 +49,7 @@ export const LINES = {
   boxSniff: ['sniff sniff...', 'snff?', 'sniff... hmm.'],
   boxFeint: ['Puppy: Wait... THAT box!', 'Puppy: Hmm... it blinked.', 'Puppy: I smell kitty over there!'],
   boxFound: ['Puppy: FOUND YOU! Peekaboo!', 'Puppy: Aha! A kitty in a box!', 'Puppy: Gotcha, sneaky!'],
-  boxBust: ['Puppy: AHA! I SEE you, kitty!', 'Puppy: Was that a cat? Was that a CAT?!', 'Puppy: Peekaboo! I see you!', 'Puppy: Nice try, sneaky!'],
-  boxDodge: ['Puppy: Olé! Missed me!', 'Oops! Noir dived into an empty box!', 'Puppy: Too slow, kitty!'],
+  boxDodge: ['Puppy: Olé! Missed me!', 'Oops! Noir dived into an empty box!', 'Puppy: Too slow, kitty!', 'Puppy: Boo-who? Nobody home!'],
   boxCount: ['Puppy: 1... 2... 3... ready or not!', 'Puppy: No peeking! Counting to three!', 'Puppy: Eyes closed! One, two, three...'],
   boxBoop: ['Shh... boop!', 'Purr-fect timing!', 'Puppy never saw it coming!', 'Ninja kitty strikes!', 'Surprise delivery!'],
   boxTug: ['Noir: Where do you think YOU are going?', 'Noir: Hold still, darling.', 'Noir: Gotcha by the fluff!', 'Noir: Mine. Paws off, darling.'],
@@ -58,6 +57,17 @@ export const LINES = {
   boxSlip: ['Puppy: Nope nope nope!', 'Puppy: Byeee! Not today, kitty!', 'Zoom! Puppy left a dust cloud!', 'Slipped away! Grab faster, sweetie!'],
   boxBlind: ['Puppy: Who turned off the lights?!', 'Puppy: Hello? Is it bedtime?', 'Puppy: I cannot see a thing!', 'Puppy: Why is the room box-shaped?'],
   boxStamp: ['Puppy: Hey! I am NOT a letter!', 'Puppy: Why do I taste like an envelope?', 'Puppy: Did someone just MAIL me?', 'Puppy: Postage paid?!'],
+  // catch payoffs (one random payoff per catch, no repeats until all 6 have played). Noir's line, then Puppy's pouty reply.
+  boxSealNoir: ['Noir: Zip, zip. Sealed for freshness.', 'Noir: Handle with care, darling.', 'Noir: One puppy, boxed. Fragile.'],
+  boxSealPup: ['Puppy: Hmph! I am NOT fragile!', 'Puppy: Which side is UP?!', 'Puppy: I said handle with CARE!', 'Puppy: Rude. Very rude.'],
+  boxGiftNoir: ['Noir: A present! For nobody.', 'Noir: Wrapped with love. And a bow.', 'Noir: Do not open until... never.'],
+  boxGiftPup: ['Puppy: Surprise... it is me. Again.', 'Puppy: I am the present?! Hmph!', 'Puppy: Ta-da... I guess.'],
+  boxShipNoir: ['Noir: Express delivery. Bye-bye!', 'Noir: Next stop: far, far away.', 'Noir: Shipping is free, darling.'],
+  boxShipPup: ['Puppy: Return to... ME?!', 'Puppy: Wrong address! Hmph!', 'Puppy: I want a refund!'],
+  boxTurtleNoir: ['Noir: Slow and steady, darling.', 'Noir: New look. Very shell-chic.', 'Noir: Take your time. I have all day.'],
+  boxTurtlePup: ['Puppy: Hey! My bum is stuck in a box!', 'Puppy: I am a turtle now. A grumpy turtle.', 'Puppy: Beep beep! Wide turtle coming through!'],
+  boxHatNoir: ['Noir: Oops. Clean-up on aisle Puppy.', 'Noir: Timber!', 'Noir: Who stacked those? ...Me.'],
+  boxHatPup: ['Puppy: I wanted a CROWN, not a box!', 'Puppy: Does this hat make me look boxy?', 'Puppy: Hmph. It fits, at least.'],
   boxWin: ['Noir: Return to sender, darling.', 'Noir: Signed, sealed, delivered.', 'Noir: This parcel is going straight back.'],
   boxWinPup: ['Puppy: Hey! I am NOT a parcel!', 'Puppy: ...is this the post office?', 'Puppy: Can I at least have a window seat?'],
   boxLose: ['Puppy: Nyeh nyeh! Hide and seek champion: ME!', 'Puppy: Found you more than you booped me!', 'Puppy: Woof! Puppy wins!'],
@@ -66,6 +76,20 @@ export const LINES = {
   // EDIT ME, Marc: Trash, junk bounces off the umbrella (last 3 are new)
   trashBlock: ['BOING! Off the umbrella!', 'Puppy: Umbrella mode! Ha!', 'Wait till he closes it!',
     'Plink! The umbrella wins this one!', 'Bounced right off! Try again!', 'Puppy: Rain, rain, go away!'],
+  // ================= EDIT ME, Marc: Iris Bunny photo =================
+  // A framed photo of Bunny flutters into the alley; Puppy stops dead and daydreams (heart eyes, hearts from his head). Bonk him while
+  // he dreams = DREAM BONK +500. One random line per moment. Keep them short (~34 characters fits).
+  // Puppy, the moment he spots the photo
+  trashPhotoSee: ['Puppy: Is that... Bunny? *sigh*', 'Puppy: So fluffy... so white...', 'Puppy: Bunny dropped her photo... for ME?', 'Puppy: Those ears... those EARS...'],
+  // Puppy, mid-daydream (second bubble)
+  trashPhotoDream: ['Puppy: Five more minutes of dreaming...', 'Puppy: La la la... Bunny...', 'Puppy: I could look at this all day.', 'Puppy: She is SO cool. Like, SO cool.'],
+  // Iris, egging you on while he dreams
+  trashPhotoIris: ['Iris: Wakey wakey, lover boy!', 'Iris: Special delivery: reality!', 'Iris: Daydreaming on MY shift?', 'Iris: Snap out of it, Romeo!'],
+  // Puppy, right after the DREAM BONK
+  trashPhotoBonk: ['Puppy: Hey! I was in the middle of something!', 'Puppy: Rude! It was a GOOD dream!', 'Puppy: Bunny was about to wave at me!'],
+  // Puppy, if you miss the window: he snaps out of it and pockets the photo
+  trashPhotoPocket: ['Puppy: Mine! Going in my wallet.', 'Puppy: Shh... this stays between us.', 'Puppy: Saving this for later!'],
+  // ================= end Iris Bunny photo =================
   // Shadow Tag catch bubbles (shown after each squash catch). Add more lines here; up to ~32 characters fits on screen at any edge.
   shadowCatch: [
 'Prickly bum delivery, Puppy!',
@@ -176,6 +200,43 @@ export const LINES = {
   walk: ['Bunny: Next door, Puppy! Chop chop!', 'Bunny: Walk faster, Puppy! Wiggle harder!', 'Bunny: Who is a brave boy? Not you. Yet.'],
   finale: ['Round nine is mine. Puppy, practice running!', 'I am saving my lasso for last. Coming soon!', 'Champions go last, sweetie. Yee-haw!'],
   locked: ['Not yet, sweetie! Beat Puppy behind the other doors first.', 'This door is locked. Puppy hid the key in his mouth.'],
+  // ================= EDIT ME, Marc: GLASSIA "PENALTY PUP" (door 2, Football scene) =================
+  // Glassia takes penalties, Puppy is the goalkeeper. One random line per moment, no repeats until a pool runs out.
+  // Keep each line short (about 32 characters fits a bubble). Family-friendly slapstick only.
+  penStart: ['Glassia: Neigh-ver look where I kick!', 'Glassia: Mane event, coming up!', 'Glassia: Ready, Puppy? I was born ready. Foaled ready.'],
+  penGlassia: ['Glassia: Left or right, Puppy? Guess!', 'Glassia: Hold your horses...', 'Glassia: Straight from the stable!', 'Glassia: Watch the hoof, not the pony!', 'Glassia: This one has your name on it.'],
+  // Puppy while he wiggles (his tell)
+  penTell: ['Puppy: I am NOT going this way.', 'Puppy: Wiggle wiggle wiggle...', 'Puppy: Totally relaxed. Very calm.', 'Puppy: Eyes on the ball. Ball. BALL.'],
+  // after a fake-out (shots 4-6, sometimes 7-8)
+  penFeint: ['Puppy: Left! No, right! No, LEFT!', 'Puppy: Wiggle wiggle... gotcha!', 'Puppy: Psych! Fooled ya!', 'Puppy: Fake! I am a master of disguise.'],
+  // shot 7: Puppy puts on the giant gloves
+  penGloves: ['Puppy: Behold! The MEGA mittens!', 'Puppy: Glove-ly upgrade, if I say so!', 'Puppy: Nothing gets past these!'],
+  // Glassia shot BEFORE he dived: he saves it (the very first early save always uses the first line)
+  penSave: ['Puppy: Paws of steel!', 'Puppy: The wall says NO!', 'Puppy: Did EVERYONE see that?!', 'Puppy: Too early, pony!'],
+  // Glassia shot to the side he dived to
+  penBlock: ['Puppy: Oof! Saved it with my tummy!', 'Puppy: I meant to do that.', 'Puppy: Ha! Right where I was lying!'],
+  // Glassia after a save
+  penOops: ['Glassia: Hay! Too soon!', 'Glassia: Wait for the dive, Glassia...', 'Glassia: Okay, that was a warm-up.', 'Glassia: Neigh! He read me!'],
+  // banner / announcer after a goal
+  penGoal: ['GOAL! Puppy dove into next week!', 'Wrong way, Puppy!', 'Back of the net!', 'Puppy saved... the grass.'],
+  // Glassia after a goal
+  penCheer: ['Glassia: Hoof-ball, baby!', 'Glassia: Gallop-ing goodness!', 'Glassia: Neigh-ce!', 'Glassia: Straight in the stable!'],
+  // Puppy after the slapstick (post bonk, net face-plant, tummy slide)
+  penPup: ['Puppy: Who moved the post?!', 'Puppy: I am... part of the net now.', 'Puppy: My tummy is a sledge.', 'Puppy: Ow. My everything.', 'Puppy: I saw stars AND planets!'],
+  // NOGGIN BONK: a middle chip lands on a diving Puppy's head
+  penNoggin: ['NOGGIN BONK!', 'Puppy: My beautiful head!', 'Glassia: Header assist, thanks Puppy!'],
+  // she waited too long after the dive and he got back up
+  penSlow: ['Puppy: Too slow, pony! Again!', 'Puppy: I got bored and stood up.', 'Puppy: Shoot already, slowpoke!'],
+  // banners
+  penLast: ['LAST SHOTS! Watch out for the MEGA mittens!'],
+  penMust: ['Bunny is watching... every shot counts!'],
+  // win outro: the net wraps Puppy like a burrito (the first line always plays)
+  penWin: ['Glassia: Puppy, you are officially NETTED!', 'Glassia: Hoof-ball 1, Puppy 0!'],
+  penFish: ['Puppy: I am a fish now. A fluffy fish.'],
+  // loss card: big line, then Puppy's line
+  penLose: ['So close! Wait for the dive, then shoot!', 'Puppy read your hooves this time!', 'Shake out that mane and try again!'],
+  penLosePup: ['Puppy: Paws of steel! Undefeated!', 'Puppy: Best keeper in the Playroom!', 'Puppy: Come back when you can wiggle-read!'],
+  // ================= end GLASSIA "PENALTY PUP" =================
 };
 /** Shared no-repeat picker (audit27): every pool gets its own shuffle-bag, so no line repeats until the whole pool has been
  *  used, and the same line never plays twice in a row (also across a refill). Keyed by the pool's contents, so LINES pools and

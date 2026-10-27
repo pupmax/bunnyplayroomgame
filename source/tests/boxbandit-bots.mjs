@@ -1,5 +1,8 @@
 // Box Bandit (Pounce) difficulty bots: frame-stepped (headless steps, no rendering) so a full 75 s level takes seconds.
 // Every bot input goes through the real tap handler (__pr.tap(x, y)), so it plays exactly like a finger would.
+// Two actions only: MEOW when he heads for Noir's box, POUNCE when his head is in another box, then tap-tap the tug.
+// average = human lag 300-450 ms, misses ~15% of MEOW moments, hesitates sometimes, ~5% impatient early POUNCE; good = 180-260 ms, no mistakes;
+// spam = mashes MEOW/POUNCE/the floor every 90-150 ms.
 // usage: URL=http://localhost:4241/ N=30 MODES=average,spam,good node tests/boxbandit-bots.mjs
 import { chromium } from 'playwright';
 const URL = process.env.URL || 'http://localhost:4199/', N = +(process.env.N || 20), MODES = (process.env.MODES || 'average,spam').split(',');
@@ -7,7 +10,7 @@ const K = process.env.K ? JSON.parse(process.env.K) : null;
 const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 390, height: 844 } })).newPage();
 const errs = []; p.on('pageerror', e => errs.push(String(e)));
 await p.goto(URL); await p.waitForFunction(() => window.__game?.scene.isActive('Title') && window.__artReady, null, { timeout: 30000 });
-await p.evaluate(() => { localStorage.setItem('playroom-test.tut.noir2', '1'); localStorage.setItem('playroom.tut.noir2', '1'); window.__game.loop.sleep(); window.__bbT = performance.now(); });
+await p.evaluate(() => { localStorage.setItem('playroom-test.tut.noir3', '1'); localStorage.setItem('playroom.tut.noir3', '1'); window.__game.loop.sleep(); window.__bbT = performance.now(); });
 const out = {};
 for (const mode of MODES) {
   const res = []; for (let g = 0; g < N; g++) { const r = await p.evaluate(game, { mode, K, dbg: !!process.env.DBG }); res.push(r); if (process.env.DBG) console.log(JSON.stringify(r)); }
@@ -29,7 +32,7 @@ async function game({ mode, K, dbg }) {
   G.scene.getScene('Pounce').tweens.getDelta = () => DT; // TweenManager runs on wall-clock (Date.now): feed it the stepped frame time
   const R = (a, b) => a + Math.random() * (b - a);
   const q = []; let now = 0; const later = (ms, fn) => q.push({ at: now + ms, fn });
-  const tap = (x, y) => pr.tap(x, y), MEOW = () => tap(190, 1180), POUNCE = () => tap(530, 1180), HOP = (i) => tap(pr.boxX()[i], 960);
+  const tap = (x, y) => pr.tap(x, y), MEOW = () => tap(190, 1180), POUNCE = () => tap(530, 1180);
   let dbgPhase = '', seen = {}, nextTap = 0, lastPup = '', lastPhase = '';
   const lag = () => mode === 'good' ? R(180, 260) : R(300, 450);
   for (let f = 0; f < 20000 && !pr.ended; f++) {
@@ -44,18 +47,13 @@ async function game({ mode, K, dbg }) {
     }
     // ---- average / good: watch, then act after a human reaction lag
     if (s.phase === 'tug') { if (now >= nextTap) { nextTap = now + (mode === 'good' ? R(110, 140) : R(140, 190)); tap(360, 640); } continue; }
-    if (s.phase === 'grab' && lastPhase !== 'grab') { const miss = mode !== 'good' && Math.random() < 0.08; later(lag() + (miss ? 900 : 0), () => { const t = pr.tip(); if (t) tap(t.x, t.y); }); }
     lastPhase = s.phase;
     if (s.phase !== 'hunt' || key === lastPup) continue; lastPup = key; seen = {};
-    const headIn = s.pup === 'peek' || s.pup === 'tell';
-    if (s.pup === 'peek' && s.pbox !== s.noirBox && !seen['p' + key]) { seen['p' + key] = 1; // pounce! (avg bot sometimes hesitates)
-      const hes = mode === 'average' && Math.random() < 0.2 ? R(300, 700) : 0; later(lag() + hes, POUNCE); }
-    if ((s.pup === 'walk' || s.pup === 'sniff') && s.tgt === s.noirBox && !seen['d' + key]) { seen['d' + key] = 1; // he's coming for my box
-      if (s.meowCd <= 0 && s.meowRow < 2 && Math.random() < 0.8) later(lag(), MEOW);
-      else if (s.pup === 'sniff') later(lag(), () => { const n = pr.boxX().length; let j = Math.floor(Math.random() * n); if (j === s.noirBox) j = (j + 1) % n; HOP(j); }); }
-    if (s.pup === 'walk' && s.tgt !== s.noirBox && !seen['m' + key] && s.meowRow < 2 && Math.random() < (mode === 'good' ? 0.9 : 0.55)) { seen['m' + key] = 1; later(lag() + R(0, 300), MEOW); }
-    if (mode === 'average' && s.pup === 'look' && !seen['x' + key] && Math.random() < 0.08) { seen['x' + key] = 1; later(lag(), () => HOP((s.noirBox + 1) % pr.boxX().length)); } // impatient mistake
-    void headIn;
+    if (s.pup === 'peek' && s.pbox !== s.noirBox) { // head in the WRONG box: POUNCE (avg bot sometimes hesitates)
+      const hes = mode === 'average' && Math.random() < 0.2 ? R(250, 600) : 0; later(lag() + hes, POUNCE); }
+    if ((s.pup === 'walk' || s.pup === 'feint' || s.pup === 'sniff') && s.tgt === s.noirBox && s.meowRow < 2) { // he's coming for my box: MEOW
+      if (mode === 'good' || Math.random() < 0.85) later(lag(), MEOW); }
+    if (mode === 'average' && s.pup === 'walk' && s.tgt !== s.noirBox && Math.random() < 0.05) later(lag(), POUNCE); // impatient mistake
   }
   step(80);
   return { win: pr.ended === 'win', boops: s.boops, busts: s.busts, slips: s.slips, time: +s.time.toFixed(1), ...(dbg ? { trace: trace.join(' ') } : {}) };

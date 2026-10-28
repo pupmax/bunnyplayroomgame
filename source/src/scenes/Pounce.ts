@@ -23,7 +23,7 @@ import { TailPup } from '../systems/tailRigs';
 import { laserTextures, laserTutorial } from './laserArt';
 
 export const K = {
-  NEED: 7, TIME: 30, STRIKES: 3,
+  NEED: 7, TIME: 32, STRIKES: 3,
   V: [280, 400, 545], ACC: [1500, 1550, 1500], ARRIVE: 4.0,     // top speed / steering accel per tier (TROT, RUN, ZOOMIES)
   RUN_AT: 0.9, ZOOM_AT: 2.2, HEAT_MAX: 3.4, HEAT_DECAY: 1.4,    // seconds of chasing to reach RUN / ZOOMIES
   LOSE_D: [540, 520, 500, 480, 470, 460, 460], LOSE_T: 0.45, MIN_TIER: 1,    // dot this far ahead for LOSE_T s = he loses it (per crash count)

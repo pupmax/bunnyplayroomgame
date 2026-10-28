@@ -164,6 +164,8 @@ export const LINES = {
   // round 3 window: Iris snaps his photo and he freezes to pose
   lassoPhoto: ['Iris: Say cheese, superstar!', 'Iris: Hold still! Photo time!', 'Iris: Strike a pose!'],
   lassoPose: ['cheese!', 'pose!', 'so fluffy!'],
+  // R2/R3 FAKE window (new pool, 28 Oct v4): Puppy wiggles + a PINK '?', pretends to stop... then bolts
+  lassoFakeOut: ['Puppy: Hehe, fooled ya!', 'Puppy: Psych!', 'Puppy: Pink means NO, Bunny~', 'Puppy: Gotcha! ...wait, wrong way round.'],
   // round 3: Puppy charges Bunny. Bunny dodges and he faceplants / or he bonks her
   lassoFaceplant: ['Puppy: Ow, my snoot!', 'Puppy: Who moved the Bunny?!', 'Puppy: The floor came out of nowhere!'],
   lassoBonk: ['Puppy: Beep beep! Coming through!', 'Puppy: Zoomies always win!', 'Puppy: Bonk! Tag, you\'re it!'],

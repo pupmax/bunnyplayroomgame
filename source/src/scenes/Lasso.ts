@@ -84,12 +84,12 @@ class LassoBunny {
 const TW_SH = 235, TW_EL = -25; // twirl arm: shoulder/elbow angles (180 = straight up, bigger = out to her right)
 /** Tuning (real touch on a phone). Times in seconds, distances in game px (720 x 1280). */
 export const LK = {
-  TIME: 38,            // clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
+  TIME: 34,            // v4 boss tune: 38 -> 34. clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
   NEED: 5,             // catches to win: 1 TROT warm-up, 2 SNEAKY, 2 ZOOMIES
   ROUND_AT: [0, 1, 3], // catches at which rounds 1/2/3 start
   SPIN: 0.45,          // one twirl of the loop
   HOLD_MAX: 0.9,       // hold this long for the BIG loop
-  R_MIN: 62, R_MAX: 90, HIT_PAD: 26, // loop radius (small tap -> full twirl) + forgiveness around Puppy's body
+  R_MIN: 62, R_MAX: 90, HIT_PAD: 12, // loop radius (small tap -> full twirl) + forgiveness around Puppy's body (v4: 26 -> 12, a smaller catch zone)
   FLY: 0.42,           // loop flight time (so you LEAD him)
   SPD: [200, 280, 340],                           // Puppy run speed per round
   PAUSE: [[0.7, 1.1], [0.45, 0.8], [0.35, 0.6]], // Puppy stands still this long between dashes
@@ -101,10 +101,13 @@ export const LK = {
   // catch windows (28 Oct v3): Puppy is only catchable inside these. TELL = the ears-perk + faint ring warning before a window opens
   WIN_FIRST: [1.0, 1.2, 1.2],                       // first window this long (free time) after a round starts / he is let go
   WIN_EVERY: [[2.2, 2.8], [2.8, 3.6], [3.4, 4.2]],  // then one every this many seconds (free time)
-  WIN: [1.5, 1.1, 0.75],                            // how long a window stays open, per round (R3 0.85 -> 0.75: the pro touch bot won 4/4 with ~26 s spare)
-  TELL: 0.35, WIN_GRACE: 0.1,                       // warning before it opens / a loop landing this soon after it shuts still counts
+  WIN: [1.1, 0.9, 0.75],                            // how long a window stays open, per round (BOSS tune 28 Oct v4: was 1.5 / 1.1 / 0.75)
+  FAKEWIN_P: [0, 0.3, 0.4], FAKE_PANT: 0.35,          // v4: R2/R3 fake windows: PINK '?' + butt-wiggle tell (real = GOLD '!' + ear hop), a fake pant, then HEHE! he bolts
+  SWAY: [0, 60, 80], SWAY_T: [1, 0.9, 0.75],  // (random start phase each window: you can't pre-learn which way he'll shuffle)          // v4: he shuffles side to side (px amplitude, period s) while a window is open, so you have to LEAD him
+  TELL: 0.5, WIN_GRACE: 0.1,                        // warning before it opens / a loop landing this soon after it shuts still counts
   OFF_COST: 0.7, OFF_LOCK: 0.6,                     // a throw that lands outside a window: clock penalty + no throwing for this long
-  TUG0: 0.15, TUG_TAP: 0.075, TUG_PULL: [0.18, 0.24, 0.30], TUG_SURGE: 0.20, SURGE_P: 0.55, TUG_GRACE: 0.6, TUG_MIN: 2.4, // tap-fast reel-in (harder)
+  TUG0: 0.15,          // v4 TIMING TUG (was a tap-mash): a marker swings along the bar, TAP when it is in the GOLD zone. 1-2 good taps = reeled in (~1-1.5 s)
+  TUG_HITS: [1, 2, 2], TUG_SWEEP: [0.7, 0.65, 0.6], TUG_ZONE: [0.32, 0.28, 0.26], TUG_MISS: 2, TUG_IDLE: 3.0, // hits needed / s per one-way sweep / gold zone width (0-1) / misses = he wriggles free / no tap this long = he wriggles free
   TIE: 2.5,            // hog-tied moment after each catch (clock paused)
   BANNER: 1.3,         // round banner (clock paused)
 };
@@ -127,7 +130,7 @@ export class LassoScene extends Phaser.Scene {
   static fresh() {
     return { time: LK.TIME, ropes: 0, round: 1, throws: 0, misses: 0, slips: 0, dodges: 0, plants: 0, bonks: 0, decoys: 0, score: 0,
       running: false, over: false, phase: 'intro' as Phase, pup: 'pause' as PupS, px: 480, py: 1060, hold: false, holdT: 0, tx: 450, ty: 1050, flying: false,
-      tug: 0, tugT: 0, tieT: 0, clock: 0, bannerT: 0, stun: 0, dodged: false, win: 'closed' as 'closed' | 'tell' | 'open', wins: 0, offs: 0, nopes: 0, lock: 0 };
+      tug: 0, tugT: 0, tieT: 0, clock: 0, bannerT: 0, stun: 0, dodged: false, win: 'closed' as 'closed' | 'tell' | 'open' | 'fake', wins: 0, fakes: 0, mk: 0, mkDir: 1, zone0: 0, zone1: 0, hits: 0, tugMiss: 0, mkSpd: 1, offs: 0, nopes: 0, lock: 0 };
   }
   private bunny!: LassoBunny; private pup!: TailPup; private hud!: Hud; private roundChip!: Phaser.GameObjects.Text; private roundPill!: Phaser.GameObjects.Graphics;
   private fx!: Phaser.GameObjects.Graphics; private ropeG!: Phaser.GameObjects.Graphics; private grip!: Phaser.GameObjects.Arc; private meter!: Phaser.GameObjects.Graphics;
@@ -138,7 +141,7 @@ export class LassoScene extends Phaser.Scene {
   private tapTxt?: Phaser.GameObjects.Text; private warn: Phaser.GameObjects.GameObject[] = []; private hint?: Phaser.GameObjects.Container; private outroT = 0; private heartT = 0;
   private hang!: HangPup; private hangG!: Phaser.GameObjects.Graphics; private hangTop!: Phaser.GameObjects.Container; private lamp!: Phaser.GameObjects.Container; private lampBar!: Phaser.GameObjects.Graphics;
   private hanging: HangKind | '' = ''; private hangT = 0; private hangSeq: HangKind[] = []; private hangDrop = false; private hangFx: Phaser.GameObjects.GameObject[] = [];
-  private winT = 0; private tellT = 0; private winLeft = 0; private winLen = 1; private closedAgo = 9; private winFx: Phaser.GameObjects.GameObject[] = []; private nowRing?: Phaser.GameObjects.Ellipse; private glow?: Phaser.GameObjects.Graphics;
+  private swayX0 = 0; private swayT = 0; private swayPh = 0; private tugIdle = 0; private winT = 0; private tellT = 0; private winLeft = 0; private winLen = 1; private closedAgo = 9; private winFx: Phaser.GameObjects.GameObject[] = []; private nowRing?: Phaser.GameObjects.Ellipse; private glow?: Phaser.GameObjects.Graphics;
   private floorTalk?: Phaser.GameObjects.Container; private byOff = 0; private bunShadow!: Phaser.GameObjects.Ellipse; private firstNow = true;
   private downX = 0; private downY = 0; private downT = 0; private bxOff = 0; private dustT = 0; private lastHud = ''; private stars?: Phaser.GameObjects.Text; private first = { tug: true, plant: true };
   constructor() { super('Lasso'); }
@@ -172,7 +175,7 @@ export class LassoScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onDown(p));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onMove(p));
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onUp(p));
-    tutorialCard(this, 'bunny3', 'PLAYROOM RODEO!', [`You are BUNNY! 🐰 Rope Puppy ${LK.NEED} times!`, 'He can ONLY be caught in a gold NOW! ring', 'HOLD to twirl, SLIDE to him, LET GO to fling', 'Too early? He dodges + you lose time!', 'Roped him? TAP TAP TAP fast!', 'Round 3: SWIPE to dodge his charge!'], () => this.begin());
+    tutorialCard(this, 'bunny3', 'PLAYROOM RODEO!', [`You are BUNNY! 🐰 Rope Puppy ${LK.NEED} times!`, 'He can ONLY be caught in a gold NOW! ring', 'HOLD to twirl, SLIDE to him, LET GO to fling', 'PINK ? = he is FAKING! Too early = lose time!', 'Roped him? TAP when the marker hits GOLD!', 'Round 3: SWIPE to dodge his charge!'], () => this.begin());
   }
   private begin() {
     popBanner(this, 'FINAL ROUND!', 700, 0xe0243a, 800);
@@ -299,10 +302,13 @@ export class LassoScene extends Phaser.Scene {
   private winReady() { const s = this.st; return s.phase === 'free' && !s.over && (s.pup === 'run' || s.pup === 'pause' || s.pup === 'fake' || s.pup === 'sneak'); }
   private updWin(dt: number) {
     const s = this.st; this.closedAgo += dt;
-    if (s.win === 'closed') { if (this.winReady()) { this.winT -= dt; if (this.winT <= 0) this.tellWindow(); } }
+    if (s.win === 'closed') { if (this.winReady()) { this.winT -= dt; if (this.winT <= 0) { if (Math.random() < LK.FAKEWIN_P[this.winRound()]) this.fakeWindow(); else this.tellWindow(); } } }
+    else if (s.win === 'fake') { this.tellT -= dt; this.pup.inner.setAngle(Math.sin(this.time.now / 45) * 9); if (this.tellT <= 0) this.breakFake(); }
     else if (s.win === 'tell') { this.tellT -= dt; if (this.tellT <= 0) this.openWindow(); }
     else if (s.pup !== 'plant') { // open (the faceplant runs its own clock)
-      this.winLeft -= dt; const k = Phaser.Math.Clamp(this.winLeft / this.winLen, 0, 1);
+      this.winLeft -= dt; const k = Phaser.Math.Clamp(this.winLeft / this.winLen, 0, 1), r = this.winRound();
+      if (LK.SWAY[r] > 0) { this.swayT += dt; const nx = Phaser.Math.Clamp(this.swayX0 + LK.SWAY[r] * (Math.sin(this.swayT * Math.PI * 2 / LK.SWAY_T[r] + this.swayPh) - Math.sin(this.swayPh)), AX0 - 20, AX1 + 10);
+        const dir = Math.sign(nx - s.px); if (dir) { this.face = dir; this.pup.flip(dir < 0); } s.px = nx; this.pup.update(dt, 0.7, 1); }
       this.nowRing?.setPosition(s.px, s.py - 30).setScale(0.4 + 0.6 * k); this.glow?.setPosition(s.px, s.py);
       if (this.winLeft <= 0) this.closeWindow(); }
   }
@@ -317,8 +323,22 @@ export class LassoScene extends Phaser.Scene {
     else if (r === 1) this.treat();
     else this.photo();
   }
+  /** v4 FAKE window (R2/R3): the tell is different on purpose so players can learn it: a PINK '?' (not the gold '!'), a pink wobbly ring
+   *  and a butt-wiggle instead of the ear-hop; he pants for a beat like a real window... then HEHE! and he bolts. Throwing at it = NOPE. */
+  private fakeWindow() {
+    const s = this.st; s.win = 'fake'; s.fakes++; this.tellT = LK.TELL + LK.FAKE_PANT; s.pup = 'pause'; this.pauseT = 99; this.fakeT = -1; this.boost = 1;
+    this.pup.setFrame('stand'); this.pup.squash(1, 1);
+    const q = txt(this, s.px + 46, s.py - 215, '?', 48, '#ff7ad9', '#22252b', 6).setDepth(70).setScale(0.3).setAngle(12); this.tweens.add({ targets: q, scale: 1, duration: 120, ease: 'Back.Out' });
+    this.tweens.add({ targets: q, angle: -12, duration: 90, yoyo: true, repeat: 3 }); this.winFx.push(q);
+    const ring = this.add.ellipse(s.px, s.py - 30, 250, 92).setStrokeStyle(6, 0xff7ad9, 0.6).setDepth(9); this.tweens.add({ targets: ring, scaleX: 1.1, scaleY: 0.9, duration: 90, yoyo: true, repeat: -1 }); this.winFx.push(ring);
+  }
+  private breakFake() {
+    const s = this.st; this.pup.inner.setAngle(0); this.word(s.px, s.py - 230, 'HEHE!', 44, 350, 6); Fx.boing();
+    if (Math.random() < 0.5) floatText(this, Phaser.Math.Clamp(s.px - 40, 170, 550), s.py - 180, pick(LINES.lassoFakeOut), '#ffb3ec', 26);
+    this.closeWindow(false); this.escape();
+  }
   private openWindow() {
-    const s = this.st; s.win = 'open'; s.wins++; this.winLen = this.winLeft = LK.WIN[this.winRound()]; Sfx.click();
+    const s = this.st; s.win = 'open'; s.wins++; this.swayX0 = s.px; this.swayT = 0; this.swayPh = Math.random() * Math.PI * 2; this.winLen = this.winLeft = LK.WIN[this.winRound()]; Sfx.click();
     const glow = this.glow = this.add.graphics().setDepth(this.pup.root.depth - 0.02); glow.fillStyle(0xffd84d, 0.28).fillEllipse(0, -80, 210, 230).fillStyle(0xfff3a0, 0.22).fillEllipse(0, -80, 160, 180);
     glow.setPosition(s.px, s.py); this.tweens.add({ targets: glow, alpha: { from: 1, to: 0.55 }, duration: 160, yoyo: true, repeat: -1 }); this.winFx.push(glow);
     this.nowRing?.setStrokeStyle(9, 0xffd84d, 1);
@@ -330,7 +350,7 @@ export class LassoScene extends Phaser.Scene {
   }
   /** window over (or used up by a catch): clear the glow, Puppy dashes on; next one after WIN_EVERY */
   private closeWindow(run = true) {
-    const s = this.st, [a, b] = LK.WIN_EVERY[this.winRound()]; const was = s.win; s.win = 'closed'; if (was === 'open') this.closedAgo = 0; this.winT = Phaser.Math.FloatBetween(a, b);
+    const s = this.st, [a, b] = LK.WIN_EVERY[this.winRound()]; const was = s.win; s.win = 'closed'; this.pup.inner?.setAngle(0); if (was === 'open') this.closedAgo = 0; this.winT = Phaser.Math.FloatBetween(a, b);
     this.winFx.forEach(o => { this.tweens.killTweensOf(o); o.destroy(); }); this.winFx = []; this.nowRing = undefined; this.glow = undefined;
     if (run && s.phase === 'free' && s.pup === 'pause') this.newLeg();
   }
@@ -356,7 +376,7 @@ export class LassoScene extends Phaser.Scene {
     this.tweens.add({ targets: lr, alpha: 0, scaleX: 0.6, scaleY: 0.6, duration: 500, onComplete: () => lr.destroy() }); }
   // ---------------------------------------------------------------- tug
   private snag(free: boolean) {
-    const s = this.st; s.phase = 'tug'; s.pup = 'tug'; s.tug = LK.TUG0; s.tugT = 0; this.freeRope = free; this.clearWarn(); this.stars?.destroy(); this.stars = undefined;
+    const s = this.st; s.phase = 'tug'; s.pup = 'tug'; s.tug = LK.TUG0; s.tugT = 0; s.hits = 0; s.tugMiss = 0; this.tugIdle = 0; this.newZone(true); this.freeRope = free; this.clearWarn(); this.stars?.destroy(); this.stars = undefined;
     this.closeWindow(false); this.tweens.killTweensOf(this.pup.inner); this.pup.inner.setY(0);
     this.pup.root.setAngle(0); this.pup.inner.setAngle(0); this.pup.squash(1, 1); this.pup.setFrame('panic');
     this.tugStart = { x: s.px, y: s.py }; this.surgeT = 0.9; this.surgeLeft = 0; this.tugShout = 0.6; this.face = 1; this.pup.flip(false);
@@ -366,38 +386,52 @@ export class LassoScene extends Phaser.Scene {
     if (Math.random() < 0.5) this.talk(330, 860, pick(LINES.lassoTug), 22, 1000);
     this.tapPrompt(); this.drawMeter();
   }
+  /** v4 timing tug: TAP while the swinging marker is inside the gold zone. A hit yanks him closer (new zone), a miss = he wriggles (marker speeds up) */
   private tap() {
-    const s = this.st; s.tug = Math.min(this.tugCap(), s.tug + LK.TUG_TAP); this.bunny.yank = -9; Fx.combo(Math.round(s.tug * 10)); Sfx.click();
-    if (s.tug >= 1) this.reeled();
+    const s = this.st; if (s.tugT < 0.12) return; this.tugIdle = 0;
+    if (s.mk >= s.zone0 && s.mk <= s.zone1) {
+      s.hits++; this.bunny.yank = -14; Fx.punch(); Sfx.click(); this.cameras.main.shake(80, 0.004);
+      const hx = 98 + 524 * s.mk; this.word(Phaser.Math.Clamp(hx, 150, 570), 330, s.hits >= LK.TUG_HITS[s.round - 1] ? 'YANK!' : 'PULL!', 40, 260, -4);
+      if (s.hits >= LK.TUG_HITS[s.round - 1]) { s.tug = 1; return this.reeled(); }
+      this.newZone(false);
+    } else {
+      s.tugMiss++; Fx.block(); this.bunny.yank = 6; this.shout(); s.mkSpd *= 1.15; this.cameras.main.shake(90, 0.005);
+      floatText(this, Phaser.Math.Clamp(98 + 524 * s.mk, 150, 570), 330, 'MISS!', '#ff8a8a', 30);
+      if (s.tugMiss >= LK.TUG_MISS) return this.slip();
+    }
   }
-  private tugCap() { return LK.TUG0 + (1 - LK.TUG0) * Math.min(1, this.st.tugT / LK.TUG_MIN); }
+  /** a new gold zone, away from where the marker is now; first one: the marker starts at an end */
+  private newZone(first: boolean) {
+    const s = this.st, r = s.round - 1, w = LK.TUG_ZONE[r];
+    if (first) { s.mkDir = Math.random() < 0.5 ? 1 : -1; s.mk = s.mkDir > 0 ? 0 : 1; s.mkSpd = 1 / LK.TUG_SWEEP[r]; }
+    // next zone sits AHEAD of the marker (first one ~0.5 s away so you can spot it, then 0.45-0.6 of a sweep along its path, bouncing off the ends) so each press comes ~0.3 s later: quick, never a long wait
+    let c = s.mk + s.mkDir * Phaser.Math.FloatBetween(first ? 0.75 : 0.45, first ? 0.9 : 0.6); if (c > 1) c = 2 - c; else if (c < 0) c = -c;
+    const z0 = Phaser.Math.Clamp(c - w / 2, 0.04, 0.96 - w);
+    s.zone0 = z0; s.zone1 = z0 + w;
+  }
   private tapPrompt() {
     this.tapTxt?.destroy(); const big = this.first.tug; this.first.tug = false;
-    const t = this.tapTxt = comic(this, W / 2, 480, big ? 'TAP TAP TAP\nto reel him in!' : 'TAP TAP TAP!', big ? 50 : 46).setDepth(67).setAngle(-4).setScale(0.3);
+    const t = this.tapTxt = comic(this, W / 2, 480, big ? 'TAP when it\'s in the GOLD!' : 'TAP in the GOLD!', big ? 46 : 44).setDepth(67).setAngle(-4).setScale(0.3);
     this.tweens.add({ targets: t, scale: 1, duration: 160, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: t, scale: 1.1, duration: 170, yoyo: true, repeat: -1, ease: 'Sine.InOut' }) });
   }
   private endTug() { if (this.tapTxt) { this.tweens.killTweensOf(this.tapTxt); this.tapTxt.destroy(); this.tapTxt = undefined; } this.meter.clear(); }
   private drawMeter() {
-    const m = this.meter, y = 395, f = Phaser.Math.Clamp(this.st.tug, 0, 1), cap = this.tugCap(); m.clear();
+    const m = this.meter, y = 395, s = this.st; m.clear();
     m.fillStyle(0x22252b, 1).fillRoundedRect(90, y - 30, 540, 60, 30);
-    m.fillStyle(0xff5c8a, 1).fillRoundedRect(98, y - 22, Math.max(24, 524 * f), 44, { tl: 22, bl: 22, tr: 0, br: 0 });
-    if (f < 0.99) m.fillStyle(0xc27230, 1).fillRoundedRect(98 + 524 * f, y - 22, 524 * (1 - f), 44, { tl: 0, bl: 0, tr: 22, br: 22 });
-    if (cap < 0.999) m.lineStyle(4, 0xffffff, 0.6).lineBetween(98 + 524 * cap, y - 22, 98 + 524 * cap, y + 22);
-    m.fillStyle(0xffffff, 1).lineStyle(5, 0x22252b, 1).fillCircle(98 + 524 * f, y, 28).strokeCircle(98 + 524 * f, y, 28);
+    m.fillStyle(0xc27230, 1).fillRoundedRect(98, y - 22, 524, 44, 22);
+    m.fillStyle(0xffd84d, 1).lineStyle(4, 0xfff3a0, 1).fillRect(98 + 524 * s.zone0, y - 22, 524 * (s.zone1 - s.zone0), 44).strokeRect(98 + 524 * s.zone0, y - 22, 524 * (s.zone1 - s.zone0), 44);
+    const need = LK.TUG_HITS[s.round - 1]; for (let i = 0; i < need; i++) { const x = W / 2 - (need - 1) * 22 + i * 44; m.fillStyle(i < s.hits ? 0xff5c8a : 0x22252b, 1).lineStyle(4, 0xffffff, 1).fillCircle(x, y + 52, 13).strokeCircle(x, y + 52, 13); }
+    const mx = 98 + 524 * s.mk; m.fillStyle(0xffffff, 1).lineStyle(5, 0x22252b, 1).fillRoundedRect(mx - 9, y - 40, 18, 80, 8).strokeRoundedRect(mx - 9, y - 40, 18, 80, 8);
   }
   private updTug(dt: number) {
-    const s = this.st, r = s.round - 1; s.tugT += dt;
-    if (s.tugT > LK.TUG_GRACE) {
-      let drain = LK.TUG_PULL[r];
-      this.surgeT -= dt; if (this.surgeT <= 0) { this.surgeT = Phaser.Math.FloatBetween(0.9, 1.4); if (Math.random() < LK.SURGE_P) { this.surgeLeft = 0.4; this.shout(); } }
-      if (this.surgeLeft > 0) { this.surgeLeft -= dt; drain += LK.TUG_SURGE / 0.4; }
-      s.tug -= drain * dt;
-      if (s.tug <= 0) return this.slip();
-    }
-    this.tugShout -= dt; if (this.tugShout <= 0) { this.tugShout = Phaser.Math.FloatBetween(1.2, 1.8); if (this.surgeLeft <= 0 && Math.random() < 0.5) this.shout(); }
+    const s = this.st, r = s.round - 1; s.tugT += dt; this.tugIdle += dt;
+    s.mk += s.mkDir * s.mkSpd * dt; if (s.mk >= 1) { s.mk = 2 - s.mk; s.mkDir = -1; } else if (s.mk <= 0) { s.mk = -s.mk; s.mkDir = 1; }
+    if (this.tugIdle > LK.TUG_IDLE) return this.slip();
+    this.tugShout -= dt; if (this.tugShout <= 0) { this.tugShout = Phaser.Math.FloatBetween(1.0, 1.5); if (Math.random() < 0.5) this.shout(); }
+    const goal = LK.TUG0 + (1 - LK.TUG0) * 0.8 * s.hits / LK.TUG_HITS[r]; s.tug += (goal - s.tug) * (1 - Math.exp(-dt * 10));
     const k = Phaser.Math.Clamp((s.tug - LK.TUG0) / (1 - LK.TUG0), 0, 1), end = { x: BX + 205, y: BY - 55 };
-    const tx = this.tugStart.x + (end.x - this.tugStart.x) * k, ty = this.tugStart.y + (end.y - this.tugStart.y) * k, f = 1 - Math.exp(-dt * 8);
-    s.px += (tx - s.px) * f + (this.surgeLeft > 0 ? 40 * dt : 0); s.py += (ty - s.py) * f;
+    const tx = this.tugStart.x + (end.x - this.tugStart.x) * k, ty = this.tugStart.y + (end.y - this.tugStart.y) * k, f = 1 - Math.exp(-dt * 8), wr = Math.sin(this.time.now / 70) * 14;
+    s.px += (tx + wr - s.px) * f; s.py += (ty - s.py) * f;
     this.pup.inner.setAngle(10 + Math.sin(this.time.now / 60) * 3);
     this.pup.update(dt, 2.6, 1); this.pup.root.setPosition(s.px, s.py);
     this.drawMeter();

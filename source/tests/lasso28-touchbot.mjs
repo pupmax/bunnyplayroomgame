@@ -1,12 +1,13 @@
-// RODEO catch-window touch bot (28 Oct v3): iPhone 390x844, CDP touch only. Reads only what a player SEES (Puppy's spot, the
+// RODEO catch-window touch bot (28 Oct v4: timing tug = tap when the marker is in the gold zone, gaussian timing error tsd (s); fake windows: spots the pink '?' with chance fk)
+// (28 Oct v3): iPhone 390x844, CDP touch only. Reads only what a player SEES (Puppy's spot, the
 // '!' tell / gold NOW! ring = st.win, the charge wind-up) and plays with human reaction delays + aim noise.
 // usage: node tests/lasso28-touchbot.mjs <url> <novice|realistic|pro> <runs>   env SHOTS=dir
 import { chromium } from 'playwright';
 const URL = process.argv[2] || 'http://localhost:8828/', STYLE = process.argv[3] || 'realistic', RUNS = +process.argv[4] || 1, SHOTS = process.env.SHOTS || '';
 const PR = { // reaction to the tell (s), aim noise (px), impatient throw chance per decision outside a window, tug taps/s, dodge chance, dodge reaction (s)
-  novice: { react: [0.45, 0.8], noise: 150, imp: 0.75, tug: 4.2, dodge: 0.35, dreact: [0.45, 0.8], hold: [0.3, 0.9] },
-  realistic: { react: [0.28, 0.5], noise: 80, imp: 0.22, tug: 6.0, dodge: 0.75, dreact: [0.25, 0.5], hold: [0.2, 0.55] },
-  pro: { react: [0.17, 0.28], noise: 35, imp: 0.0, tug: 8.0, dodge: 0.97, dreact: [0.16, 0.28], hold: [0.15, 0.3] },
+  novice: { react: [0.45, 0.8], noise: 150, imp: 0.75, tug: 4.2, tsd: 0.09, fk: 0.3, dodge: 0.35, dreact: [0.45, 0.8], hold: [0.3, 0.9] },
+  realistic: { react: [0.28, 0.5], noise: 80, imp: 0.22, tug: 6.0, tsd: 0.05, fk: 0.6, dodge: 0.75, dreact: [0.25, 0.5], hold: [0.2, 0.55] },
+  pro: { react: [0.17, 0.28], noise: 35, imp: 0.0, tug: 8.0, tsd: 0.028, fk: 0.9, dodge: 0.97, dreact: [0.16, 0.28], hold: [0.15, 0.3] },
 }[STYLE];
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: +(process.env.DPR || 1), hasTouch: true, isMobile: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
@@ -19,10 +20,10 @@ const K = +(process.env.K || 0.4); await p.evaluate(K => { const L = window.__ga
 const bx = await p.locator('canvas').boundingBox(); const P = (x, y) => ({ x: bx.x + x * bx.width / 720, y: bx.y + y * bx.height / 1280 });
 const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ ...P(x, y), id: 1 }] });
 let SPD = K; // game seconds per wall second (dt is capped at 50 ms/frame, so a slow headless GPU slows the game; human timings are in GAME time)
-const wait = ms => p.waitForTimeout(ms); const gwait = ms => p.waitForTimeout(ms / SPD); const R = Math.random, U = ([a, c]) => (a + R() * (c - a)) * 1000;
+const wait = ms => p.waitForTimeout(ms); const gwait = ms => p.waitForTimeout(ms / SPD); const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }; const R = Math.random, U = ([a, c]) => (a + R() * (c - a)) * 1000;
 const tap = async (x, y) => { await touch('touchStart', x, y); await wait(35); await touch('touchEnd', x, y); };
 const look = () => p.evaluate(() => { const r = window.__pr; if (!r || r.scene !== 'Lasso' || !r.st) return { scene: window.__game.scene.getScenes(true).map(s => s.sys.settings.key).join(',') }; const s = r.st;
-  return { ph: s.phase, pup: s.pup, px: s.px, py: s.py, win: s.win, lock: s.lock, ropes: s.ropes, round: s.round, time: s.time, ended: r.ended, card: !!r.cardShown, throws: s.throws, misses: s.misses, slips: s.slips, offs: s.offs, wins: s.wins, dodges: s.dodges, bonks: s.bonks, plants: s.plants, banner: s.bannerT > 0, fps: Math.round(window.__game.loop.actualFps), spd: Math.min(window.__K, 0.05 * window.__game.loop.actualFps) }; });
+  return { ph: s.phase, pup: s.pup, px: s.px, py: s.py, win: s.win, lock: s.lock, ropes: s.ropes, round: s.round, time: s.time, ended: r.ended, card: !!r.cardShown, throws: s.throws, misses: s.misses, slips: s.slips, offs: s.offs, wins: s.wins, dodges: s.dodges, bonks: s.bonks, plants: s.plants, fakes: s.fakes, mk: s.mk, mkDir: s.mkDir, mkSpd: s.mkSpd, zone0: s.zone0, zone1: s.zone1, hits: s.hits, tugT: s.tugT, banner: s.bannerT > 0, fps: Math.round(window.__game.loop.actualFps), spd: Math.min(window.__K, 0.05 * window.__game.loop.actualFps) }; });
 const shot = async n => { if (SHOTS) { await p.evaluate(() => window.__game.loop.sleep()); await p.screenshot({ path: `${SHOTS}/${STYLE}_${n}.png` }); await p.evaluate(() => window.__game.loop.wake()); } };
 const once = {}; const shot1 = async n => { if (!once[n]) { once[n] = 1; await shot(n); } };
 const throwAt = async (c, holdMs) => {
@@ -31,12 +32,12 @@ const throwAt = async (c, holdMs) => {
   for (let i = 1; i <= 4; i++) { await gwait(holdMs / 4); await touch('touchMove', sx + (tx - sx) * i / 4, sy + (ty - sy) * i / 4); }
   await touch('touchEnd', tx, ty);
 };
-const results = [];
+const results = []; let lat = 0.04; // learned touch/system lag (game s), like a player adapting to their phone
 for (let run = 0; run < RUNS; run++) {
   await p.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.includes('.tut.')) localStorage.removeItem(k); window.__pr = null; const g = window.__game; g.scene.getScenes(true).forEach(s => s.scene.stop()); g.scene.start('Lasso'); });
   await p.waitForFunction(() => window.__tutorialOpen === true, null, { timeout: 30000 }); await wait(700); await tap(360, 640);
   await p.waitForFunction(() => window.__pr?.st?.running, null, { timeout: 30000 });
-  await p.evaluate(() => { const L = window.__game.scene.getScene('Lasso'); window.__lands = []; window.__tugs = []; if (!L.__wrapped) { L.__wrapped = 1; const o = L.land; window.__tugs = []; const ot = L.tap, os = L.slip; L.tap = function () { const g = window.__tugs; if (g.length && !g[g.length - 1].end) g[g.length - 1].taps++; return ot.call(this); }; L.slip = function () { const g = window.__tugs; if (g.length) { const e = g[g.length - 1]; e.end = 'slip@' + this.st.tugT.toFixed(1); e.wall = Math.round(performance.now() - e.t0); } return os.call(this); }; const osn = L.snag, orl = L.reeled; L.snag = function (f) { window.__tugs.push({ taps: 0, t0: performance.now() }); return osn.call(this, f); }; L.reeled = function () { const g = window.__tugs; if (g.length && !g[g.length - 1].end) g[g.length - 1].end = 'CAUGHT@' + this.st.tugT.toFixed(1); return orl.call(this); }; L.land = function (x, y, r) { const s = this.st; window.__lands.push({ win: s.win, pup: s.pup, d: Math.round(Math.hypot(x - s.px, (y - s.py + 70) * 0.85)), r: Math.round(r), tell: +this.tellT.toFixed(2), left: +this.winLeft.toFixed(2), ago: +this.closedAgo.toFixed(2) }); return o.call(this, x, y, r); }; } });
+  await p.evaluate(() => { const L = window.__game.scene.getScene('Lasso'); window.__lands = []; window.__tapT = -1; window.__tugs = []; if (!L.__wrapped) { L.__wrapped = 1; const o = L.land; window.__tugs = []; const ot = L.tap, os = L.slip; L.tap = function () { const g = window.__tugs; if (g.length && !g[g.length - 1].end) { const e = g[g.length - 1], t = this.st; window.__tapT = t.tugT; e.taps++; (e.at = e.at || []).push([+t.mk.toFixed(2), +t.zone0.toFixed(2), +t.zone1.toFixed(2), +t.tugT.toFixed(2)]); } return ot.call(this); }; L.slip = function () { const g = window.__tugs; if (g.length) { const e = g[g.length - 1]; e.end = 'slip@' + this.st.tugT.toFixed(1); e.wall = Math.round(performance.now() - e.t0); } return os.call(this); }; const osn = L.snag, orl = L.reeled; L.snag = function (f) { window.__tugs.push({ taps: 0, t0: performance.now() }); return osn.call(this, f); }; L.reeled = function () { const g = window.__tugs; if (g.length && !g[g.length - 1].end) g[g.length - 1].end = 'CAUGHT@' + this.st.tugT.toFixed(1); return orl.call(this); }; L.land = function (x, y, r) { const s = this.st; window.__lands.push({ win: s.win, pup: s.pup, d: Math.round(Math.hypot(x - s.px, (y - s.py + 70) * 0.85)), r: Math.round(r), tell: +this.tellT.toFixed(2), left: +this.winLeft.toFixed(2), ago: +this.closedAgo.toFixed(2) }); return o.call(this, x, y, r); }; } });
   const t0 = Date.now(); let fin = null, fpsMin = 99, seenTell = 0, lastWin = 'closed', nextImp = Date.now() + 900 / SPD, champion = false, lastPup = '';
   while (Date.now() - t0 < 150000 / SPD) {
     const s = await look(); if (!s.ph) { if (/Champion/.test(s.scene)) { champion = true; await wait(1200); if (run === 0) await shot1('champion'); break; } await wait(100); continue; }
@@ -44,7 +45,14 @@ for (let run = 0; run < RUNS; run++) {
     if (s.ended === 'lose' || s.ph === 'over') { await p.waitForFunction(() => window.__pr?.cardShown, null, { timeout: 10000 }).catch(() => {}); await wait(600); if (run === 0) await shot1('loss_card'); break; }
     if (s.ph === 'outro' || s.ph === 'tied' || s.ph === 'intro') { lastWin = 'closed'; seenTell = 0; await wait(120); continue; }
     if (s.ph === 'tug' && prevPh !== 'tug') { await gwait(U(PR.react)); } // notice the snag before mashing
-    if (s.ph === 'tug') { for (let k = 0; k < 4; k++) { const t1 = Date.now(); await tap(360 + (R() - 0.5) * 300, 950 + (R() - 0.5) * 250); const left = 1000 / PR.tug / SPD - (Date.now() - t1); if (left > 0) await wait(left); } continue; }
+    if (s.ph === 'tug') { // timing press: aim the tap at the moment the marker crosses the gold zone's centre (the first crossing at least 0.12 s away: the marker is predictable, players anticipate it), + human timing error
+      const q = await look(); if (q.ph !== 'tug') continue; Object.assign(s, q);
+      let m = s.mk, d = s.mkDir, t = 0; const v = s.mkSpd, c = (s.zone0 + s.zone1) / 2; const hits = [];
+      for (let i = 0; i < 6 && hits.length < 3; i++) { const edge = d > 0 ? 1 : 0; if ((d > 0 && c >= m) || (d < 0 && c <= m)) { hits.push(t + Math.abs(c - m) / v); } t += Math.abs(edge - m) / v; m = edge; d = -d; }
+      const tt = hits.find(h => h >= 0.12) ?? hits[hits.length - 1], plan = Math.max(0, tt + gauss() * PR.tsd - lat); await gwait(plan * 1000);
+      await tap(360 + (R() - 0.5) * 300, 950 + (R() - 0.5) * 250);
+      const at = await p.evaluate(() => window.__tapT); if (at >= 0 && at >= s.tugT) lat = 0.7 * lat + 0.3 * Math.max(0, at - s.tugT - plan); // players get used to the phone's touch lag
+      await gwait(60); continue; }
     if (s.ph !== 'free') { await wait(80); continue; }
     if ((s.pup === 'wind') && lastPup !== 'wind') { lastPup = 'wind'; // charge warning: dodge (or freeze)
       if (R() < PR.dodge) { await gwait(U(PR.dreact)); const dir = R() < 0.5 ? -1 : 1; await touch('touchStart', 360, 1050); for (let i = 1; i <= 4; i++) { await wait(22); await touch('touchMove', 360 + dir * 40 * i, 1050); } await touch('touchEnd', 360 + dir * 160, 1050); }
@@ -53,9 +61,10 @@ for (let run = 0; run < RUNS; run++) {
     if (s.pup === 'wind' || s.pup === 'charge' || s.pup === 'crash' || s.pup === 'bonk') { await wait(60); continue; }
     if (s.lock > 0) { await wait(80); continue; }
     if (s.pup === 'plant') { await gwait(U(PR.react)); const c = await look(); if (c.ph === 'free' && c.pup === 'plant') { if (run === 0) await shot1('faceplant'); await throwAt(c, U(PR.hold) * 0.6); await wait(500); } continue; }
-    if (s.win !== 'closed' && lastWin === 'closed') seenTell = Date.now();
+    if (s.win !== 'closed' && lastWin === 'closed') { seenTell = Date.now(); if (s.win === 'fake' && R() < PR.fk) { lastWin = 'used'; await wait(60); continue; } } // spotted the pink '?': hold fire
+    if (lastWin === 'used' && s.win !== 'closed') { await wait(60); continue; }
     lastWin = s.win;
-    if (s.win === 'tell' || s.win === 'open') {
+    if (s.win === 'tell' || s.win === 'open' || s.win === 'fake') {
       const since = (Date.now() - seenTell) * SPD, react = U(PR.react); if (since < react) { await gwait(react - since); }
       const c = await look(); if (c.ph !== 'free') continue; if (run === 0) await shot1(`window_r${c.round}`);
       await throwAt(c, U(PR.hold)); await gwait(480); lastWin = 'used'; continue; }
@@ -64,7 +73,8 @@ for (let run = 0; run < RUNS; run++) {
         const lead = 0.6, vx = (c.px - a.px) / 0.2, vy = (c.py - a.py) / 0.2; await throwAt({ ...c, px: c.px + vx * lead, py: c.py + vy * lead }, U(PR.hold)); await gwait(480); if (run === 0) await shot1('off_window_nope'); continue; } }
     await wait(60);
   }
-  const r = { run, style: STYLE, spd: +SPD.toFixed(2), outcome: champion ? 'WIN' : fin?.card || fin?.ended === 'lose' ? 'LOSE' : 'TIMEOUT', ropes: champion ? 5 : fin?.ropes, round: fin?.round, clockLeft: +(fin?.time ?? 0).toFixed(1), throws: fin?.throws, offs: fin?.offs, slips: fin?.slips, wins: fin?.wins, dodges: fin?.dodges, bonks: fin?.bonks, plants: fin?.plants, fpsMin, secs: +((Date.now() - t0) / 1000).toFixed(0), errs: errs.length };
+  const r = { run, style: STYLE, fakes: fin?.fakes, spd: +SPD.toFixed(2), outcome: champion ? 'WIN' : fin?.card || fin?.ended === 'lose' ? 'LOSE' : 'TIMEOUT', ropes: champion ? 5 : fin?.ropes, round: fin?.round, clockLeft: +(fin?.time ?? 0).toFixed(1), throws: fin?.throws, offs: fin?.offs, slips: fin?.slips, wins: fin?.wins, dodges: fin?.dodges, bonks: fin?.bonks, plants: fin?.plants, fpsMin, secs: +((Date.now() - t0) / 1000).toFixed(0), errs: errs.length };
+  r.tugs = await p.evaluate(() => window.__tugs.map(e => (e.end || '?') + '/' + e.taps)); // e.g. CAUGHT@1.1/2 = reeled in after 1.1 game-s with 2 taps
   results.push(r); console.log(JSON.stringify(r)); if (process.env.DBG) console.log(JSON.stringify(await p.evaluate(() => window.__lands)), JSON.stringify(await p.evaluate(() => window.__tugs)));
   await p.evaluate(() => { const g = window.__game; g.scene.getScenes(true).forEach(s => s.scene.stop()); g.scene.start('Title'); }); await wait(400);
 }

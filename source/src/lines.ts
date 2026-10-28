@@ -264,6 +264,14 @@ export const LINES = {
   // loss card big line (mixed with penLose minus the old dive line)
   penLose2: ['So close! Shoot AWAY from his lean!', 'Watch his tail on the last shots!'],
   // ================= end PENALTY PUP v2 =================
+  // ================= EDIT ME, Marc: PENALTY PUP "REBOUND BONK" (after a goal: quick second ball at his head, points only) =================
+  // Glassia after she bonks his head (the FIRST bonk of a game always uses line 1, Marc's line; after that they rotate)
+  penBonk: ['Glassia: Oops, sorry I did not mean to... haha!', 'Glassia: Oopsie! My hoof slipped... hehe.', 'Glassia: Sorry, sorry! ...Not sorry. Haha!', 'Glassia: Whoops! That ball REALLY likes you, Pup.', 'Glassia: Oh no, your poor head! ...Anyway, haha!'],
+  // Puppy, flustered, after the bonk
+  penBonkPup: ['Puppy: HEY! The goal was ALREADY in!', 'Puppy: Ow! You did that on PURPOSE!', 'Puppy: My noggin! I am telling Bunny!', 'Puppy: Rude. Cute, but RUDE.', 'Puppy: Seeing stars... and one smug pony.'],
+  // the big prompt when the window opens, and the small note when it closes unused / missed
+  penBonkPrompt: ['BONK HIM!'], penBonkSlow: ['too slow!'], penBonkMiss: ['missed!'],
+  // ================= end REBOUND BONK =================
   // ================= NANA "ACORN BARRAGE" twists: tail whack, snack thief, seeing stars, K.O. =================
   // EDIT ME: Puppy/Nana banter for the new Acorn Barrage moments (smug + sneaky, the odd sweet one). Hints are the one-line tutorials.
   acornHint: { swat: '❗ Tail wiggle = he WHACKS it back. WAIT!', munch: 'He\'s eating your acorn! BONK him first!', stars: '⭐ Seeing stars: every hit counts DOUBLE!' },

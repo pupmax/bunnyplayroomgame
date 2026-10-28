@@ -41,6 +41,8 @@ export const PK = {
   REACT: 150, CROUCH: 60, DIVE: 300, FLIGHT: 420, CHIP: 470, KICK_CONTACT: 120, QUICK: 600, SWIPE_MIN: 60, MID: 85,
   MEGA: 1.45,
   RESETS: 3, // he re-centres this many times if Glassia never shoots, then the shot is lost
+  /** REBOUND BONK (after a goal, points only): window length, fast-bonus cut-off, aim tolerance round his head (px, 720-wide world) */
+  BONK_WIN: 1100, BONK_FAST: 500, BONK_PTS: 300, BONK_PTS_FAST: 500, BONK_TOL: 120, BONK_TAP_R: 150, BONK_TOSS: 340,
 };
 const KX = 360, KY = 768, KM = 1.55; // keeper feet + art scale (2.07x the old 0.75 Puppy)
 const GOAL = { cx: 360, x0: 70, x1: 650, top: 440, ground: 770 };
@@ -186,17 +188,20 @@ export class FootballScene extends Phaser.Scene {
   private seq = 0; private down?: { x: number; y: number; t: number }; private held: 'none' | 'kp' | 'gla' = 'none';
   private dizzy?: Phaser.GameObjects.Container; private tellTw?: Phaser.Tweens.Tween; private wigTw?: Phaser.Time.TimerEvent; private firstEarly = true; private bagReact: string[] = []; private hiddenBall = false;
   private outroCard?: () => void; private ringG!: Phaser.GameObjects.Graphics; private ruleT!: Phaser.GameObjects.Text; private ruleBg!: Phaser.GameObjects.Graphics; private shownGo = false;
+  /** rebound bonk window: 'toss' (2nd ball in the air) -> 'open' (aim at his head) -> 'done' */
+  private bk?: { ph: 'toss' | 'open' | 'done'; t0: number; end: number; ball: Phaser.GameObjects.Container; g: Phaser.GameObjects.Graphics; prompt?: Phaser.GameObjects.Text };
+  private bonkBusy = 0; private reactWord?: Phaser.GameObjects.Text;
   constructor() { super('Football'); }
   private fresh() {
     return { shot: 0, goals: 0, noggins: 0, pride: 1, results: [] as (string | undefined)[], phase: 'intro', ready: false, over: false, score: 0,
       react: null as number | null, side: 0, fired: false, resets: 0, vis: { k: 'intro', side: 0, at: 0 } as Vis, last: '', hits: 0, kick: 0, mega: false,
       /** shot clock ring: wait (white) | read (yellow) | go (green) | off */
-      ring: 'off' as 'wait' | 'read' | 'go' | 'off', lean: 0, trueSide: 0, bluff: false, greenAt: 0, greenEnd: 0, greenLen: 1, nogginUsed: false, swaps: 0 };
+      ring: 'off' as 'wait' | 'read' | 'go' | 'off', lean: 0, trueSide: 0, bluff: false, greenAt: 0, greenEnd: 0, greenLen: 1, nogginUsed: false, swaps: 0, bonk: { offered: 0, hit: 0, fast: 0, slow: 0, miss: 0, pts: 0 } };
   }
   create() {
     setupCamera(this); this.cameras.main.fadeIn(250);
     this.st = this.fresh(); this.seq = 0; this.held = 'none'; this.ghost = 1; this.marks = []; this.crowd = []; this.firstEarly = true; this.bagReact = []; this.shownGo = false;
-    this.tweens.timeScale = 1; this.time.timeScale = 1; this.gnow = 0; this.clapping = false; this.down = undefined; this.dizzy = undefined; this.outroCard = undefined; this.hiddenBall = false;
+    this.tweens.timeScale = 1; this.time.timeScale = 1; this.gnow = 0; this.clapping = false; this.down = undefined; this.dizzy = undefined; this.outroCard = undefined; this.hiddenBall = false; this.bk = undefined; this.bonkBusy = 0;
     (this as any).kp = undefined;
     art(this, 0, 0, 'bg_pitch');
     // the pitch art's ad board still says BALL BONK: paint our own board over it
@@ -213,10 +218,7 @@ export class FootballScene extends Phaser.Scene {
     const rf = this.gla.point('rf'); this.GX += KX - (rf.x + 38); this.gla.setPosition(this.GX, this.GY); this.BALL0 = { x: KX, y: rf.y - 24 };
     this.ballSh = this.add.ellipse(this.BALL0.x, this.BALL0.y + 28, 58, 16, 0x0b3a14, 0.35).setDepth(44);
     this.ringG = this.add.graphics().setDepth(44.5);
-    this.ball = this.add.container(this.BALL0.x, this.BALL0.y).setDepth(45);
-    const bg = this.add.graphics(); bg.fillStyle(0xffffff, 1).lineStyle(5, COLORS.INK, 1).fillCircle(0, 0, 32).strokeCircle(0, 0, 32);
-    bg.fillStyle(COLORS.INK, 1).fillCircle(0, 0, 10); [0, 1, 2, 3, 4].forEach(i => { const a = i * 1.256; bg.fillCircle(Math.cos(a) * 24, Math.sin(a) * 24, 6); });
-    bg.fillStyle(0xffffff, 0.6).fillCircle(-12, -14, 6); this.ball.add(bg);
+    this.ball = this.makeBall(this.BALL0.x, this.BALL0.y);
     this.aimG = this.add.graphics().setDepth(50);
     this.bun = art(this, 646, 1262, 'bun_full_laugh', 0.5).setDepth(38); this.clapG = this.add.graphics().setDepth(39);
     // HUD
@@ -239,10 +241,15 @@ export class FootballScene extends Phaser.Scene {
       if (dead) return;
       this.kp = new Keeper(this);
       (window as any).__pr = { scene: 'Football', st: this.st, force: (win: boolean) => this.finish(win), pup: () => ({ x: this.kp.c.x, y: this.kp.c.y }),
-        zones: () => ZONES.map(z => ({ ...z })), ball: () => ({ x: this.ball.x, y: this.ball.y }), now: () => this.gnow, tune: PK, ring: () => this.st.ring };
+        zones: () => ZONES.map(z => ({ ...z })), ball: () => ({ x: this.ball.x, y: this.ball.y }), now: () => this.gnow, tune: PK, ring: () => this.st.ring, head: () => this.kp.head(), bonk: () => this.bk?.ph ?? 'none', bonkAt: (x: number, y: number, tap = true) => this.bonkShot(x, y, tap) };
       tutorialCard(this, 'glassia_pen2', 'PENALTY PUP!', ['You are GLASSIA! Puppy is in goal.', 'He LEANS to guess where you will kick.', 'Ring GREEN? SWIPE (or tap) the OTHER corner!', 'Kick on yellow = he saves it. Too slow = he scolds!', `${PK.SHOTS} shots: score ${PK.NEED} goals to win!`], () => this.begin());
     };
     if (KEEPER_KEYS.every(k => this.textures.exists(k))) go(); else ensureArt(this, KEEPER_KEYS).then(go);
+  }
+  private makeBall(x: number, y: number) {
+    const c = this.add.container(x, y).setDepth(45), bg = this.add.graphics(); bg.fillStyle(0xffffff, 1).lineStyle(5, COLORS.INK, 1).fillCircle(0, 0, 32).strokeCircle(0, 0, 32);
+    bg.fillStyle(COLORS.INK, 1).fillCircle(0, 0, 10); [0, 1, 2, 3, 4].forEach(i => { const a = i * 1.256; bg.fillCircle(Math.cos(a) * 24, Math.sin(a) * 24, 6); });
+    bg.fillStyle(0xffffff, 0.6).fillCircle(-12, -14, 6); c.add(bg); return c;
   }
   private setRule(s: string) {
     this.ruleT.setText(s); const w = this.ruleT.width + 40, g = this.ruleBg.clear();
@@ -284,7 +291,7 @@ export class FootballScene extends Phaser.Scene {
   /** shot-timing clock: scene time that respects time.timeScale (hit-stop / test freezes cannot turn a fair shot into an early one) */
   private gnow = 0;
   update(t: number, dt: number) {
-    this.gnow += dt * this.time.timeScale; if (!this.kp) return; this.kp.draw(t); this.drawRing(t);
+    this.gnow += dt * this.time.timeScale; if (!this.kp) return; this.kp.draw(t); this.drawRing(t); this.drawBonk(t);
     if (this.held === 'kp') { const m = this.kp.gloveMid(); this.ball.setPosition(m.x, m.y - 6); this.ballSh.setAlpha(0); }
     else if (this.held === 'gla') { const p = this.gla.point('rp'); this.ball.setPosition(p.x, p.y - 30); this.ballSh.setAlpha(0); }
     if (this.strings.visible && this.kp.wrap.visible) { const top = this.kp.world(0, -0.47 * this.kp.h - 0.55 * this.kp.h); const g = this.strings.clear(); g.lineStyle(4, 0xffffff, 0.9);
@@ -444,8 +451,9 @@ export class FootballScene extends Phaser.Scene {
   }
   private onUp(p: Phaser.Input.Pointer) {
     const d = this.down; this.down = undefined; this.aimG.clear(); if (!d) return; const s = this.st; this.drawZones(0.22);
-    if (!s.ready || s.fired || s.over) return;
     const w = worldPoint(this, p), dx = w.x - d.x, dy = w.y - d.y, dist = Math.hypot(dx, dy);
+    if (this.bk?.ph === 'open' && !s.over) { this.bonkInput(w.x, w.y, dx, dy, dist); return; }
+    if (!s.ready || s.fired || s.over) return;
     let z: Zone | null = null;
     if (dist >= PK.SWIPE_MIN) z = this.aimFrom(dx, dy); else if (dist < 30) z = this.tapZone(w.x, w.y);
     if (!z) { floatText(this, W / 2, 960, 'SWIPE to a corner (or tap one)!', '#fff', 34); (window as any).__pr.hint = 1; return; }
@@ -569,7 +577,7 @@ export class FootballScene extends Phaser.Scene {
     this.gla.setMood('happy').act([{ dur: 0.18, to: { ls: -160, le: -20, rs: 160, re: 20, lh: -10, rh: 10, dy: -14, sq: 0.06 }, ease: Phaser.Math.Easing.Back.Out },
       { dur: 0.12, to: { ls: -140, rs: 140, dy: -2 } }, { dur: 0.12, to: { ls: -165, rs: 165, dy: -12 } }, { dur: 0.3, to: { ls: -150, rs: 150, dy: -4 } }], false, 0.3);
     this.time.delayedCall(250, () => popBanner(this, pick(LINES.penGoal), 330, 0x3a86ff, 900));
-    this.time.delayedCall(1000, () => !s.over && s.pride > 0.001 && Math.random() < 0.5 && say(this, 300, 860, pick(LINES.penCheer), 22, 1000));
+    this.time.delayedCall(1000, () => !s.over && !this.bk && s.pride > 0.001 && Math.random() < 0.5 && say(this, 300, 860, pick(LINES.penCheer), 22, 1000));
   }
   /** he guessed wrong: full dive the wrong way, ball in the open corner, then slapstick (shots 7-8: WRONG WAY, PUP! double-take first) */
   private goal(z: Zone, d: -1 | 1, react: number) {
@@ -582,8 +590,10 @@ export class FootballScene extends Phaser.Scene {
       if (!this.bagReact.length) this.bagReact = Phaser.Utils.Array.Shuffle(['post', 'net', 'slide']);
       const r = this.bagReact.pop()!; (window as any).__pr.react = r; k.flail = 0;
       const go = () => r === 'post' ? this.rPost(d) : r === 'net' ? this.rNet(d, z) : this.rSlide(d, z);
-      if (n >= 6) { this.wrongWay(d, z); this.time.delayedCall(1150, () => !s.over && go()); } else this.time.delayedCall(250, go);
-      this.result('goal');
+      const goAt = n >= 6 ? 1150 : 250; if (n >= 6) { this.wrongWay(d, z); this.time.delayedCall(goAt, () => !s.over && go()); } else this.time.delayedCall(goAt, go);
+      // REBOUND BONK: opens as his slapstick lands him on his bottom (post / net / slide settle at different times)
+      const open = goAt + ({ post: 700, net: 900, slide: 800 } as Record<string, number>)[r];
+      if (this.result('goal', open + PK.BONK_WIN + 650)) this.bonkOffer(open);
     }, 20);
   }
   /** shots 7-8 slapstick: he sits up, looks the way he dived, looks at the ball, looks back... ?! */
@@ -613,7 +623,7 @@ export class FootballScene extends Phaser.Scene {
       this.tweens.add({ targets: k.c, y: feetY, duration: 300, ease: 'Quad.Out', onComplete: () => {
         const hp = k.head(); Fx.punch(); Fx.boing(); this.cameras.main.shake(220, 0.014);
         this.tweens.add({ targets: this.frame, x: { from: b * 7, to: 0 }, duration: 500, ease: 'Elastic.Out' });
-        const w = comic(this, hp.x - b * 20, hp.y - 80, 'BONK!', 80).setDepth(78).setAngle(b * 10); this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
+        const w = comic(this, hp.x - b * 20, hp.y - 80, 'BONK!', 80).setDepth(78).setAngle(b * 10); this.reactWord = w; this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
         sparks(this, xp, hp.y, 14); k.setTex('pup_box_dizzy'); this.dizzyStars();
         // knocked back off the post and flops down flat
         // bounces off the post and drops onto his bottom beside it, dizzy (stays inside the goal)
@@ -631,7 +641,7 @@ export class FootballScene extends Phaser.Scene {
       this.tweens.add({ targets: k.c, x: nx, duration: 380, ease: 'Sine.InOut' });
       this.tweens.chain({ targets: k.c, tweens: [{ y: KY - 150, scaleX: 0.92, scaleY: 0.92, duration: 220, ease: 'Quad.Out' }, { y: KY - 70, duration: 160, ease: 'Quad.In', onComplete: () => {
         Fx.boing(); this.bulgeAt(nx, KY - 0.62 * k.h - 70); k.setTex('pup_box_dizzy'); k.c.setScale(1.0, 0.86);
-        const w = comic(this, nx, KY - 330, 'FWUMP!', 72).setDepth(78); this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
+        const w = comic(this, nx, KY - 330, 'FWUMP!', 72).setDepth(78); this.reactWord = w; this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
         k.pose('up', 120); this.dizzyStars(1400);
         // stuck to the net for a beat, then drops onto his bottom
         this.tweens.add({ targets: k.c, y: KY, scaleX: 1, scaleY: 1, delay: 450, duration: 380, ease: 'Bounce.Out', onComplete: () => this.thud(k.c.x, KY) });
@@ -648,7 +658,7 @@ export class FootballScene extends Phaser.Scene {
     k.pose('dive', 200);
     const skid = this.add.graphics().setDepth(13), x0 = sx;
     this.time.delayedCall(330, () => {
-      const w = comic(this, (x0 + ex) / 2, KY - 200, 'SKRRRT!', 66).setDepth(78); this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
+      const w = comic(this, (x0 + ex) / 2, KY - 200, 'SKRRRT!', 66).setDepth(78); this.reactWord = w; this.tweens.add({ targets: w, alpha: 0, delay: 800, duration: 260, onComplete: () => w.destroy() });
       this.tweens.add({ targets: k.c, x: ex, duration: 700, ease: 'Quad.Out', onUpdate: () => {
         skid.clear().lineStyle(14, 0x2a6b2a, 0.5).lineBetween(x0, KY - 4, k.c.x, KY - 4);
         if (Math.random() < 0.4) { const d = this.add.circle(k.c.x - b * 20, KY - 4, 12, 0xe9f5d0, 0.8).setDepth(31); this.tweens.add({ targets: d, y: d.y - 24, scale: 1.8, alpha: 0, duration: 360, onComplete: () => d.destroy() }); } },
@@ -685,18 +695,106 @@ export class FootballScene extends Phaser.Scene {
       } });
     });
   }
-  private result(kind: string) {
+  /** books the shot; returns true if the round goes on (so a rebound bonk can be offered). `wait` = min ms before the next shot. */
+  private result(kind: string, wait = 1900): boolean {
     const s = this.st; s.last = kind; (window as any).__pr.last = kind; s.results[s.shot] = kind; s.shot++; s.kick = s.shot; s.hits = s.goals; this.updateHud();
-    if (s.pride <= 0.001) { this.time.delayedCall(kind === 'noggin' ? 1500 : 1300, () => this.finish(true)); return; }
+    if (s.pride <= 0.001) { this.time.delayedCall(kind === 'noggin' ? 1500 : 1300, () => this.finish(true)); return false; }
     const left = PK.SHOTS - s.shot;
-    if (left <= 0 || s.pride > left * PK.DRAIN_NOGGIN + 1e-6) { this.time.delayedCall(1500, () => this.finish(false)); return; }
-    this.time.delayedCall(1900, () => !s.over && this.startShot());
+    if (left <= 0 || s.pride > left * PK.DRAIN_NOGGIN + 1e-6) { this.time.delayedCall(1500, () => this.finish(false)); return false; }
+    const next = () => { if (s.over) return; const rest = this.bonkBusy - this.gnow; if (rest > 0) this.time.delayedCall(rest, next); else this.startShot(); };
+    this.time.delayedCall(Math.max(1900, wait), next);
+    return true;
+  }
+  // ---------------- REBOUND BONK (after a goal: a 2nd ball pops to Glassia, she has ~1 s to bonk his head; points only) ----------------
+  private bonkOffer(openAt: number) {
+    const s = this.st, ball = this.makeBall(this.bun.x - 20, this.bun.y - 120).setScale(0.8).setAlpha(0).setDepth(46), g = this.add.graphics().setDepth(70);
+    this.bk = { ph: 'toss', t0: 0, end: 0, ball, g }; s.bonk.offered++;
+    // Bunny (the ref) tosses a spare ball: it pops in an arc to Glassia's foot just as the window opens
+    this.after(Math.max(0, openAt - PK.BONK_TOSS), () => {
+      if (!this.bk || this.bk.ball !== ball) return; ball.setAlpha(1); Fx.whoosh();
+      this.tweens.add({ targets: this.bun, y: this.bun.y - 24, yoyo: true, duration: 140, ease: 'Quad.Out' });
+      const x0 = ball.x, y0 = ball.y, o = { t: 0 };
+      this.tweens.add({ targets: o, t: 1, duration: PK.BONK_TOSS, ease: 'Linear', onUpdate: () => { const t = o.t;
+        ball.setPosition(x0 + (this.BALL0.x - x0) * t, y0 + (this.BALL0.y - y0) * t - Math.sin(t * Math.PI) * 170).setScale(0.8 + 0.2 * t).setAngle(-t * 540); },
+        onComplete: () => { Fx.boing(); ball.setScale(1.2, 0.8); this.tweens.add({ targets: ball, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.Out' }); this.bonkOpen(); } });
+    });
+  }
+  private bonkOpen() {
+    const b = this.bk; if (!b || b.ph !== 'toss' || this.st.over) return;
+    b.ph = 'open'; b.t0 = this.gnow; b.end = this.gnow + PK.BONK_WIN; this.vis('bonk');
+    if (this.reactWord?.active) { this.tweens.killTweensOf(this.reactWord); this.tweens.add({ targets: this.reactWord, alpha: 0, duration: 120, onComplete: () => this.reactWord?.destroy() }); }
+    const pr = comic(this, W / 2, 925, pick(LINES.penBonkPrompt), 78).setDepth(81).setAngle(-4).setScale(0.3); b.prompt = pr;
+    this.tweens.add({ targets: pr, scale: 1, duration: 140, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: pr, scale: 1.08, yoyo: true, repeat: -1, duration: 160 }) });
+    this.after(PK.BONK_WIN, () => { if (this.bk === b && b.ph === 'open') this.bonkClose('slow'); });
+  }
+  /** target ring on his head + the draining timer arc round it */
+  private drawBonk(t: number) {
+    const b = this.bk; if (!b) return; const g = b.g.clear(); if (b.ph !== 'open') return;
+    const hp = this.kp.head(), f = Phaser.Math.Clamp((b.end - this.gnow) / PK.BONK_WIN, 0, 1), r = 74 + 6 * Math.sin(t / 70);
+    g.lineStyle(16, INK, 0.75).strokeCircle(hp.x, hp.y, r);
+    g.lineStyle(10, f > 0.35 ? 0xff4b8b : 0xff2b2b, 1).beginPath(); g.arc(hp.x, hp.y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * f); g.strokePath();
+    g.lineStyle(5, 0xffffff, 0.95).strokeCircle(hp.x, hp.y, 30);
+    for (const a of [0, 1, 2, 3]) { const q = a * Math.PI / 2; g.lineBetween(hp.x + Math.cos(q) * 38, hp.y + Math.sin(q) * 38, hp.x + Math.cos(q) * (r - 14), hp.y + Math.sin(q) * (r - 14)); }
+  }
+  /** a swipe (aimed up the pitch) or a tap: work out where it goes at his head height and shoot */
+  private bonkInput(x: number, y: number, dx: number, dy: number, dist: number) {
+    const hp = this.kp.head();
+    if (dist >= PK.SWIPE_MIN && dy < -20) this.bonkShot(this.BALL0.x + dx * (hp.y - this.BALL0.y) / dy, hp.y, false);
+    else if (dist < 30) this.bonkShot(x, y, true);
+  }
+  bonkShot(tx: number, ty: number, tap: boolean) {
+    const b = this.bk, s = this.st; if (!b || b.ph !== 'open' || s.over) return; b.ph = 'done';
+    const ms = Math.round(this.gnow - b.t0), hp = this.kp.head();
+    const hit = tap ? Math.hypot(tx - hp.x, ty - hp.y) <= PK.BONK_TAP_R : Math.abs(tx - hp.x) <= PK.BONK_TOL;
+    (window as any).__pr.bonkLast = { hit, ms }; b.prompt?.destroy(); b.g.clear();
+    // Glassia's quick toe-poke (same rig as the penalty kick)
+    this.gla.act([{ dur: 0.06, to: { rh: -60, rk: 55, lean: -8, dy: 4 } }, { dur: 0.05, to: { rh: 110, rk: -4, lean: 10, dy: -4 } }, { dur: 0.16, to: { rh: 40, rk: 10, lean: 2 } }], false, 0.3);
+    const ball = b.ball; Fx.kick(); this.cameras.main.shake(60, 0.004);
+    if (!hit) {
+      const ex = Phaser.Math.Clamp(tx, 40, W - 40); this.tweens.add({ targets: ball, x: ex, y: hp.y - 80, scale: 0.5, angle: 540, duration: 300, ease: 'Quad.Out',
+        onComplete: () => this.tweens.add({ targets: ball, y: ball.y - 120, alpha: 0, duration: 300, onComplete: () => ball.destroy() }) });
+      s.bonk.miss++; floatText(this, W / 2, 960, pick(LINES.penBonkMiss), '#ffffff', 32); this.bk = undefined; return;
+    }
+    // homing flight: the ball meets his head wherever his slapstick has him
+    const x0 = ball.x, y0 = ball.y, o = { t: 0 }, dur = 230; Fx.whoosh();
+    this.tweens.add({ targets: o, t: 1, duration: dur, ease: 'Linear', onUpdate: () => { const h2 = this.kp.head(), t = o.t;
+      ball.setPosition(x0 + (h2.x - x0) * t, y0 + (h2.y - y0) * t - Math.sin(t * Math.PI) * 60).setScale(1 - 0.4 * t).setAngle(t * 720); },
+      onComplete: () => this.bonkHit(ms) });
+    this.bonkBusy = this.gnow + dur + 1900;
+  }
+  private bonkHit(ms: number) {
+    const s = this.st, k = this.kp, b = this.bk; if (!b || s.over) return; const ball = b.ball, hp = k.head();
+    const fast = ms < PK.BONK_FAST, pts = fast ? PK.BONK_PTS_FAST : PK.BONK_PTS; s.score += pts; s.bonk.hit++; s.bonk.pts += pts; if (fast) s.bonk.fast++;
+    Fx.punch(); Fx.boing(); const ts = this.tweens.timeScale; this.tweens.timeScale = ts * 0.05; this.time.delayedCall(70, () => { this.tweens.timeScale = ts; });
+    impact(this, hp.x, hp.y, '', 0, '', false); sparks(this, hp.x, hp.y, 14); flashVignette(this, 0xffffff, 0.35); this.cameras.main.shake(160, 0.01);
+    const w = comic(this, Phaser.Math.Clamp(hp.x + (hp.x > KX ? -190 : 190), 170, W - 170), hp.y - 10, 'BONK!', 92).setDepth(79).setAngle(-8).setScale(0.3); this.tweens.add({ targets: w, scale: 1, duration: 160, ease: 'Back.Out' });
+    this.tweens.add({ targets: w, alpha: 0, y: w.y - 30, delay: 800, duration: 260, onComplete: () => w.destroy() });
+    floatText(this, W / 2, 900, `+${pts} ${fast ? 'FAST BONK!' : 'BONK!'}`, fast ? '#ffdf6b' : '#7dff9a', 42);
+    // the ball pings off his head and away
+    this.tweens.add({ targets: ball, x: hp.x + (hp.x < KX ? 1 : -1) * 220, y: hp.y - 300, angle: ball.angle + 540, scale: 0.4, alpha: 0, duration: 600, ease: 'Quad.Out', onComplete: () => ball.destroy() });
+    // he goes down on his bottom where he is, squashed, seeing stars (arms out, still the goalie rig)
+    this.tweens.killTweensOf(k.c); k.flail = 0; k.setTex('pup_box_dizzy'); this.dizzyStars(1700);
+    const kx = Phaser.Math.Clamp(k.c.x, GOAL.x0 + 0.4 * k.h, GOAL.x1 - 0.4 * k.h);
+    k.c.setScale(1.22, 0.78); this.tweens.add({ targets: k.c, x: kx, y: KY, angle: 0, duration: 260, ease: 'Bounce.Out' });
+    this.tweens.add({ targets: k.c, scaleX: 1, scaleY: 1, duration: 480, ease: 'Elastic.Out', easeParams: [1.3, 0.35] }); k.pose('sit', 200);
+    this.tweens.add({ targets: this.bar, x: { from: 6, to: 0 }, duration: 360, ease: 'Elastic.Out' }); // PUPPY PRIDE wobbles (no extra drain: the bonus is points only)
+    this.gla.setMood('smug'); const first = s.bonk.hit === 1;
+    this.after(260, () => { say(this, 300, 860, first ? LINES.penBonk[0] : pick(LINES.penBonk), 22, 1500);
+      this.gla.setMood('happy').act([{ dur: 0.12, to: { dy: -10, tilt: -6 } }, { dur: 0.12, to: { dy: 0, tilt: 4 } }, { dur: 0.12, to: { dy: -8, tilt: -4 } }, { dur: 0.2, to: { dy: 0, tilt: 0 } }], false, 0.3); });
+    this.after(1050, () => say(this, 470, 416, pick(LINES.penBonkPup), 22, 1100));
+    this.vis('bonkhit'); this.bk = undefined;
+  }
+  private bonkClose(why: 'slow') {
+    const b = this.bk; if (!b) return; b.ph = 'done'; b.prompt?.destroy(); b.g.clear(); this.st.bonk.slow++;
+    floatText(this, W / 2, 960, pick(LINES.penBonkSlow), '#ffffff', 32); void why;
+    this.tweens.add({ targets: b.ball, x: b.ball.x + 140, y: b.ball.y + 30, angle: 360, alpha: 0, duration: 500, ease: 'Quad.Out', onComplete: () => b.ball.destroy() });
+    this.bk = undefined;
   }
   // ---------------- endings ----------------
   finish(win: boolean) {
     const s = this.st; if (s.over) return; s.over = true; s.ready = false; s.phase = 'over'; ++this.seq; this.clearTell(); this.aimG.clear();
     (window as any).__pr.ended = win ? 'win' : 'lose'; this.updateHud();
-    const score = s.score + (win ? (PK.SHOTS - s.shot) * 300 : 0), detail = `${s.goals} goal${s.goals === 1 ? '' : 's'}${s.noggins ? ` • ${s.noggins} noggin bonk${s.noggins > 1 ? 's' : ''}` : ''}`;
+    const score = s.score + (win ? (PK.SHOTS - s.shot) * 300 : 0), detail = `${s.goals} goal${s.goals === 1 ? '' : 's'}${s.noggins ? ` • ${s.noggins} noggin bonk${s.noggins > 1 ? 's' : ''}` : ''}${s.bonk.hit ? ` • ${s.bonk.hit} rebound bonk${s.bonk.hit > 1 ? 's' : ''}` : ''}`;
     let shown = false; const card = () => { if (shown) return; shown = true; endCard(this, 'Glassia', 1, win, score, detail); if (!win) this.lossCard(); };
     if (win) this.winOutro(card); else this.lossOutro(card);
   }

@@ -437,8 +437,9 @@ export class HeroRig {
   private update(_t: number, dms: number) { const dt = Math.min(dms, 50) / 1000; this.t += dt; this.anim.update(dt); this.apply(); }
 }
 
-/** Puppy flails: temporary noodle arms + legs windmilling on a Puppy image (follows it, then pops away). Cartoon only. */
-export function pupFlail(scene: Phaser.Scene, img: Phaser.GameObjects.Image, ms = 700) {
+/** Puppy flails: temporary noodle arms + legs windmilling on a Puppy image (follows it, then pops away). Cartoon only.
+ *  limbK scales the limb length (both segments; roots stay on the body). Default 1; Dive's airborne Puppy uses a shorter set (Marc fb 28 Oct). */
+export function pupFlail(scene: Phaser.Scene, img: Phaser.GameObjects.Image, ms = 700, limbK = 1) {
   const g = scene.add.graphics(); const t0 = scene.time.now; const FUR = 0xc97830, INK = 0x3b1f10;
   const upd = () => {
     if (!img.active) return stop(); const k = (scene.time.now - t0) / ms; if (k >= 1) return stop();
@@ -453,7 +454,7 @@ export function pupFlail(scene: Phaser.Scene, img: Phaser.GameObjects.Image, ms 
       g.lineStyle(w, FUR, fade).beginPath(); g.moveTo(bx, by); g.lineTo(ex, ey); g.lineTo(px, py); g.strokePath();
       g.fillStyle(INK, fade).fillCircle(px, py, w * 0.8).fillStyle(0xe7a058, fade).fillCircle(px, py, w * 0.6);
     };
-    lim(-70, -100, -115, 31, 50); lim(70, -100, 115, 29, 50); lim(-34, -14, -45, 27, 40); lim(34, -14, 45, 33, 40);
+    lim(-70, -100, -115, 31, 50 * limbK); lim(70, -100, 115, 29, 50 * limbK); lim(-34, -14, -45, 27, 40 * limbK); lim(34, -14, 45, 33, 40 * limbK);
   };
   const stop = () => { scene.events.off('update', upd); g.destroy(); };
   scene.events.on('update', upd); scene.events.once('shutdown', stop);

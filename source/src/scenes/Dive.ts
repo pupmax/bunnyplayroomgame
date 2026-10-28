@@ -20,7 +20,8 @@ import { HeroRig, pupFlail } from '../systems/rigs';
 // Tuning (sim-checked in pups3-out/midnight/sim.mjs: avg bot ~66%; eased in audit27: NEED 7->5, CHIM_P .55->.40, chimney stun 1.0->0.7 s, -2 s->-1 s, 0.8 s immunity)
 const TIME = 50, NEED = 7, // Marc fb 27 Oct ('a bit too easy'): NEED 5->6, CHIM_P .40->.45; 2nd pass ('still a bit easy'): NEED 6->7, CHIM_P .45->.48, SPEED 280->308, hop gaps 1.2-2.0->0.9-1.5 s
   SPEED = 308, RAMP = 0.3, MX = 190;
-const SNATCH_R = 95, MOON_R = 160, HOP_H = 110, CHIM_P = 0.48;
+const SNATCH_R = 88, MOON_R = 160, HOP_H = 110, CHIM_P = 0.48; // Marc fb 28 Oct ('slightly more difficult'): SNATCH_R 95->88 (catch reach -7%; sim avg bot win 50%->44%)
+const AIR_LIMB = 0.78; // Marc fb 28 Oct: airborne Puppy's flailing arms + legs 22% shorter (carry + fling)
 const CARRY_T = 2.6; // after a snatch Midnight carries the crying Puppy through the air for CARRY_T s; the clock + hazards pause meanwhile
 const STUN = 0.7, BONK_S = 1, IMMUNE = 0.8; // audit27: shorter chimney stun, -1 s, then 0.8 s chimney immunity (blinking) so bonks can't chain
 const MOON_SNATCH = 35, MOON_CLOSE = 15, MOON_T = 5, HIGH_DIVE_Y = 470, CHAIN_T = 7;
@@ -300,7 +301,7 @@ export class DiveScene extends Phaser.Scene {
     this.tweens.add({ targets: beam, alpha: 0, duration: 500, onComplete: () => beam.destroy() });
     flashVignette(this, 0xfff4c0, high ? 0.5 : 0.3);
     const cam = this.cameras.main; cam.zoomTo(this.zoom0 * 1.05, 90, 'Sine.easeOut', true); this.time.delayedCall(160, () => cam.zoomTo(this.zoom0, 260, 'Sine.easeInOut', true));
-    this.tweens.killTweensOf(p.img); p.img.setTexture('pup_panic').setAngle(0).setY(0); this.pupS = p.img.scaleX; p.shadow.destroy(); pupFlail(this, p.img, CARRY_T * 1000 + 300); // legs kick the whole carry
+    this.tweens.killTweensOf(p.img); p.img.setTexture('pup_panic').setAngle(0).setY(0); this.pupS = p.img.scaleX; p.shadow.destroy(); pupFlail(this, p.img, CARRY_T * 1000 + 300, AIR_LIMB); // legs kick the whole carry
     // talon grab: legs snap forward and clench shut around him, wings/arms flare
     this.rig.act([{ dur: 0.05, to: { lh: 80, lk: -10, rh: 95, rk: -15, ls: -130, rs: 130 } }, { dur: 0.08, to: { lh: 60, lk: 95, rh: 75, rk: 100, sq: -0.06 }, ease: Phaser.Math.Easing.Back.Out },
       { dur: 0.45, to: { lh: 55, lk: 100, rh: 70, rk: 105, ls: -110, rs: 110 } }], false, 0.25);

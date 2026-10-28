@@ -1,7 +1,10 @@
 // BUNNY FINALE — PLAYROOM RODEO: you are Bunny, the 8 girls cheer from the pink couch.
 // HOLD to twirl the lasso (longer = bigger loop), SLIDE your finger to where Puppy is GOING, LET GO to fling.
 // A loop that lands on him snags him: TAP TAP TAP to reel him in (tug meter, Tail Catch style). Reeled in = hog-tied
-// for a moment (clock paused), then he wriggles free. Three rounds (1 + 2 + 2 catches): 1 TROT, 2 SNEAKY (fake stops + a
+// for a moment (clock paused), then he wriggles free. 28 Oct v3 (Marc: 'too easy, it's the finale'): Puppy is DODGY by default and can
+// only be roped inside short gold NOW! windows (R1 he stops to pant, R2 he sniffs a treat from the couch, R3 he poses for Iris's photo
+// or faceplants after a dodged charge). A throw that lands outside a window: he sidesteps, taunts, the clock loses 0.7 s.
+// Three rounds (1 + 2 + 2 catches): 1 TROT, 2 SNEAKY (fake stops + a
 // cardboard decoy), 3 ZOOMIES (he charges you: SWIPE to dodge, he faceplants = free rope). The last catch stays tied and
 // Bunny drags him off by the rope.
 import Phaser from 'phaser';
@@ -19,7 +22,7 @@ import { Hud, impact } from '../systems/level';
 import { Storage } from '../systems/storage';
 import { TailPup } from '../systems/tailRigs';
 import { bakeG } from '../systems/bake';
-import { HangPup, ensureHangArt, type HangKind } from '../art/pupHang';
+import { HangPup, ensureHangArt, drawSnare, headHearts, type HangKind } from '../art/pupHang';
 
 type Mode = 'idle' | 'twirl' | 'hold' | 'walk' | 'dizzy';
 /** Bunny (stays white: same bun_rig body + su_bun limb art as BunnyRig) with a jointed lasso arm.
@@ -81,7 +84,7 @@ class LassoBunny {
 const TW_SH = 235, TW_EL = -25; // twirl arm: shoulder/elbow angles (180 = straight up, bigger = out to her right)
 /** Tuning (real touch on a phone). Times in seconds, distances in game px (720 x 1280). */
 export const LK = {
-  TIME: 26,            // clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
+  TIME: 38,            // clock (runs only while Puppy is loose: paused during the tug, the tie-up and round banners)
   NEED: 5,             // catches to win: 1 TROT warm-up, 2 SNEAKY, 2 ZOOMIES
   ROUND_AT: [0, 1, 3], // catches at which rounds 1/2/3 start
   SPIN: 0.45,          // one twirl of the loop
@@ -94,8 +97,14 @@ export const LK = {
   DECOY_P: 0.35, DECOY_CD: 5, DECOY_LIFE: 4,    // R2: chance per wind-up that he swaps in a cardboard Puppy
   CHARGE_FIRST: 1.2, CHARGE_EVERY: [3.2, 5.0],    // R3: Puppy charges Bunny this often (free-time seconds)
   CHARGE_WIND: 1.0, CHARGE_RUN: 0.5,              // warning (paw scrape + red ring) then the dash; swipe any time in between
-  PLANT: 2.6, BONK: 0.9, FREE_PAD: 60,           // faceplant (free rope: any loop within FREE_PAD extra px hits) / Bunny bonked
-  TUG0: 0.25, TUG_TAP: 0.1, TUG_PULL: [0.13, 0.17, 0.21], TUG_SURGE: 0.14, TUG_GRACE: 0.6, TUG_MIN: 1.8, // tap-fast reel-in
+  PLANT: 1.6, BONK: 0.9, FREE_PAD: 60,           // faceplant = an R3 catch window (free rope: any loop within FREE_PAD extra px hits) / Bunny bonked
+  // catch windows (28 Oct v3): Puppy is only catchable inside these. TELL = the ears-perk + faint ring warning before a window opens
+  WIN_FIRST: [1.0, 1.2, 1.2],                       // first window this long (free time) after a round starts / he is let go
+  WIN_EVERY: [[2.2, 2.8], [2.8, 3.6], [3.4, 4.2]],  // then one every this many seconds (free time)
+  WIN: [1.5, 1.1, 0.75],                            // how long a window stays open, per round (R3 0.85 -> 0.75: the pro touch bot won 4/4 with ~26 s spare)
+  TELL: 0.35, WIN_GRACE: 0.1,                       // warning before it opens / a loop landing this soon after it shuts still counts
+  OFF_COST: 0.7, OFF_LOCK: 0.6,                     // a throw that lands outside a window: clock penalty + no throwing for this long
+  TUG0: 0.15, TUG_TAP: 0.075, TUG_PULL: [0.18, 0.24, 0.30], TUG_SURGE: 0.20, SURGE_P: 0.55, TUG_GRACE: 0.6, TUG_MIN: 2.4, // tap-fast reel-in (harder)
   TIE: 2.5,            // hog-tied moment after each catch (clock paused)
   BANNER: 1.3,         // round banner (clock paused)
 };
@@ -118,7 +127,7 @@ export class LassoScene extends Phaser.Scene {
   static fresh() {
     return { time: LK.TIME, ropes: 0, round: 1, throws: 0, misses: 0, slips: 0, dodges: 0, plants: 0, bonks: 0, decoys: 0, score: 0,
       running: false, over: false, phase: 'intro' as Phase, pup: 'pause' as PupS, px: 480, py: 1060, hold: false, holdT: 0, tx: 450, ty: 1050, flying: false,
-      tug: 0, tugT: 0, tieT: 0, clock: 0, bannerT: 0, stun: 0, dodged: false };
+      tug: 0, tugT: 0, tieT: 0, clock: 0, bannerT: 0, stun: 0, dodged: false, win: 'closed' as 'closed' | 'tell' | 'open', wins: 0, offs: 0, nopes: 0, lock: 0 };
   }
   private bunny!: LassoBunny; private pup!: TailPup; private hud!: Hud; private roundChip!: Phaser.GameObjects.Text; private roundPill!: Phaser.GameObjects.Graphics;
   private fx!: Phaser.GameObjects.Graphics; private ropeG!: Phaser.GameObjects.Graphics; private grip!: Phaser.GameObjects.Arc; private meter!: Phaser.GameObjects.Graphics;
@@ -129,6 +138,8 @@ export class LassoScene extends Phaser.Scene {
   private tapTxt?: Phaser.GameObjects.Text; private warn: Phaser.GameObjects.GameObject[] = []; private hint?: Phaser.GameObjects.Container; private outroT = 0; private heartT = 0;
   private hang!: HangPup; private hangG!: Phaser.GameObjects.Graphics; private hangTop!: Phaser.GameObjects.Container; private lamp!: Phaser.GameObjects.Container; private lampBar!: Phaser.GameObjects.Graphics;
   private hanging: HangKind | '' = ''; private hangT = 0; private hangSeq: HangKind[] = []; private hangDrop = false; private hangFx: Phaser.GameObjects.GameObject[] = [];
+  private winT = 0; private tellT = 0; private winLeft = 0; private winLen = 1; private closedAgo = 9; private winFx: Phaser.GameObjects.GameObject[] = []; private nowRing?: Phaser.GameObjects.Ellipse; private glow?: Phaser.GameObjects.Graphics;
+  private floorTalk?: Phaser.GameObjects.Container; private byOff = 0; private bunShadow!: Phaser.GameObjects.Ellipse; private firstNow = true;
   private downX = 0; private downY = 0; private downT = 0; private bxOff = 0; private dustT = 0; private lastHud = ''; private stars?: Phaser.GameObjects.Text; private first = { tug: true, plant: true };
   constructor() { super('Lasso'); }
   create() {
@@ -137,7 +148,8 @@ export class LassoScene extends Phaser.Scene {
     (this as any).bunny = undefined; (this as any).hud = undefined; // RETRY restarts this instance: update() must idle until build() re-creates the rig/HUD
     this.girls = []; this.warn = []; this.hanging = ''; this.hangT = 0; this.hangSeq = []; this.hangDrop = false; this.hangFx = []; this.decoy = undefined; this.tapTxt = undefined; this.hint = undefined; this.stars = undefined; this.pend = false;
     Object.assign(this, { gx: 480, gy: 1060, pauseT: 1, fakeT: 0, boost: 1, face: -1, chargeT: LK.CHARGE_FIRST, windT: 0, plantT: 0, decoyT: 0, decoyCD: 0, surgeT: 0, surgeLeft: 0, tugShout: 0,
-      freeRope: false, bigLoop: false, outroT: 0, heartT: 0, bxOff: 0, dustT: 0, lastHud: '', first: { tug: true, plant: true } });
+      freeRope: false, bigLoop: false, outroT: 0, heartT: 0, bxOff: 0, byOff: 0, dustT: 0, lastHud: '', first: { tug: true, plant: true },
+      winT: LK.WIN_FIRST[0], tellT: 0, winLeft: 0, closedAgo: 9, winFx: [], nowRing: undefined, glow: undefined, floorTalk: undefined, firstNow: true });
     (window as any).__pr = { scene: 'Lasso', st: s, K: LK, force: (win: boolean) => this.finish(win), pup: () => ({ x: s.px, y: s.py }), hangs: this.hangSeq, hang: '' };
     const loading = txt(this, W / 2, H / 2, 'Saddling up...', 34, '#fff', '#22252b', 6);
     Promise.all([ensureArt(this, KEYS), ensureHangArt(this)]).then(() => { if (!this.sys.isActive() && !this.sys.isPaused()) return; loading.destroy(); this.build(); });
@@ -149,7 +161,7 @@ export class LassoScene extends Phaser.Scene {
     this.tiedC = this.add.container(0, 0).setVisible(false); this.tiedIn = this.add.container(0, 0); this.tiedC.add([this.add.image(0, 4, 'su_shadow').setScale(artScale('su_shadow', 1.5), artScale('su_shadow', 0.7)), this.tiedIn]);
     this.tiedIn.add([art(this, 0, 0, 'pup_box_panic', PS), this.tiedRopes()]);
     this.buildHang();
-    this.add.ellipse(BX, BY - 4, 190, 40, 0x000000, 0.28).setDepth(19);
+    this.bunShadow = this.add.ellipse(BX, BY - 4, 190, 40, 0x000000, 0.28).setDepth(19);
     this.bunny = new LassoBunny(this, BX, BY, 0.9).setDepth(20);
     this.fx = this.add.graphics().setDepth(24); this.ropeG = this.add.graphics().setDepth(21); this.meter = this.add.graphics().setDepth(66);
     this.grip = this.add.circle(0, 0, 15, 0xffffff).setStrokeStyle(5, COLORS.INK).setDepth(22).setVisible(false);
@@ -160,7 +172,7 @@ export class LassoScene extends Phaser.Scene {
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => this.onDown(p));
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => this.onMove(p));
     this.input.on('pointerup', (p: Phaser.Input.Pointer) => this.onUp(p));
-    tutorialCard(this, 'bunny2', 'PLAYROOM RODEO!', [`You are BUNNY! 🐰 Rope Puppy ${LK.NEED} times!`, 'HOLD to twirl (longer = BIGGER loop)', 'SLIDE to where Puppy is GOING, let go to fling', 'Roped him? TAP TAP TAP to reel him in!', 'Round 3: SWIPE to dodge his charge!'], () => this.begin());
+    tutorialCard(this, 'bunny3', 'PLAYROOM RODEO!', [`You are BUNNY! 🐰 Rope Puppy ${LK.NEED} times!`, 'He can ONLY be caught in a gold NOW! ring', 'HOLD to twirl, SLIDE to him, LET GO to fling', 'Too early? He dodges + you lose time!', 'Roped him? TAP TAP TAP fast!', 'Round 3: SWIPE to dodge his charge!'], () => this.begin());
   }
   private begin() {
     popBanner(this, 'FINAL ROUND!', 700, 0xe0243a, 800);
@@ -217,10 +229,10 @@ export class LassoScene extends Phaser.Scene {
     if (s.phase === 'outro') { if (this.outroT > 0.8) this.toChampion(); return; }
     if (!s.running || s.over) return;
     if (s.phase === 'tug') return this.tap();
-    if (s.phase !== 'free' || s.flying || s.stun > 0 || s.pup === 'wind' || s.pup === 'charge' || s.pup === 'crash') return;
+    if (s.phase !== 'free' || s.flying || s.stun > 0 || s.lock > 0 || s.pup === 'wind' || s.pup === 'charge' || s.pup === 'crash') return;
     s.hold = true; s.holdT = 0; this.setAim(w.x, w.y); this.hint?.destroy(); this.hint = undefined;
     this.bunny.setFace('laugh');
-    if (s.round === 2 && this.decoyCD <= 0 && !this.decoy && (s.pup === 'run' || s.pup === 'pause' || s.pup === 'fake') && Math.random() < LK.DECOY_P) this.makeDecoy();
+    if (s.round === 2 && s.win === 'closed' && this.decoyCD <= 0 && !this.decoy && (s.pup === 'run' || s.pup === 'pause' || s.pup === 'fake') && Math.random() < LK.DECOY_P) this.makeDecoy();
   }
   private onMove(p: Phaser.Input.Pointer) {
     const s = this.st; if (!p.isDown) return; const w = worldPoint(this, p);
@@ -252,25 +264,101 @@ export class LassoScene extends Phaser.Scene {
   private land(x: number, y: number, r: number) {
     const s = this.st; s.flying = false; if (s.over || s.phase !== 'free') return;
     const bx = s.px, by = s.py - 70, d = Math.hypot(x - bx, (y - by) * 0.85);
-    const free = s.pup === 'plant', hitPup = s.pup !== 'charge' && s.pup !== 'crash' && d < r + LK.HIT_PAD + (free ? LK.FREE_PAD : 0);
+    const free = s.pup === 'plant', near = s.pup !== 'charge' && s.pup !== 'crash' && d < r + LK.HIT_PAD + (free ? LK.FREE_PAD : 0);
+    const inWin = this.inWindow(), hitPup = near && inWin;
     if (!hitPup && this.decoy && Math.hypot(x - this.decoy.x, (y - (this.decoy.y - 70)) * 0.85) < r + LK.HIT_PAD) { // roped the cardboard one
       s.misses++; Fx.block(); this.floorLoop(this.decoy.x, this.decoy.y, r); floatText(this, this.decoy.x, this.decoy.y - 220, 'CARDBOARD!', '#ff8a8a', 40);
-      const dc = this.decoy; this.decoy = undefined; this.tweens.add({ targets: dc, angle: -88, y: dc.y + 10, duration: 260, ease: 'Quad.In' }); this.tweens.add({ targets: dc, alpha: 0, delay: 700, duration: 300, onComplete: () => dc.destroy() });
+      const dc = this.decoy; this.decoy = undefined; this.flatten(dc, true);
       this.couch('gasp'); this.bunny.setFace('unimpressed'); this.time.delayedCall(700, () => this.bunny.setFace('wink'));
       if (s.time <= 0) this.finish(false); return;
     }
     if (hitPup) return this.snag(free);
+    if (!inWin) return this.offWindow(x, y, r, near);
     s.misses++; this.floorLoop(x, y, r); Fx.save(); floatText(this, x, y - 120, 'MISS', '#fff', 30); this.bunny.setFace('stern'); this.time.delayedCall(600, () => this.bunny.setFace('wink'));
     if (Math.random() < 0.35) this.talk(400, 860, pick(LINES.lassoMiss), 22, 1000);
     if (s.misses % 3 === 0) this.couch('gasp');
     if (s.time <= 0) this.finish(false);
+  }
+  /** the loop must LAND inside a window (a hair of grace either side) */
+  private inWindow() { const s = this.st; return s.win === 'open' || (s.win === 'tell' && this.tellT <= LK.WIN_GRACE) || (s.win === 'closed' && this.closedAgo <= LK.WIN_GRACE); }
+  /** a throw that lands outside a NOW! window: Puppy sidesteps it (NOPE!) and taunts, the clock loses OFF_COST, short throw lock-out */
+  private offWindow(x: number, y: number, r: number, near: boolean) {
+    const s = this.st; s.offs++; s.misses++; s.time = Math.max(0, s.time - LK.OFF_COST); s.lock = LK.OFF_LOCK; this.drawHud(true);
+    this.floorLoop(x, y, r); Fx.save(); floatText(this, 580, 260, `-${LK.OFF_COST}s`, '#ff8a8a', 32);
+    if (near) { s.nopes++; Fx.whoosh(); const dir = s.px < 470 ? 1 : -1, to = Phaser.Math.Clamp(s.px + dir * 100, AX0, AX1);
+      this.word(s.px, s.py - 225, 'NOPE!', 48, 450, dir * 6); this.face = dir; this.pup.flip(dir < 0);
+      this.tweens.add({ targets: s, px: to, duration: 170, ease: 'Quad.Out' }); this.tweens.add({ targets: this.pup.inner, y: { from: 0, to: -26 }, duration: 85, yoyo: true, ease: 'Quad.Out' });
+      if (s.win === 'closed' && (s.pup === 'run' || s.pup === 'pause' || s.pup === 'fake' || s.pup === 'sneak')) { s.pup = 'pause'; this.pauseT = 0.35; this.pup.setFrame('stand'); } }
+    else floatText(this, x, y - 120, 'TOO EARLY!', '#fff', 30);
+    if (near || Math.random() < 0.4) this.talk(400, 860, pick(LINES.lassoNope), 22, 1000);
+    this.bunny.setFace('unimpressed'); this.time.delayedCall(600, () => this.bunny.setFace('wink'));
+    if (s.time <= 0) this.finish(false);
+  }
+  // ---------------------------------------------------------------- catch windows
+  private winRound() { return this.st.round - 1; }
+  private winReady() { const s = this.st; return s.phase === 'free' && !s.over && (s.pup === 'run' || s.pup === 'pause' || s.pup === 'fake' || s.pup === 'sneak'); }
+  private updWin(dt: number) {
+    const s = this.st; this.closedAgo += dt;
+    if (s.win === 'closed') { if (this.winReady()) { this.winT -= dt; if (this.winT <= 0) this.tellWindow(); } }
+    else if (s.win === 'tell') { this.tellT -= dt; if (this.tellT <= 0) this.openWindow(); }
+    else if (s.pup !== 'plant') { // open (the faceplant runs its own clock)
+      this.winLeft -= dt; const k = Phaser.Math.Clamp(this.winLeft / this.winLen, 0, 1);
+      this.nowRing?.setPosition(s.px, s.py - 30).setScale(0.4 + 0.6 * k); this.glow?.setPosition(s.px, s.py);
+      if (this.winLeft <= 0) this.closeWindow(); }
+  }
+  /** the tell: Puppy stops, ears perk (a little hop), the round's gag starts, a faint gold ring */
+  private tellWindow() {
+    const s = this.st, r = this.winRound(); s.win = 'tell'; this.tellT = LK.TELL; s.pup = 'pause'; this.pauseT = 99; this.fakeT = -1; this.boost = 1;
+    this.pup.setFrame('stand'); this.pup.squash(1, 1); this.tweens.add({ targets: this.pup.inner, y: { from: 0, to: -16 }, duration: 110, yoyo: true, ease: 'Quad.Out' });
+    const ex = txt(this, s.px + 46, s.py - 215, '!', 44, '#ffdf6b', '#22252b', 6).setDepth(70).setScale(0.3); this.tweens.add({ targets: ex, scale: 1, duration: 120, ease: 'Back.Out' });
+    this.tweens.add({ targets: ex, alpha: 0, delay: 380, duration: 150, onComplete: () => ex.destroy() });
+    const ring = this.nowRing = this.add.ellipse(s.px, s.py - 30, 250, 92).setStrokeStyle(7, 0xffd84d, 0.45).setDepth(9); this.winFx.push(ring);
+    if (r === 0) { floatText(this, s.px, s.py - 200, pick(LINES.lassoPant), '#fff', 28); }
+    else if (r === 1) this.treat();
+    else this.photo();
+  }
+  private openWindow() {
+    const s = this.st; s.win = 'open'; s.wins++; this.winLen = this.winLeft = LK.WIN[this.winRound()]; Sfx.click();
+    const glow = this.glow = this.add.graphics().setDepth(this.pup.root.depth - 0.02); glow.fillStyle(0xffd84d, 0.28).fillEllipse(0, -80, 210, 230).fillStyle(0xfff3a0, 0.22).fillEllipse(0, -80, 160, 180);
+    glow.setPosition(s.px, s.py); this.tweens.add({ targets: glow, alpha: { from: 1, to: 0.55 }, duration: 160, yoyo: true, repeat: -1 }); this.winFx.push(glow);
+    this.nowRing?.setStrokeStyle(9, 0xffd84d, 1);
+    const big = this.firstNow; this.firstNow = false;
+    const now = comic(this, Phaser.Math.Clamp(s.px, big ? 190 : 120, big ? 530 : 600), s.py - 245, big ? 'NOW! THROW!' : 'NOW!', big ? 50 : 44).setDepth(70).setScale(0.3).setAngle(-5); this.winFx.push(now);
+    this.tweens.add({ targets: now, scale: 1, duration: 130, ease: 'Back.Out', onComplete: () => this.tweens.add({ targets: now, scale: 1.08, duration: 140, yoyo: true, repeat: -1 }) });
+    if (this.winRound() === 1) floatText(this, Phaser.Math.Clamp(s.px - 40, 170, 550), s.py - 190, pick(LINES.lassoSniff), '#fff', 26);
+    if (this.winRound() === 2) floatText(this, Phaser.Math.Clamp(s.px - 40, 170, 550), s.py - 190, pick(LINES.lassoPose), '#fff', 26);
+  }
+  /** window over (or used up by a catch): clear the glow, Puppy dashes on; next one after WIN_EVERY */
+  private closeWindow(run = true) {
+    const s = this.st, [a, b] = LK.WIN_EVERY[this.winRound()]; const was = s.win; s.win = 'closed'; if (was === 'open') this.closedAgo = 0; this.winT = Phaser.Math.FloatBetween(a, b);
+    this.winFx.forEach(o => { this.tweens.killTweensOf(o); o.destroy(); }); this.winFx = []; this.nowRing = undefined; this.glow = undefined;
+    if (run && s.phase === 'free' && s.pup === 'pause') this.newLeg();
+  }
+  /** R2: a couch girl tosses a dog cookie; it bounces to his paws and he stops to sniff it */
+  private treat() {
+    const s = this.st, line = pick(LINES.lassoTreat), who = GIRLS.indexOf(line.split(':')[0]), g = this.girls[who >= 0 ? who : 3];
+    if (Math.random() < 0.6) this.talk(g.x, 440, line, 20, 1100);
+    const tx = s.px + (this.face < 0 ? -58 : 58), ty = s.py - 6, bone = this.add.graphics().setDepth(this.pup.root.depth + 0.01);
+    bone.fillStyle(0xf3dcae, 1).lineStyle(4, COLORS.INK, 1).fillRoundedRect(-16, -6, 32, 12, 6).strokeRoundedRect(-16, -6, 32, 12, 6);
+    [-16, 16].forEach(x => [-6, 6].forEach(y => bone.fillCircle(x, y, 7).strokeCircle(x, y, 7))); bone.fillStyle(0xf3dcae, 1).fillRoundedRect(-14, -4, 28, 8, 4);
+    bone.setPosition(g.x, 640).setScale(0.8); this.winFx.push(bone);
+    const p = { k: 0 }; this.tweens.add({ targets: p, k: 1, duration: LK.TELL * 1000, ease: 'Linear', onUpdate: () => { if (!bone.active) return;
+      bone.setPosition(g.x + (tx - g.x) * p.k, 640 + (ty - 640) * p.k - Math.sin(p.k * Math.PI) * 150).setAngle(p.k * 540); } });
+  }
+  /** R3: Iris snaps his photo: flash on the couch, CLICK!, he freezes in a pose */
+  private photo() {
+    const s = this.st, g = this.girls[6]; if (Math.random() < 0.6) this.talk(g.x, 440, pick(LINES.lassoPhoto), 20, 1100);
+    const fl = this.add.circle(g.x + 20, 640, 30, 0xffffff, 1).setDepth(7); this.tweens.add({ targets: fl, scale: 3, alpha: 0, duration: 300, onComplete: () => fl.destroy() });
+    this.word(g.x + 10, 590, 'CLICK!', 34, 300, 8); Fx.whoosh();
+    const sp = txt(this, s.px - 60, s.py - 170, '✦', 34, '#fff27a', '#22252b', 5).setDepth(70); this.winFx.push(sp); this.tweens.add({ targets: sp, angle: 180, scale: 1.3, duration: 400, yoyo: true, repeat: -1 });
   }
   private floorLoop(x: number, y: number, r: number) { this.dust(x, y, 8); const lr = this.add.ellipse(x, y, r * 2, r * 0.8).setStrokeStyle(7, ROPE, 1).setDepth(8).setAlpha(0.9);
     this.tweens.add({ targets: lr, alpha: 0, scaleX: 0.6, scaleY: 0.6, duration: 500, onComplete: () => lr.destroy() }); }
   // ---------------------------------------------------------------- tug
   private snag(free: boolean) {
     const s = this.st; s.phase = 'tug'; s.pup = 'tug'; s.tug = LK.TUG0; s.tugT = 0; this.freeRope = free; this.clearWarn(); this.stars?.destroy(); this.stars = undefined;
-    this.pup.root.setAngle(0); this.pup.inner.setAngle(0); this.pup.squash(1, 1);
+    this.closeWindow(false); this.tweens.killTweensOf(this.pup.inner); this.pup.inner.setY(0);
+    this.pup.root.setAngle(0); this.pup.inner.setAngle(0); this.pup.squash(1, 1); this.pup.setFrame('panic');
     this.tugStart = { x: s.px, y: s.py }; this.surgeT = 0.9; this.surgeLeft = 0; this.tugShout = 0.6; this.face = 1; this.pup.flip(false);
     Fx.punch(); this.cameras.main.shake(120, 0.006); this.dust(s.px, s.py, 10);
     this.word(s.px, s.py - 240, free ? 'FREE ROPE!' : 'SNAGGED!', 54, 500);
@@ -301,7 +389,7 @@ export class LassoScene extends Phaser.Scene {
     const s = this.st, r = s.round - 1; s.tugT += dt;
     if (s.tugT > LK.TUG_GRACE) {
       let drain = LK.TUG_PULL[r];
-      this.surgeT -= dt; if (this.surgeT <= 0) { this.surgeT = Phaser.Math.FloatBetween(0.9, 1.4); if (Math.random() < 0.45) { this.surgeLeft = 0.4; this.shout(); } }
+      this.surgeT -= dt; if (this.surgeT <= 0) { this.surgeT = Phaser.Math.FloatBetween(0.9, 1.4); if (Math.random() < LK.SURGE_P) { this.surgeLeft = 0.4; this.shout(); } }
       if (this.surgeLeft > 0) { this.surgeLeft -= dt; drain += LK.TUG_SURGE / 0.4; }
       s.tug -= drain * dt;
       if (s.tug <= 0) return this.slip();
@@ -320,29 +408,31 @@ export class LassoScene extends Phaser.Scene {
     const b = comic(this, W / 2, 600, pick(LINES.lassoSlip), 60).setDepth(66).setAngle(-6).setScale(0.3);
     this.tweens.add({ targets: b, scale: 1, duration: 170, ease: 'Back.Out' }); this.tweens.add({ targets: b, alpha: 0, y: b.y - 50, delay: 900, duration: 300, onComplete: () => b.destroy() });
     this.floorLoop(s.px, s.py, 60); this.couch('gasp');
-    s.phase = 'free'; this.escape(); this.fakeT = -1; /* wriggled free: a real dash-off, no fake stop */ this.time.delayedCall(700, () => this.bunny.setFace('wink'));
+    s.phase = 'free'; this.pup.setFrame('stand'); this.escape(); this.fakeT = -1; /* wriggled free: a real dash-off, no fake stop */ this.winT = Phaser.Math.FloatBetween(...LK.WIN_EVERY[this.winRound()] as [number, number]); this.time.delayedCall(700, () => this.bunny.setFace('wink'));
     if (s.time <= 0) this.finish(false);
   }
   // ---------------------------------------------------------------- caught: hog-tied
   private reeled() {
     const s = this.st; this.endTug(); s.ropes++; s.phase = 'tied'; s.pup = 'tied'; s.tieT = 0; this.heartT = 0.2;
     const pts = 1000 + (this.bigLoop ? 300 : 0) + (this.freeRope ? 500 : 0) + (s.round - 1) * 200; s.score += pts;
-    const cx = s.px, cy = s.py; this.pup.root.setVisible(false); this.startHang(this.nextHang());
-    this.cameras.main.shake(140, 0.008); const z0 = this.zoom0; this.cameras.main.zoomTo(z0 * 1.05, 90, Phaser.Math.Easing.Quadratic.Out); this.time.delayedCall(160, () => this.cameras.main.zoomTo(z0, 220, Phaser.Math.Easing.Quadratic.InOut));
-    Fx.goal(); impact(this, cx + 40, 600, pick(['YEE-HAW!', 'ROPED!', 'GOTCHA!']), pts, this.freeRope ? 'FREE ROPE!' : this.bigLoop ? 'BIG LOOP!' : '', true);
-    this.confetti(cx, cy - 120); this.bunny.setFace('laugh'); this.hud.pop(); this.drawHud(true);
+    const cx = s.px, cy = s.py, last = s.ropes >= LK.NEED; this.pup.root.setVisible(false);
+    if (last) this.showTied(); else this.startHang(this.nextHang()); // the 5th catch goes straight to the hog-tie for the drag outro (no hang, no puff swap)
+    // 28 Oct v3: no zoom punch (it jolted the HUD); the word sits above the girls' heads, the burst is the normal size
+    this.cameras.main.shake(120, 0.006);
+    Fx.goal(); impact(this, Phaser.Math.Clamp(cx + 40, 170, W - 170), 560, last ? 'ROPED!' : pick(['YEE-HAW!', 'ROPED!', 'GOTCHA!']), pts, this.freeRope ? 'FREE ROPE!' : this.bigLoop ? 'BIG LOOP!' : '', false);
+    if (!last) this.confetti(cx, cy - 120); this.bunny.setFace('laugh'); this.hud.pop(); this.drawHud(true);
     if (s.ropes < LK.NEED) { this.couch('cheer', Math.random() < 0.4 ? pick(LINES.lassoCouchCheer) : undefined); if (Math.random() < 0.3) this.time.delayedCall(1200, () => this.talk(330, 860, pick(LINES.lassoHit), 22, 900)); }
     else this.win();
   }
   private updTied(dt: number) {
     const s = this.st; s.tieT += dt; this.heartT -= dt;
     if (this.hanging) this.updHang(dt);
-    if (this.heartT <= 0) { this.heartT = 0.7; if (this.hanging && !this.hangDrop) { const h = this.hang.head(); this.hearts(h.x, h.y + 10, 2, true); } else if (!this.hanging) this.hearts(s.px, s.py - 232 * PS, 2); } // hearts from his HEAD only
+    if (this.heartT <= 0) { this.heartT = 0.7; if (this.hanging && !this.hangDrop) headHearts(this, this.hang, 2, 41); else if (!this.hanging) this.hearts(this.tiedC.x, this.tiedC.y - 200 * PS, 2); } // hearts from his HEAD only
     if (s.phase === 'tied' && !s.over && s.tieT >= LK.TIE) this.untie();
   }
   private untie() {
     const s = this.st; this.clearWarn();
-    if (this.hanging) { this.endHang(); this.pup.root.setVisible(true).setPosition(s.px, s.py); this.pup.setFrame('stand'); this.pup.flip(false); }
+    if (this.hanging) { this.endHang(); this.pup.root.setVisible(true).setPosition(s.px, s.py).setAngle(0); this.pup.root.list[0] && (this.pup.root.list[0] as Phaser.GameObjects.Image).setVisible(true); this.pup.setFrame('stand'); this.pup.flip(false); }
     else { this.tweens.killTweensOf(this.tiedIn); this.tiedC.setVisible(false); this.pup.root.setVisible(true);
       Fx.boing(); this.word(s.px, s.py - 200, 'POP!', 50, 300);
       for (let i = 0; i < 3; i++) { const e = this.add.ellipse(s.px, s.py - 30 - i * 25, 120, 34).setStrokeStyle(7, ROPE).setDepth(30);
@@ -351,6 +441,7 @@ export class LassoScene extends Phaser.Scene {
     const nr = s.ropes >= LK.ROUND_AT[2] ? 3 : s.ropes >= LK.ROUND_AT[1] ? 2 : 1;
     if (nr !== s.round) { s.round = nr; s.bannerT = LK.BANNER; this.setRoundChip(); popBanner(this, `ROUND ${nr}: ${ROUND_NAME[nr - 1]}!`, 700, nr === 3 ? 0xe0243a : 0x6b4cc9, 900);
       this.time.delayedCall(500, () => this.talk(400, 860, LINES.lassoRound[nr - 2], 22, 1400)); this.chargeT = LK.CHARGE_FIRST; }
+    this.winT = LK.WIN_FIRST[this.winRound()]; s.win = 'closed';
     if (s.time <= 0) this.finish(false);
   }
   // ---------------------------------------------------------------- caught: the hang (tie-up VISUALS only; timing/clock are untouched)
@@ -386,71 +477,80 @@ export class LassoScene extends Phaser.Scene {
     const s = this.st, C = kind === 'C', x = C ? HANG.C.x : HANG.A.x, y = C ? HANG.C.y : HANG.A.y;
     this.cloud(s.px, s.py - 80); Fx.whoosh();
     this.hanging = kind; this.hangT = 0; this.hangDrop = false; this.hangSide = s.px < x ? -1 : 1; // he swings in from the side he was caught on
-    this.hang.start(kind, x, y).root.setDepth(10 + (HANG.LAND - 900) / 100);
-    this.hangAng = 180; this.hangG.clear().setAlpha(1); this.hangTop.setVisible(!C); this.lamp.setVisible(C).setAlpha(1); this.lampBar.setVisible(C).setAlpha(1);
+    this.hang.start(kind, x, y).setDepth(10 + (HANG.LAND - 900) / 100, 14.5); // C: shins + paws in FRONT of the lamp bar (depth 14), the rest behind it
+    this.hangG.clear().setAlpha(1); this.hangTop.setVisible(!C).setAlpha(1); this.lamp.setVisible(C).setAlpha(1); this.lampBar.setVisible(C).setAlpha(1);
     s.px = x; s.py = HANG.LAND; // he drops here and runs off from here
-    this.word(x + (C ? -150 : 150), C ? 1000 : 960, kind === 'B' ? 'SPIN!' : 'YOINK!', 46, 450, kind === 'A' ? 6 : -6);
+    if (kind === 'B') this.word(x + 150, 960, 'SPIN!', 46, 450, 6);
     if (C) { const coil = this.add.graphics().setDepth(8); // no tie for C: the lasso lies loose on the rug
       [[0, 0, 110, 34], [8, -4, 84, 26], [-6, 3, 64, 20]].forEach(([dx, dy, w, h]) => coil.lineStyle(11, 0xffffff, 0.9).strokeEllipse(330 + dx, 1180 + dy, w, h).lineStyle(6, ROPE, 1).strokeEllipse(330 + dx, 1180 + dy, w, h));
       coil.lineStyle(6, ROPE, 1).lineBetween(385, 1180, 430, 1192); this.hangFx.push(coil); }
     if (kind === 'B') for (let i = 0; i < 3; i++) this.hangFx.push(txt(this, x, y, '★', 30, '#ffdf6b', '#22252b', 5).setDepth(41));
+    if (kind === 'B') { const sw = this.add.graphics().setDepth(13.5); this.hangFx.push(sw); } // twist swooshes round his middle
     const bun = C ? LINES.lassoLampBun : LINES.lassoHangBun, pup = kind === 'A' ? LINES.lassoHangPup : kind === 'B' ? LINES.lassoSpinPup : LINES.lassoLampPup;
     this.time.delayedCall(350, () => { if (this.hanging === kind) this.talk(230, 860, pick(bun), 22, 1100); });
     this.time.delayedCall(1250, () => { if (this.hanging === kind && !this.st.over) this.talk(x, 1190, pick(pup), 22, 1150); });
-    this.time.delayedCall(1200, () => { if (this.hanging === kind && this.st.phase === 'tied' && !this.st.over) this.couch('giggle'); }); // (5th catch: the couch is already partying)
+    this.time.delayedCall(1200, () => { if (this.hanging === kind && this.st.phase === 'tied' && !this.st.over) this.couch('giggle'); });
   }
-  private hangSide = 1; private hangAng = 180;
+  private hangSide = 1;
   private updHang(dt: number) {
     const s = this.st, k = this.hanging, h = this.hang, t = (this.hangT += dt), g = this.hangG.clear();
-    if (!k) return;
+    if (!k || this.hangDrop) return; // (the drop is the regular rig tumbling)
+    if (k === 'C') { // by the knees: swings in, settles into a small sway under the bar
+      const th = this.hangSide * (3 + 9 * Math.exp(-1.7 * t)) * Math.cos(t * Math.PI * 2 / 1.15);
+      h.root.setPosition(HANG.C.x, HANG.C.y).setAngle(180 - th);
+    } else { // pendulum on the long rope from the hook
+      const L = HANG.A.y - HANG.A.hookY, amp = k === 'A' ? 3.5 + 6 * Math.exp(-1.3 * t) : 2 + 4 * Math.exp(-1.5 * t);
+      const th = this.hangSide * amp * Math.cos(t * Math.PI * 2 / 1.6), r = Phaser.Math.DegToRad(th);
+      h.root.setPosition(HANG.A.x + Math.sin(r) * L, HANG.A.hookY + Math.cos(r) * L).setAngle(180 - th);
+      // B (28 Oct v3, was a flat scaleX card-flip): he TWISTS on the rope like a wound-up yo-yo: a 3/4 turn each way that winds down.
+      // The body narrows a little (never below 80 %), the face slides round his head and fades at the far edge, the tail swings round.
+      if (k === 'B') h.twist = this.hangSide * (18 + 62 * Math.exp(-0.7 * t)) * Math.sin(t * Math.PI * 2 / 0.95);
+    }
     h.update(dt, 0.5, 5);
-    if (!this.hangDrop) {
-      if (k === 'C') { // by the knees: swings in, settles into a gentle sway under the bar
-        const th = this.hangSide * (6 + 12 * Math.exp(-1.7 * t)) * Math.cos(t * Math.PI * 2 / 1.15);
-        this.hangAng = 180 - th; h.root.setPosition(HANG.C.x, HANG.C.y).setAngle(this.hangAng);
-      } else { // pendulum on the long rope from the hook; B also spins slowly on it
-        const L = HANG.A.y - HANG.A.hookY, amp = k === 'A' ? 3.5 + 6 * Math.exp(-1.3 * t) : 2 + 4 * Math.exp(-1.5 * t); // long rope: a few degrees is a gentle sway
-        const th = this.hangSide * amp * Math.cos(t * Math.PI * 2 / 1.6), r = Phaser.Math.DegToRad(th);
-        this.hangAng = 180 - th; h.root.setPosition(HANG.A.x + Math.sin(r) * L, HANG.A.hookY + Math.cos(r) * L).setAngle(this.hangAng);
-        if (k === 'B') h.root.scaleX = Math.cos(Math.PI * 2 * (0.42 * t + 0.8 * (1 - Math.exp(-1.6 * t)))); // twirls on the rope, winding down to a lazy spin
-      }
-      if (!s.over && t >= LK.TIE - HANG.DROP) this.dropHang();
-    }
-    if (k !== 'C') { // the rope + the snare loop around ONE hind ankle
-      const a = h.root, top = this.hangDrop ? this.ropeTop : { x: HANG.A.x, y: HANG.A.hookY };
-      const end = this.hangDrop ? this.ropeEnd : { x: a.x, y: a.y };
-      g.lineStyle(10, 0xffffff, 0.95).lineBetween(top.x, top.y, end.x, end.y).lineStyle(5, ROPE, 1).lineBetween(top.x, top.y, end.x, end.y);
-      if (!this.hangDrop) { const w = 30 * Math.max(0.35, Math.abs(a.scaleX)); g.lineStyle(10, 0xffffff, 0.95).strokeEllipse(a.x, a.y + 3, w, 13).lineStyle(5, ROPE, 1).strokeEllipse(a.x, a.y + 3, w, 13); }
-    }
-    if (k === 'B') { const hd = h.head(); this.hangFx.forEach((o, i) => { if (o instanceof Phaser.GameObjects.Text) { const a = t * 4 + i * 2.094; o.setPosition(hd.x + Math.cos(a) * 62, hd.y + 52 + Math.sin(a) * 16).setDepth(Math.sin(a) > 0 ? 41 : 11).setAlpha(this.hangDrop ? 0 : 1); } }); }
+    if (k !== 'C') drawSnare(g, h, { x: HANG.A.x, y: HANG.A.hookY }, ROPE);
+    if (k === 'B') { const hd = h.headPos(), hr = h.headR(), mid = h.world(100, 175), ph = Phaser.Math.DegToRad(h.twist);
+      this.hangFx.forEach((o, i) => { if (o instanceof Phaser.GameObjects.Text) { const a = t * 4 + i * 2.094; o.setPosition(hd.x + Math.cos(a) * (hr.rx + 10), hd.y + hr.ry + 14 + Math.sin(a) * 12).setDepth(Math.sin(a) > 0 ? 41 : 11); } });
+      const sw = this.hangFx.find(o => o instanceof Phaser.GameObjects.Graphics && o !== this.hangFx[0]) as Phaser.GameObjects.Graphics | undefined;
+      if (sw) { sw.clear(); const sp = Math.cos(t * Math.PI * 2 / 0.95), al = Phaser.Math.Clamp(Math.abs(sp) * Math.abs(ph) * 1.1, 0, 0.85); // swoosh arcs in the direction of the turn
+        for (const [dy, w] of [[-30, 70], [10, 64]] as const) { const P: Phaser.Math.Vector2[] = []; for (let j = 0; j <= 10; j++) { const q = (j / 10 - 0.5) * 2.2 * Math.sign(sp || 1); P.push(new Phaser.Math.Vector2(mid.x + Math.sin(q) * w, mid.y + dy + Math.cos(q) * 12)); }
+          sw.lineStyle(5, 0xffffff, al).strokePoints(P); } } }
+    if (!s.over && t >= LK.TIE - HANG.DROP) this.dropHang();
   }
-  private ropeTop = { x: 0, y: 0 }; private ropeEnd = { x: 0, y: 0 };
-  /** the last moment of the tie-up: the snare / his knees let go, he flips over and lands on his feet (swapping to the normal standing frame mid-flip) */
+  /** the end of the tie-up (28 Oct v3, was a mid-flip texture swap): POP, a puff at his middle, the rope / bar lets go and the NORMAL
+   *  running Puppy tumbles out of it head-over-heels to land on his feet. The hook / lamp / coil fade out right now, not after. */
   private dropHang() {
     const s = this.st, h = this.hang, k = this.hanging; this.hangDrop = true; Fx.boing();
-    const a = h.root; this.ropeTop = { x: HANG.A.x, y: HANG.A.hookY }; this.ropeEnd = { x: a.x, y: a.y };
-    this.word(Math.min(a.x + 70, W - 120), a.y - 10, k === 'C' ? 'WHOOPS!' : 'POP!', 44, 260);
-    if (k !== 'C') { this.tweens.add({ targets: this.ropeEnd, x: HANG.A.x, y: HANG.A.hookY + 30, duration: 260, ease: 'Quad.In' });
-      const e = this.add.ellipse(a.x, a.y, 34, 14).setStrokeStyle(6, ROPE).setDepth(30); this.tweens.add({ targets: e, x: e.x + 90 * this.hangSide, y: e.y - 70, angle: 200, alpha: 0, duration: 420, onComplete: () => e.destroy() }); }
-    h.pivotTo(100, 166); // spin about his middle
-    const u = PS, p = { a: this.hangAng, x: a.x, y: a.y, sx: a.scaleX }, ty = s.py - (238 - 166) * u; let swapped = false;
-    this.tweens.add({ targets: p, a: this.hangAng > 180 ? 360 : 0, x: s.px, sx: 1, duration: (HANG.DROP - 0.06) * 1000, ease: 'Sine.InOut',
-      onUpdate: () => { a.setAngle(p.a).setX(p.x); a.scaleX = p.sx; if (!swapped && Math.abs(p.a - 180) >= 90) { swapped = true; h.upright(); } } });
-    this.tweens.add({ targets: p, y: ty, duration: (HANG.DROP - 0.06) * 1000, ease: 'Quad.In', onUpdate: () => a.setY(p.y), onComplete: () => this.dust(s.px, s.py, 6) });
+    const mid = h.world(100, 175), side = this.hangSide, pivot = { x: h.root.x, y: h.root.y };
+    this.word(Phaser.Math.Clamp(mid.x + 90 * side, 120, W - 120), mid.y - 60, k === 'C' ? 'WHOOPS!' : 'POP!', 44, 260);
+    this.cloud(mid.x, mid.y); h.hide(); this.hangG.clear();
+    if (k !== 'C') { // the rope springs back up to the hook, the empty snare flies off
+      const rg = this.add.graphics().setDepth(13); this.hangFx.push(rg); const e = { x: pivot.x, y: pivot.y };
+      this.tweens.add({ targets: e, x: HANG.A.x, y: HANG.A.hookY + 30, duration: 260, ease: 'Quad.In', onUpdate: () => { if (!rg.active) return; rg.clear().lineStyle(10, 0xffffff, 0.95).lineBetween(HANG.A.x, HANG.A.hookY, e.x, e.y).lineStyle(5, ROPE, 1).lineBetween(HANG.A.x, HANG.A.hookY, e.x, e.y); } });
+      const lp = this.add.ellipse(pivot.x, pivot.y, 34, 14).setStrokeStyle(6, ROPE).setDepth(30); this.tweens.add({ targets: lp, x: lp.x + 90 * side, y: lp.y - 70, angle: 200, alpha: 0, duration: 420, onComplete: () => lp.destroy() }); }
+    [this.lamp, this.lampBar, this.hangTop, ...this.hangFx.filter(o => o instanceof Phaser.GameObjects.Graphics || o instanceof Phaser.GameObjects.Text)].forEach(o => { if ((o as any).visible) this.tweens.add({ targets: o, alpha: 0, duration: 300 }); });
+    const p = this.pup, sh = p.root.list[0] as Phaser.GameObjects.Image, M = 92; // M: feet -> middle of the standing rig (px)
+    p.setFrame('panic'); p.flip(side > 0); p.squash(1, 1); p.inner.setAngle(0).setY(0); sh.setVisible(false);
+    p.root.setVisible(true).setDepth(10 + (s.py - 900) / 100);
+    const st = { k: 0 }, c0 = mid, c1 = { x: s.px, y: s.py - M }, dir = side > 0 ? -1 : 1, D = (HANG.DROP - 0.04) * 1000;
+    const place = () => { const th = Phaser.Math.DegToRad(180 + 180 * st.k * dir), ky = st.k * st.k, cx = c0.x + (c1.x - c0.x) * st.k, cy = c0.y + (c1.y - c0.y) * ky;
+      p.root.setPosition(cx - M * Math.sin(th), cy + M * Math.cos(th)).setAngle(Phaser.Math.RadToDeg(th)); };
+    place(); this.tweens.add({ targets: st, k: 1, duration: D, ease: 'Linear', onUpdate: place, onComplete: () => { p.root.setAngle(0).setPosition(s.px, s.py); sh.setVisible(true); p.setFrame('stand'); p.squash(1.12, 0.88); this.dust(s.px, s.py, 6);
+      this.time.delayedCall(90, () => p.squash(1, 1)); } });
   }
   private endHang(fade = true) {
     this.hanging = ''; this.hangDrop = false; this.hang.hide(); this.hangG.clear(); this.hangTop.setVisible(false);
     const objs = [this.lamp, this.lampBar, ...this.hangFx]; this.hangFx = [];
-    objs.forEach(o => { this.tweens.killTweensOf(o); if (fade && (o === this.lamp || o === this.lampBar) && (o as any).visible) this.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => (o as any).setVisible(false) });
-      else if (o === this.lamp || o === this.lampBar) (o as any).setVisible(false); else if (o instanceof Phaser.GameObjects.Graphics) this.tweens.add({ targets: o, alpha: 0, duration: 350, onComplete: () => o.destroy() }); else o.destroy(); });
+    objs.forEach(o => { this.tweens.killTweensOf(o); if (fade && (o === this.lamp || o === this.lampBar) && (o as any).visible && (o as any).alpha > 0.05) this.tweens.add({ targets: o, alpha: 0, duration: 200, onComplete: () => (o as any).setVisible(false) });
+      else if (o === this.lamp || o === this.lampBar) (o as any).setVisible(false); else if (o instanceof Phaser.GameObjects.Graphics && (o as any).alpha > 0.05) this.tweens.add({ targets: o, alpha: 0, duration: 200, onComplete: () => o.destroy() }); else o.destroy(); });
   }
-  /** 5th catch: the outro drag needs the hog-tied bundle, so the hang turns into it in a puff right where he would have landed */
-  private hangToTied() {
-    if (!this.hanging) return; const s = this.st; this.endHang(); this.cloud(s.px, s.py - 70); Fx.boing();
-    this.tiedC.setVisible(true).setPosition(s.px, s.py).setDepth(this.pup.root.depth); this.tweens.killTweensOf(this.tiedIn); this.tiedIn.setAngle(0).setX(0);
+  /** 5th catch: straight into the hog-tie bundle (the drag outro needs it), right where he was caught */
+  private showTied() {
+    const s = this.st; this.cloud(s.px, s.py - 70);
+    this.tiedC.setVisible(true).setPosition(s.px, s.py).setDepth(10 + (s.py - 900) / 100); this.tweens.killTweensOf(this.tiedIn); this.tiedIn.setAngle(0).setX(0);
     this.tweens.add({ targets: this.tiedIn, angle: { from: -7, to: 7 }, duration: 110, yoyo: true, repeat: -1, ease: 'Sine.InOut' });
     this.tweens.add({ targets: this.tiedIn, x: { from: -4, to: 4 }, duration: 70, yoyo: true, repeat: -1 });
   }
+  private hangToTied() { if (this.hanging) { this.endHang(false); this.showTied(); } }
   // ---------------------------------------------------------------- Puppy AI
   private spd() { return LK.SPD[this.st.round - 1]; }
   private newLeg(far = false) {
@@ -481,33 +581,52 @@ export class LassoScene extends Phaser.Scene {
       if (this.windT <= 0) this.impactCharge();
     } else if (s.pup === 'crash') { p.update(dt, 0, 0); }
     else if (s.pup === 'plant') {
-      this.plantT -= dt; p.update(dt, 0, 0.3); if (this.stars) this.stars.setPosition(s.px + Math.cos(this.time.now / 150) * 40, s.py - 90 + Math.sin(this.time.now / 150) * 10);
-      if (this.plantT <= 0 && !s.flying) { this.stars?.destroy(); this.stars = undefined; this.clearWarn(); p.inner.setAngle(0); p.root.setAngle(0); Fx.boing(); this.escape(); }
+      this.plantT -= dt; p.update(dt, 0, 0.3);
+      if (this.stars) this.stars.setPosition(s.px + Math.cos(this.time.now / 150) * 50, s.py - 120 + Math.sin(this.time.now / 150) * 10);
+      if (this.plantT <= 0 && !s.flying) { this.stars?.destroy(); this.stars = undefined; this.clearWarn(); this.tweens.killTweensOf(p.inner); p.inner.setAngle(0); p.root.setAngle(0); p.squash(1, 1); p.setFrame('stand'); Fx.boing();
+        this.closeWindow(false); this.escape(); }
     } else if (s.pup === 'bonk') { p.update(dt, 2.5, 1); }
     if (s.phase === 'free' && s.pup !== 'charge' && s.pup !== 'crash' && s.pup !== 'bonk') { s.px = Phaser.Math.Clamp(s.px, s.pup === 'plant' ? 200 : AX0 - 20, AX1 + 10); s.py = Phaser.Math.Clamp(s.py, AY0, AY1 + 20); }
     if (s.pup !== 'wind') p.root.setPosition(s.px, s.py); p.root.setDepth(10 + (s.py - 900) / 100);
     // round 3: charge timer
-    if (s.round === 3 && s.phase === 'free' && !s.flying && !s.hold && (s.pup === 'run' || s.pup === 'pause')) { this.chargeT -= dt; if (this.chargeT <= 0) this.startCharge(); }
+    if (s.round === 3 && s.phase === 'free' && s.win === 'closed' && !s.flying && !s.hold && (s.pup === 'run' || s.pup === 'pause')) { this.chargeT -= dt; if (this.chargeT <= 0) this.startCharge(); }
     // round 2: decoy timers
-    this.decoyCD -= dt; if (this.decoy) { this.decoyT -= dt; if (this.decoyT <= 0) { const dc = this.decoy; this.decoy = undefined; this.tweens.add({ targets: dc, alpha: 0, angle: 80, duration: 300, onComplete: () => dc.destroy() }); } }
+    this.decoyCD -= dt; if (this.decoy) { this.decoyT -= dt; if (this.decoyT <= 0) { const dc = this.decoy; this.decoy = undefined; this.flatten(dc, false); } }
   }
   private runDust(dt: number, dir: number) { this.dustT -= dt; if (this.dustT > 0) return; this.dustT = 0.11; const s = this.st;
     const d = this.add.circle(s.px - Math.sign(dir || 1) * 30, s.py + 4, Phaser.Math.Between(8, 14), 0xd8b080, 0.6).setDepth(this.pup.root.depth - 0.01);
     this.tweens.add({ targets: d, scale: 2, alpha: 0, y: d.y - 16, duration: 400, onComplete: () => d.destroy() }); }
+  /** R2 decoy (28 Oct v3, was an identical second Puppy): a flat CARDBOARD cut-out on a wooden stake: pale card print, a brown card
+   *  edge showing its thickness, two strips of tape, Zoe's scribbled tag. He pops out from behind it and tiptoes off. */
   private makeDecoy() {
     const s = this.st; s.decoys++; this.decoyCD = LK.DECOY_CD; this.decoyT = LK.DECOY_LIFE;
     const c = this.decoy = this.add.container(s.px, s.py).setDepth(this.pup.root.depth);
-    const stand = this.add.graphics(); stand.fillStyle(0x8a5a2a, 1).lineStyle(4, COLORS.INK, 1).fillTriangle(20, 0, 60, 0, 30, -110).strokeTriangle(20, 0, 60, 0, 30, -110);
-    const img = art(this, 0, 0, 'pup_idle', PS).setTint(0xe6c48e).setFlipX(this.face < 0);
-    c.add([stand, img]);
+    const L = -36, D = PS * 1.4; // the cut-out stands on its stake, a little off the floor; printed life-size (D matches the live rig)
+    const stake = this.add.graphics(); stake.fillStyle(0x000000, 0.25).fillEllipse(0, 4, 80, 16).fillStyle(0x8a5a2a, 1).lineStyle(4, COLORS.INK, 1).fillRect(-8, -90, 16, 94).strokeRect(-8, -90, 16, 94);
+    const rim = art(this, 0, L + 7, 'pup_idle', D * 1.07).setTintFill(0xe9d3a8).setFlipX(this.face < 0);   // the card rim round the print (scissor cut)
+    const edge = art(this, 10, L + 9, 'pup_idle', D * 1.07).setTintFill(0x8d6236).setFlipX(this.face < 0); // the card's cut edge (thickness)
+    const img = art(this, 0, L, 'pup_idle', D).setTint(0xffe4bd).setFlipX(this.face < 0);                     // the printed side
+    (img as any).preFX?.addColorMatrix().saturate(-0.35); // a faded print, not a live pup
+    const top = L - img.displayHeight * img.originY; // top of the print
+    const deco = this.add.graphics(); deco.fillStyle(0xd9d4c4, 0.95).lineStyle(2, 0xa9a494, 1); [[-70, top + 18, 0.3], [36, top + 12, -0.25]].forEach(([x, y, a]) => { deco.save(); deco.translateCanvas(x + 17, y + 6); deco.rotateCanvas(a); deco.fillRect(-19, -7, 38, 14).strokeRect(-19, -7, 38, 14); deco.restore(); }); // tape
+    deco.lineStyle(4, 0x6b4cc9, 0.9).beginPath(); deco.moveTo(-40, L - 26); [[-24, L - 40], [-8, L - 24], [8, L - 40], [24, L - 26]].forEach(([x, y]) => deco.lineTo(x, y)); deco.strokePath(); // Zoe's crayon zigzag
+    const tag = txt(this, 40, L - 6, 'ZOE', 20, '#6b4cc9', '#fff', 4).setAngle(-8);
+    c.setAngle(this.face < 0 ? 3 : -3);
+    c.add([stake, edge, rim, img, deco, tag]);
     this.cloud(s.px, s.py - 80); Fx.boing(); floatText(this, s.px, s.py - 230, 'ZOE DECOY!', '#ffdf6b', 30);
     if (Math.random() < 0.5) this.talk(400, 860, pick(LINES.lassoTrick), 22, 1100); else if (Math.random() < 0.6) this.couch('gasp', pick(LINES.lassoCouchTip));
     s.pup = 'sneak'; this.fakeT = -1; const goLeft = s.px > 480; this.gx = goLeft ? Phaser.Math.Between(AX0, 380) : Phaser.Math.Between(560, AX1); this.gy = Phaser.Math.Between(AY0, AY1);
-    s.px += goLeft ? -40 : 40; // pops out from behind the cutout
+    s.px += goLeft ? -90 : 90; // pops out from behind the cutout, clear of it
+  }
+  /** the cut-out tips over backwards flat onto the floor (it squashes toward its base: a flat card falling away from you) */
+  private flatten(dc: Phaser.GameObjects.Container, roped: boolean) {
+    this.tweens.add({ targets: dc, scaleY: 0.1, y: dc.y + 6, duration: roped ? 240 : 300, ease: 'Quad.In', onComplete: () => { this.dust(dc.x, dc.y, 5); if (roped) this.word(dc.x, dc.y - 90, 'THWAP!', 36, 300, 4); } });
+    this.tweens.add({ targets: dc, alpha: 0, delay: roped ? 800 : 500, duration: 300, onComplete: () => dc.destroy() });
   }
   private startCharge() {
     const s = this.st; s.pup = 'wind'; s.dodged = false; this.windT = LK.CHARGE_WIND; this.chargeT = Phaser.Math.FloatBetween(LK.CHARGE_EVERY[0], LK.CHARGE_EVERY[1]);
     if (s.hold) { s.hold = false; this.bunny.setFace('unimpressed'); }
+    if (this.floorTalk?.active) { this.tweens.killTweensOf(this.floorTalk); this.floorTalk.destroy(); } this.floorTalk = undefined; // nothing covers the dodge prompt
     this.face = -1; this.pup.flip(true); this.pup.setFrame('stand'); Fx.alert();
     const ex = txt(this, s.px, s.py - 220, '!', 70, '#ff3b3b', '#22252b', 8).setDepth(70); this.tweens.add({ targets: ex, scale: 1.3, duration: 120, yoyo: true, repeat: 3 });
     const ring = this.add.ellipse(BX + 20, BY - 20, 300, 110).setStrokeStyle(8, 0xff3b3b, 0.9).setDepth(18); this.tweens.add({ targets: ring, scaleX: 0.55, scaleY: 0.55, duration: (LK.CHARGE_WIND + LK.CHARGE_RUN) * 1000 });
@@ -516,18 +635,20 @@ export class LassoScene extends Phaser.Scene {
   }
   private dodge(dir: number) {
     const s = this.st; s.dodged = true; s.dodges++; s.hold = false; Sfx.jump();
-    const to = dir < 0 ? -95 : 160; this.tweens.killTweensOf(this); this.tweens.add({ targets: this, bxOff: to, duration: 160, ease: 'Quad.Out' });
-    this.bunny.setFace('cool'); floatText(this, BX + to, BY - 300, 'DODGE!', '#7dff9a', 40);
+    // 28 Oct v3: she hops BACK into the room (up the screen), out of his lane, so he zooms past in FRONT of her instead of through her
+    const to = dir < 0 ? -40 : 60; this.tweens.killTweensOf(this); this.tweens.add({ targets: this, bxOff: to, byOff: -175, duration: 180, ease: 'Quad.Out' });
+    this.bunny.setFace('cool'); floatText(this, BX + to, BY - 480, 'DODGE!', '#7dff9a', 40); this.clearWarn(); // the SWIPE prompt + target ring go as soon as she is out of the lane
   }
   private impactCharge() {
     const s = this.st; this.clearWarn();
-    if (s.dodged) { // he zooms through where she stood, bonks the wall, bounces back into a faceplant
-      s.pup = 'crash'; s.plants++; const wx = -30; this.tweens.add({ targets: s, px: wx, duration: 160, ease: 'Quad.In', onComplete: () => {
-        Fx.punch(); this.cameras.main.shake(180, 0.012); this.word(110, BY - 220, 'BONK!', 60, 400, 8);
-        this.tweens.add({ targets: this, bxOff: 0, duration: 260, ease: 'Quad.InOut' }); this.bunny.setFace('laugh');
-        this.pup.setFrame('dizzy'); this.pup.flip(false);
-        this.tweens.add({ targets: s, px: 330, duration: 450, ease: 'Sine.Out' }); this.tweens.add({ targets: s, py: { from: BY - 30, to: BY - 60 }, duration: 450, ease: 'Sine.Out' });
-        this.tweens.add({ targets: this.pup.inner, angle: 720 + 90, duration: 450, onComplete: () => this.plant() }); } });
+    if (s.dodged) { // he zooms past in front of her, SPLATS into the wall (on screen), bounces back and lands in a faceplant
+      s.pup = 'crash'; s.plants++; const wx = 72; this.pup.root.setDepth(21); this.tweens.add({ targets: s, px: wx, duration: 170, ease: 'Quad.In', onComplete: () => {
+        Fx.punch(); this.cameras.main.shake(180, 0.012); this.word(150, BY - 260, 'BONK!', 60, 400, 8);
+        this.pup.squash(0.62, 1.12); this.time.delayedCall(110, () => this.pup.squash(1, 1)); this.bunny.setFace('laugh');
+        this.time.delayedCall(110, () => { this.pup.setFrame('dizzy'); this.pup.flip(false);
+          this.tweens.add({ targets: s, px: 330, duration: 430, ease: 'Sine.Out' }); this.tweens.add({ targets: s, py: { from: BY - 30, to: BY - 70 }, duration: 430, ease: 'Sine.Out' });
+          this.tweens.add({ targets: this.pup.inner, angle: 720, duration: 430, onComplete: () => { this.pup.inner.setAngle(0); this.plant(); } }); });
+        this.time.delayedCall(560, () => this.tweens.add({ targets: this, bxOff: 0, byOff: 0, duration: 240, ease: 'Quad.InOut' })); } }); // she hops back down once he is past
     } else { // BONK: he bowls Bunny over and scampers off laughing
       s.bonks++; s.stun = LK.BONK; Fx.ouch(); this.cameras.main.shake(200, 0.014); this.bunny.setFace('unimpressed'); this.word(BX + 60, BY - 330, 'BONK!', 64, 500);
       this.talk(400, 860, pick(LINES.lassoBonk), 22, 1200); this.couch('gasp');
@@ -535,30 +656,36 @@ export class LassoScene extends Phaser.Scene {
     }
   }
   private plant() {
-    const s = this.st; if (s.phase !== 'free' || s.pup !== 'crash') return; s.pup = 'plant'; this.plantT = LK.PLANT; this.pup.squash(1, 1); this.pup.inner.setAngle(90);
+    const s = this.st; if (s.phase !== 'free' || s.pup !== 'crash') return; s.pup = 'plant'; this.plantT = LK.PLANT; this.pup.inner.setAngle(0); this.pup.setFrame('dizzy');
+    this.pup.root.setDepth(10 + (s.py - 900) / 100);
+    // 28 Oct v3 (was the sprite turned 90 deg): a cartoon SPLAT: he lands flat, squashes wide, wobbles; dizzy face, stars round his head
+    const sq = { x: 1.3, y: 0.62 }; this.pup.squash(sq.x, sq.y); this.tweens.add({ targets: sq, x: 1.16, y: 0.78, duration: 160, yoyo: true, repeat: 3, ease: 'Sine.InOut', onUpdate: () => { if (s.pup === 'plant') this.pup.squash(sq.x, sq.y); } });
+    // the faceplant IS a catch window (R3): no tell, the splat is the tell
+    this.closeWindow(false); s.win = 'open'; s.wins++; this.winLen = this.winLeft = LK.PLANT;
     this.dust(s.px, s.py, 12); Fx.save(); this.couch('cheer');
     this.word(s.px + 30, s.py - 230, 'FACEPLANT!', 56, 900);
     this.time.delayedCall(300, () => this.talk(420, 860, pick(LINES.lassoFaceplant), 22, 1100));
-    this.stars = txt(this, s.px, s.py - 90, '✦ ✦', 30, '#ffdf6b', '#22252b', 5).setDepth(41);
-    const ring = this.add.ellipse(s.px, s.py - 40, 220, 90).setStrokeStyle(8, 0x7dff9a, 0.9).setDepth(9); this.tweens.add({ targets: ring, alpha: 0.3, scaleX: 1.15, scaleY: 1.15, duration: 300, yoyo: true, repeat: -1 });
-    const pr = comic(this, s.px + 10, Math.min(1250, s.py + 50), this.first.plant ? 'FREE ROPE! Throw now!' : 'FREE ROPE!', 40).setDepth(70); this.first.plant = false;
+    this.stars = txt(this, s.px, s.py - 120, '✦ ✦', 30, '#ffdf6b', '#22252b', 5).setDepth(41);
+    const ring = this.add.ellipse(s.px, s.py - 30, 250, 92).setStrokeStyle(9, 0xffd84d, 1).setDepth(9); this.tweens.add({ targets: ring, scaleX: 0.45, scaleY: 0.45, duration: LK.PLANT * 1000 });
+    const pr = comic(this, s.px + 10, Math.min(1250, s.py + 50), this.first.plant ? 'FREE ROPE! NOW!' : 'NOW!', 40).setDepth(70); this.first.plant = false;
     this.warn.push(ring, pr);
   }
   private clearWarn() { this.warn.forEach(o => { this.tweens.killTweensOf(o); o.destroy(); }); this.warn = []; }
   // ---------------------------------------------------------------- frame
   update(_t: number, dms: number) {
     const s = this.st; if (!this.bunny) return; const dt = Math.min(dms, 50) / 1000; const g = this.fx.clear();
-    if (s.stun > 0) s.stun -= dt; if (s.running || s.phase === 'outro') s.clock += dt; // game-time since the start (tests/tuning)
+    if (s.stun > 0) s.stun -= dt; if (s.lock > 0) s.lock -= dt; if (s.running || s.phase === 'outro') s.clock += dt; // game-time since the start (tests/tuning)
     if (s.hold) { s.holdT += dt; }
     const knot = this.knot();
     const mode: Mode = s.phase === 'outro' ? 'walk' : (s.phase === 'tug' || (s.phase === 'tied' && !this.hanging)) ? 'hold' : s.stun > 0 ? 'dizzy' : s.hold ? 'twirl' : 'idle';
-    this.bunny.root.setX(BX + this.bxOff + (s.phase === 'outro' ? -this.outroWalk() : 0));
+    this.bunny.root.setPosition(BX + this.bxOff + (s.phase === 'outro' ? -this.outroWalk() : 0), BY + this.byOff); this.bunShadow.setPosition(this.bunny.root.x, BY - 4 + this.byOff * 0.97).setScale(1 + this.byOff / 900);
     this.bunny.update(dt, mode, s.holdT / LK.SPIN, knot, s.phase === 'tug' ? s.tug : 0.6);
     if (s.running && s.phase === 'free' && s.bannerT <= 0 && !s.over) {
       s.time = Math.max(0, s.time - dt);
       if (s.time <= 0 && !s.flying && s.pup !== 'charge' && s.pup !== 'crash') { this.finish(false); }
     }
     if (s.bannerT > 0) s.bannerT -= dt;
+    if (s.running && s.phase === 'free' && s.bannerT <= 0 && !s.over) this.updWin(dt);
     if (s.phase === 'free' || s.phase === 'intro') this.updPup(dt);
     else if (s.phase === 'tug') this.updTug(dt);
     else if (s.phase === 'tied') this.updTied(dt);
@@ -580,10 +707,11 @@ export class LassoScene extends Phaser.Scene {
   }
   private drawAim(g: Phaser.GameObjects.Graphics) {
     const s = this.st, hp = this.bunny.handPos(), r = this.loopR(), a = s.holdT / LK.SPIN * Math.PI * 2, big = s.holdT >= LK.HOLD_MAX;
-    const lx = hp.x + Math.cos(a) * 22, ly = hp.y - 34 + Math.sin(a) * 6, lw = r * 1.5, lh = r * 0.45;
+    const lx = hp.x + 46 + Math.cos(a) * 22, ly = hp.y - 70 + Math.sin(a) * 6, lw = r * 1.5, lh = r * 0.45; // 28 Oct v3: overhead + out to her right (was across her face)
+    g.lineStyle(5, ROPE, 1).lineBetween(hp.x, hp.y, lx - lw * 0.42, ly + 4); // the short rope from her paw up to the spinning loop
     g.lineStyle(12, 0xffffff, 0.9).strokeEllipse(lx, ly, lw, lh).lineStyle(7, ROPE, 1).strokeEllipse(lx, ly, lw, lh);
     if (big) g.lineStyle(18, 0x7dff9a, 0.35).strokeEllipse(lx, ly, lw + 14, lh + 10);
-    for (let i = 0; i < 3; i++) g.fillStyle(s.holdT >= (i + 1) / 3 * LK.HOLD_MAX ? 0x7dff9a : 0xffffff, s.holdT >= (i + 1) / 3 * LK.HOLD_MAX ? 1 : 0.35).fillCircle(hp.x - 40 + i * 40, hp.y - 110, 11);
+    for (let i = 0; i < 3; i++) g.fillStyle(s.holdT >= (i + 1) / 3 * LK.HOLD_MAX ? 0x7dff9a : 0xffffff, s.holdT >= (i + 1) / 3 * LK.HOLD_MAX ? 1 : 0.35).fillCircle(hp.x + 6 + i * 40, hp.y - 130, 11);
     // dotted arc to the landing spot + the landing loop
     for (let i = 1; i < 12; i++) { const k = i / 12; const x = hp.x + (s.tx - hp.x) * k, y = hp.y + (s.ty - hp.y) * k - Math.sin(k * Math.PI) * 160; g.fillStyle(0xffffff, 0.55).fillCircle(x, y, 5); }
     g.lineStyle(6, 0xffffff, 0.85).strokeEllipse(s.tx, s.ty, r * 2, r * 0.8).lineStyle(3, big ? 0x7dff9a : 0xffdf6b, 0.9).strokeEllipse(s.tx, s.ty, r * 2 - 10, r * 0.8 - 8);
@@ -597,8 +725,8 @@ export class LassoScene extends Phaser.Scene {
   // ---------------------------------------------------------------- win: drag him off by the rope
   private win() {
     const s = this.st; this.finish(true);
-    this.couch('party'); popBanner(this, 'PUPPY ROUNDED UP!', 600, 0x2fbf5a, 1600); this.cameras.main.flash(300, 255, 240, 200);
-    this.time.delayedCall(1300, () => { if (!this.scene.isActive()) return; s.phase = 'outro'; this.outroT = 0; this.bunny.setFace('wink');
+    this.couch('party'); this.time.delayedCall(650, () => { if (this.scene.isActive()) popBanner(this, 'PUPPY ROUNDED UP!', 600, 0x2fbf5a, 1300); }); // one beat at a time: catch burst, THEN the banner (no white flash)
+    this.time.delayedCall(1700, () => { if (!this.scene.isActive()) return; s.phase = 'outro'; this.outroT = 0; this.bunny.setFace('wink');
       this.talk(260, 860, pick(mix(LINES.lassoOutroBun, CHEEKY.lassoOutroBun)), 22, 1300); this.time.delayedCall(1300, () => this.talk(420, 860, pick(mix(LINES.lassoOutroPup, CHEEKY.lassoOutroPup)), 22, 1400)); });
   }
   private outroWalk() { return Math.max(0, this.outroT - 0.25) * 150; }
@@ -653,13 +781,17 @@ export class LassoScene extends Phaser.Scene {
     c.setAlpha(0); this.tweens.add({ targets: c, alpha: 1, duration: 300 });
   }
   // ---------------------------------------------------------------- bits
-  private tiedRopes() { // three wraps over his pinned arms, feet bundled, a cross strap and a bow knot (viewBox units * PS)
+  /** hog-tie (28 Oct v3, was three full ellipses = a slinky): two wraps that go ROUND him (only the front half of each loop shows, the
+   *  back half is behind his body), one over his pinned arms and one round his ankles, joined by a single tie line and a bow knot. */
+  private tiedRopes() {
     const g = this.add.graphics(), s = PS;
-    const band = (yy: number, w: number, h: number, lw = 9) => { g.lineStyle((lw + 4) * s, 0xffffff, 1).strokeEllipse(0, yy * s, w * s, h * s); g.lineStyle(lw * s, ROPE, 1).strokeEllipse(0, yy * s, w * s, h * s); };
-    band(-62, 150, 34); band(-34, 158, 34); band(-6, 120, 24, 8);
-    g.lineStyle(15 * s, 0xffffff, 1).lineBetween(-56 * s, -78 * s, 50 * s, -20 * s); g.lineStyle(9 * s, ROPE, 1).lineBetween(-56 * s, -78 * s, 50 * s, -20 * s);
-    g.fillStyle(ROPE, 1).lineStyle(4, COLORS.INK, 1); [[-20, -48], [20, -48]].forEach(([bx, by]) => g.fillEllipse(bx * s, by * s, 34 * s, 22 * s).strokeEllipse(bx * s, by * s, 34 * s, 22 * s));
-    g.fillCircle(0, -48 * s, 10 * s).strokeCircle(0, -48 * s, 10 * s); g.lineStyle(7 * s, ROPE, 1).lineBetween(4 * s, -40 * s, 18 * s, -14 * s).lineBetween(-4 * s, -40 * s, -22 * s, -16 * s);
+    const wrap = (yy: number, w: number, h: number, lw: number) => { const P: Phaser.Math.Vector2[] = []; for (let i = 0; i <= 16; i++) { const t = Math.PI * i / 16; P.push(new Phaser.Math.Vector2(-Math.cos(t) * w / 2 * s, (yy + Math.sin(t) * h / 2) * s)); }
+      g.lineStyle((lw + 5) * s, 0xffffff, 1).strokePoints(P); g.lineStyle(lw * s, ROPE, 1).strokePoints(P);
+      g.lineStyle(2.5 * s, 0xf2c48d, 0.9); for (let i = 2; i < 16; i += 3) { const q = P[i]; g.lineBetween(q.x - 3 * s, q.y - 3 * s, q.x + 3 * s, q.y + 3 * s); } };
+    wrap(-60, 150, 30, 10); wrap(-8, 104, 20, 9);
+    g.lineStyle(14 * s, 0xffffff, 1).lineBetween(6 * s, -44 * s, 6 * s, 2 * s); g.lineStyle(9 * s, ROPE, 1).lineBetween(6 * s, -44 * s, 6 * s, 2 * s); // tie line arms -> ankles
+    g.fillStyle(ROPE, 1).lineStyle(4, COLORS.INK, 1); [[-14, -46], [26, -46]].forEach(([bx, by]) => g.fillEllipse(bx * s, by * s, 30 * s, 20 * s).strokeEllipse(bx * s, by * s, 30 * s, 20 * s));
+    g.fillCircle(6 * s, -46 * s, 9 * s).strokeCircle(6 * s, -46 * s, 9 * s);
     return g;
   }
   /** little hearts float up from Puppy's HEAD only (never heart eyes, never at Bunny) */
@@ -669,7 +801,8 @@ export class LassoScene extends Phaser.Scene {
       this.tweens.add({ targets: h, y: away ? y + 30 + Math.random() * 30 : y - 80 - Math.random() * 40, x: h.x + (away ? sd * Phaser.Math.Between(50, 80) : Phaser.Math.Between(-30, 30)), angle: Phaser.Math.Between(-25, 25), delay: i * 160, duration: 1000, ease: 'Sine.Out', onComplete: () => this.tweens.add({ targets: h, alpha: 0, duration: 200, onComplete: () => h.destroy() }) }); }
   }
   private talk(x: number, y: number, t: string, sz?: number, ms?: number) {
-    const c: any = say(this, x, y, t, sz, ms); const tx: any = c?.list?.find((o: any) => o.type === 'Text');
+    const fl = y >= 800, s = this.st; if (fl && (s.pup === 'wind' || s.pup === 'charge')) return undefined; // the SWIPE to DODGE prompt owns the floor
+    const c: any = say(this, x, y, t, sz, ms); if (fl) this.floorTalk = c; const tx: any = c?.list?.find((o: any) => o.type === 'Text');
     if (c && tx) { const hw = tx.width / 2 + 34; c.x = Phaser.Math.Clamp(c.x, hw, W - hw); } return c;
   }
   /** a comic word that pops in, holds, floats up and fades */

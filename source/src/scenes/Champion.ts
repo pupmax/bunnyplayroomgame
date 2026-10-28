@@ -9,7 +9,7 @@ import { txt } from '../systems/fx';
 import { Fx } from '../systems/audio';
 import { say, setPageBg, comic } from '../systems/kit';
 import { LINES, pick, CHEEKY, mix } from '../lines';
-import { pupHearts, blush, bunTease, winkSparkle, headOf, fan, pipe, eyeRoll, ptOn, type Neck } from '../systems/cheeky';
+import { blush, bunTease, winkSparkle, headOf, fan, pipe, eyeRoll, ptOn, type Neck } from '../systems/cheeky';
 import { koPupFor } from '../systems/koPup';
 import { champHang } from '../art/pupHang';
 
@@ -45,7 +45,11 @@ export class ChampionScene extends Phaser.Scene {
    *  wags harder), then a booty-bump; the couch girls fan
    *  themselves or roll their eyes. Repeats every few seconds. */
   private cheeky(bun: Phaser.GameObjects.Image, pup: Phaser.GameObjects.Image, girls: Phaser.GameObjects.Image[]) {
-    const head = () => headOf(pup, 0.3); let blushed = false;
+    // 28 Oct v3: his real head (the hang rig's head layer), not the anchor's box: the blush sits on his CHEEKS and the hearts pop off the
+    // sides of his head (never across his chest or face)
+    type HeadInfo = { x: number; y: number; rx: number; ry: number };
+    const head = (): HeadInfo => (pup.getData('head') as (() => HeadInfo) | undefined)?.() ?? { ...headOf(pup, 0.5), rx: 60, ry: 50 };
+    const hearts = (n: number) => (pup.getData('hearts') as ((n: number) => void) | undefined)?.(n); let blushed = false;
     const fans = [1, 4, 6], rolls = [0, 5, 3]; let k = 0;
     const couch = () => { const f = girls[fans[k % 3]], r = girls[rolls[k % 3]]; k++;
       if (f?.active) { const b = f.getBounds(); fan(this, b.centerX + 34, b.top + b.height * 0.42, 45, 2000); pipe(this, b.centerX, b.top - 8, pick(CHEEKY.couchFan), 46, '#ffd1e0'); }
@@ -57,14 +61,14 @@ export class ChampionScene extends Phaser.Scene {
       this.time.delayedCall(2100, () => bun.active && raised() && bun.setTexture('bun_full_coolwink'));
       winkSparkle(this, b.centerX + b.width * 0.14, b.top + b.height * 0.28, 52, undefined, '');
       bunTease(this, () => ({ ...(raised() ? ptOn(bun, 0.845, 0.565) : ptOn(bun, 0.76, 0.84)), r: 11 }) /* her right paw, in the art */, () => (pup.getData('neck') as (() => Neck) | undefined)?.() ?? { x: pup.x, y: pup.y - 60 } /* his neck (he hangs upside-down, so it's above his face; pup = the hang anchor) */, () => {
-        if (!blushed) { blushed = true; blush(this, () => { const h = head(); return { x: h.x, y: h.y + 18 }; }, 30, 27); }
-        pupHearts(this, head().x, head().y - 10, 3, 27); this.tweens.add({ targets: pup, x: pup.x - 22, y: pup.y - 12, yoyo: true, repeat: 2, duration: 110, ease: 'Quad.Out' }); /* the tug jiggles his hang */
-        couch(); }, 52, undefined, 0.2, 0.45); }; // a shallower sag: the rope stays above the girls' heads
+        if (!blushed) { blushed = true; blush(this, () => { const h = head(); return { x: h.x, y: h.y + h.ry * 0.48 }; }, head().rx * 1.135, 27); } // on his cheeks (head art: cheeks at +-42, +28 of 74 x 58)
+        hearts(3); this.tweens.add({ targets: pup, x: pup.x - 22, y: pup.y - 12, yoyo: true, repeat: 2, duration: 110, ease: 'Quad.Out' }); /* the tug jiggles his hang */
+        couch(); }, 52, undefined, 0.2, -1.1); }; // 28 Oct v3: the leash bows UP and round (sagMul < 0), clear of his face and above the girls' heads
     const bump = () => { if (!bun.active || !pup.active) return; const x0 = bun.x, px = pup.x;
       this.tweens.add({ targets: bun, x: x0 + 70, angle: 10, duration: 160, yoyo: true, ease: 'Quad.Out', onYoyo: () => {
         const w = comic(this, (x0 + px) / 2 + 40, 690, 'BUMP!', 40).setDepth(52).setAngle(8).setScale(0.3);
         this.tweens.add({ targets: w, scale: 1, duration: 140, ease: 'Back.Out' }); this.tweens.add({ targets: w, alpha: 0, y: 650, delay: 600, duration: 250, onComplete: () => w.destroy() });
-        Fx.boing(); this.tweens.add({ targets: pup, x: px + 30, y: pup.y - 30, duration: 140, yoyo: true, ease: 'Quad.Out' }); pupHearts(this, head().x, head().y - 10, 2, 27); } }); };
+        Fx.boing(); this.tweens.add({ targets: pup, x: px + 30, y: pup.y - 30, duration: 140, yoyo: true, ease: 'Quad.Out' }); hearts(2); } }); };
     this.time.delayedCall(1700, tease); this.time.delayedCall(3800, bump);
     this.time.addEvent({ delay: 5000, loop: true, callback: () => { tease(); this.time.delayedCall(2100, bump); } });
     this.time.delayedCall(4600, () => bun.active && bun.setTexture('bun_full_coolwink'));

@@ -153,6 +153,17 @@ export const LINES = {
   lassoLampPup: ['Puppy: Ta-daa...? Hmph.', 'Puppy: Totally planned. Ten out of ten.', 'Puppy: Just hanging out!'],
   // the couch giggling at the hang (little pops over the girls)
   lassoGiggle: ['hee hee!', 'tee-hee!', 'hihi!', 'giggle!'],
+  // ================= EDIT ME, Marc: RODEO catch windows (new pools, 28 Oct). Puppy can only be roped in a gold NOW! window =================
+  // Puppy taunts when Bunny throws OUTSIDE a window (he sidesteps the loop; she loses a little time)
+  lassoNope: ['Puppy: Nope! Too early!', 'Puppy: Not now, Bunny~', 'Puppy: Wait for it... hehe!', 'Puppy: Missed me! Watch for the sparkle!', 'Puppy: Nyoom! Try again!', 'Puppy: Patience, cowbunny!'],
+  // round 1 window: Puppy stops to catch his breath (little floater over him)
+  lassoPant: ['pant pant...', 'huff... puff...', 'phew!'],
+  // round 2 window: a couch girl tosses him a treat and he stops to sniff it
+  lassoTreat: ['Nana: Treat incoming!', 'Nana: Here, Puppy! A cookie!', 'Zoe: Sniff THIS, sneaky!', 'Nana: Snack break!'],
+  lassoSniff: ['sniff sniff...', 'ooh, cookie?', 'nom?'],
+  // round 3 window: Iris snaps his photo and he freezes to pose
+  lassoPhoto: ['Iris: Say cheese, superstar!', 'Iris: Hold still! Photo time!', 'Iris: Strike a pose!'],
+  lassoPose: ['cheese!', 'pose!', 'so fluffy!'],
   // round 3: Puppy charges Bunny. Bunny dodges and he faceplants / or he bonks her
   lassoFaceplant: ['Puppy: Ow, my snoot!', 'Puppy: Who moved the Bunny?!', 'Puppy: The floor came out of nowhere!'],
   lassoBonk: ['Puppy: Beep beep! Coming through!', 'Puppy: Zoomies always win!', 'Puppy: Bonk! Tag, you\'re it!'],

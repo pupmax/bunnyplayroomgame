@@ -114,7 +114,7 @@ function leg(x: number, angle: number, lift: number, fill: string): string {
     `</g>`;
 }
 
-function body(b: number): string {
+function body(b: number, crease = true): string {
   const path = blobPath(98, 180 + b, 50, 46, {
     pear: 0.2, power: 2.1,
     tufts: [{ a: 165, s: 4, w: 4 }, { a: 196, s: 3.5, w: 4 }, { a: 15, s: 4, w: 4 }, { a: 345, s: 3.5, w: 4 }],
@@ -124,8 +124,8 @@ function body(b: number): string {
     `<path d="${arcOf(98, 180 + b, 50, 46, 150, 215, { power: 2.1, pear: 0.2, inset: 4.5 })}" fill="none" stroke="#ffd7a3" stroke-width="3" stroke-linecap="round" opacity="0.65"/>` +
     `<ellipse cx="100" cy="${146 + b}" rx="46" ry="12" fill="url(#ao)"/>` +
     `<ellipse cx="84" cy="${214 + b}" rx="18" ry="7" fill="url(#ao)"/><ellipse cx="114" cy="${214 + b}" rx="18" ry="7" fill="url(#ao)"/>` +
-    // arm crease line like the clips
-    `<path d="M70 ${158 + b} q-3 12 1 24" fill="none" stroke="${OUT}" stroke-width="2.6" stroke-linecap="round" opacity="0.75"/>`;
+    // arm crease line like the clips (off for the Penalty Pup keeper, whose arms are drawn by the scene)
+    (crease ? `<path d="M70 ${158 + b} q-3 12 1 24" fill="none" stroke="${OUT}" stroke-width="2.6" stroke-linecap="round" opacity="0.75"/>` : '');
 }
 
 export function puppySVG(pose: Partial<PupPose>, pxPerUnit: number): string {
@@ -254,3 +254,23 @@ function irisMouth(face: IrisFace): string {
 // ---------- end Trash-Can Drop Puppy faces ----------
 /** Puppy's own part painters + palette, shared read-only with art/pupHang.ts (Lasso hang poses reuse the exact same body/head/leg/ear/face code). */
 export const PUP_PARTS = { OUT, SW, DEFS, head, topTuft, ear, leg, body, eyes, brows, mouth };
+
+// ---------- Penalty Pup keeper (Glassia, Football scene): Puppy split into two layers that overlay exactly (same viewBox), so the
+// scene can draw his goalie arms BETWEEN them: in front of the body, behind the face. No baked arm, no tail (the scene wags its own),
+// no arm-crease line. part 'body' = legs + body, part 'head' = top tuft + head + face + ears. ----------
+export function keeperSVG(pose: Partial<PupPose>, part: 'body' | 'head', pxPerUnit: number): string {
+  const p: PupPose = { ...POSE_DEFAULT, ...pose }, b = p.bob, f = p.face;
+  let s = `<g transform="rotate(${p.lean} 100 200)">`;
+  if (part === 'body') s += leg(84, p.legBack, p.legLift, '#a85d24') + body(b, false) + leg(113, p.legFront, p.legLift, '#c27230');
+  else {
+    s += topTuft(b) + head(b) + `<g transform="translate(0 ${b})">` + `<ellipse cx="100" cy="118" rx="30" ry="20" fill="url(#glow)"/>` +
+      `<ellipse cx="58" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="0.8"/><ellipse cx="142" cy="122" rx="13" ry="8" fill="url(#blush)" opacity="0.8"/>` +
+      brows(f) + eyes(f) + `<path d="M91 112 Q100 106 109 112 Q108 120 100 121 Q92 120 91 112 Z" fill="#24130b"/><ellipse cx="97" cy="112" rx="2.6" ry="1.5" fill="#fff" opacity="0.7"/>` + mouth(f);
+    if (f === 'panic') s += `<path d="M34 60 q-7 12 0 16 q7 -4 0 -16 Z" fill="#7fd4ff" stroke="${OUT}" stroke-width="2.6"/><path d="M166 52 q-7 12 0 16 q7 -4 0 -16 Z" fill="#7fd4ff" stroke="${OUT}" stroke-width="2.6"/>`;
+    if (f === 'dizzy') s += star(46, 30, 12) + star(156, 26, 10) + star(102, 8, 8);
+    s += `</g>` + ear('L', p.earL, b) + ear('R', p.earR, b);
+  }
+  s += `</g>`;
+  return svgDoc(PUP_VB.w, PUP_VB.h, PUP_VB.w * pxPerUnit, PUP_VB.h * pxPerUnit, s, DEFS);
+}
+// ---------- end Penalty Pup keeper ----------

@@ -3,7 +3,7 @@ import { chromium, devices } from 'playwright';
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message));
-await p.goto(process.env.URL); await p.evaluate(() => { for (const pf of ['playroom.', 'playroom-test.']) for (const k of ['bunny2','glassia_pen1','iris1','linye1','midnight1','nana2','noir3','rubybag','tail1','tailmock','zoe1']) localStorage.setItem(pf + 'tut.' + k, '1'); });
+await p.goto(process.env.URL); await p.evaluate(() => { for (const pf of ['playroom.', 'playroom-test.']) for (const k of ['bunny2','glassia_pen2','iris1','linye1','midnight1','nana2','noir3','rubybag','tail1','tailmock','zoe1']) localStorage.setItem(pf + 'tut.' + k, '1'); });
 await p.reload(); await p.waitForFunction(() => window.__game?.scene.isActive('Title') && (window.__artReady ?? true), null, { timeout: 180000 });
 const times = (process.env.TIMES || '1700,2300').split(',').map(Number);
 const NAMES = ['Ruby', 'Glassia', 'Zoe', 'Nana', 'Midnight', 'Noir', 'Iris', 'Linye'];

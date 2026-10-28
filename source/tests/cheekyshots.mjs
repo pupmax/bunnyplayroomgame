@@ -5,7 +5,7 @@ const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
 const p = await (await b.newContext({ ...devices['iPhone 13'], viewport: { width: 390, height: 844 } })).newPage();
 const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-await p.goto(URL_); await p.evaluate(() => { for (let i = 0; i < 12; i++) ['Boxing','Football','Hive','Acorn','Dive','Pounce','Trash','Shadow','Lasso','Tail','bunny2','glassia_pen1','iris1','linye1','midnight1','nana2','noir2','rubybag','tail1','tailmock','zoe1'].forEach(k => localStorage.setItem('playroom.tut.' + k, '1')); });
+await p.goto(URL_); await p.evaluate(() => { for (let i = 0; i < 12; i++) ['Boxing','Football','Hive','Acorn','Dive','Pounce','Trash','Shadow','Lasso','Tail','bunny2','glassia_pen2','iris1','linye1','midnight1','nana2','noir2','rubybag','tail1','tailmock','zoe1'].forEach(k => localStorage.setItem('playroom.tut.' + k, '1')); });
 await p.reload(); await p.waitForFunction(() => window.__game?.scene.isActive('Title') && (window.__artReady ?? true), null, { timeout: 120000 });
 const W = ms => p.waitForTimeout(ms);
 const go = (k, d) => p.evaluate(([k, d]) => { const g = window.__game; g.scene.getScenes(true).forEach(s => g.scene.stop(s.scene.key)); g.scene.start(k, d); }, [k, d]);

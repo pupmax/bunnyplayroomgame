@@ -245,6 +245,25 @@ export const LINES = {
   penLose: ['So close! Wait for the dive, then shoot!', 'Puppy read your hooves this time!', 'Shake out that mane and try again!'],
   penLosePup: ['Puppy: Paws of steel! Undefeated!', 'Puppy: Best keeper in the Playroom!', 'Puppy: Come back when you can wiggle-read!'],
   // ================= end GLASSIA "PENALTY PUP" =================
+  // ================= EDIT ME, Marc: PENALTY PUP v2 "READ & SHOOT" (new pools; the ones above still play too) =================
+  // Puppy LEANS to guess, Glassia shoots the OTHER corner on green. Keep lines short, family-friendly slapstick.
+  // Puppy while the ring is yellow (he is reading her)
+  penRead: ['Puppy: I can read you like a bone menu.', 'Puppy: Hmm... I sniff a LEFT. Or a right.', 'Puppy: My nose knows!'],
+  // Puppy when he swaps his lean
+  penSwap: ['Puppy: Changed my mind!', 'Puppy: Other way! No... this way!', 'Puppy: Wiggle switch!'],
+  // she kicks straight at him in the middle (tummy catch)
+  penMidSave: ['Puppy: Tummy catch! Delicious.', 'Puppy: Right into my fluffy belly!', 'Puppy: You kicked it TO me? Thanks!'],
+  // Glassia after he guesses right and saves
+  penOops2: ['Glassia: Hay! I kicked where he leaned!', 'Glassia: Other corner next time!', 'Glassia: Neigh! Read his lean, Glassia!'],
+  // banner when the bluffs start (shots 7-8)
+  penBluff: ['He BLUFFS now! His TAIL never lies!'],
+  // rule pill on the bluff shots (shots 7-8)
+  penBluffRule: ['BLUFF! Shoot AWAY from his TAIL!'],
+  // shots 7-8: he dives the wrong way and does a double-take
+  penWrongWay: ['Puppy: Wait... wrong way?!', 'Puppy: My tail TOLD on me!', 'Puppy: Who put the ball THERE?!'],
+  // loss card big line (mixed with penLose minus the old dive line)
+  penLose2: ['So close! Shoot AWAY from his lean!', 'Watch his tail on the last shots!'],
+  // ================= end PENALTY PUP v2 =================
   // ================= NANA "ACORN BARRAGE" twists: tail whack, snack thief, seeing stars, K.O. =================
   // EDIT ME: Puppy/Nana banter for the new Acorn Barrage moments (smug + sneaky, the odd sweet one). Hints are the one-line tutorials.
   acornHint: { swat: '❗ Tail wiggle = he WHACKS it back. WAIT!', munch: 'He\'s eating your acorn! BONK him first!', stars: '⭐ Seeing stars: every hit counts DOUBLE!' },

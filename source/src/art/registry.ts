@@ -9,6 +9,7 @@ import { sushiSVG, SUSHI } from './sushi';
 import { CAST, chibiHeadSVG, chibiFullSVG, rubyBackSVG, lassoSVG, gloveSVG } from './chibi';
 import { BACKGROUNDS, backgroundSVG } from './backgrounds';
 import { PROPS, propSVG } from './props';
+import { TRASH_PROPS, trashPropSVG, trashBgSVG, bobbleBodies, bobbleHeads, bobbleBodySVG, bobbleHeadSVG, NECK } from './trashArt';
 import { RES } from '../systems/resolution';
 import playroomLogoUrl from '../assets/playroom_logo.png';
 
@@ -29,7 +30,7 @@ function bootDeferred(key: string): boolean {
   if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
   if (key.startsWith('pa_')) return true; // Acorn Puppy (Tail Catch rig) extra frames: drawn when Acorn opens (ensureArt)
   if (key.startsWith('pk_')) return true; // Penalty Pup keeper layers: drawn when Football opens (ensureArt)
-  if (key.startsWith('pi_')) return true; // Trash-Can Drop Puppy (Tail Catch rig) reaction frames: drawn when Trash opens (ensureArt)
+  if (/^t[pibuclx]_/.test(key)) return true; // Trash-Can Drop (Comic Rooftop Heist) bobble Puppy + props: drawn when Trash opens (ensureArt)
   if (key === 'bun_rig_sneaky' || key.startsWith('bun_rig2_')) return true; // Tail Catch only (drawn when the level opens)
   if (key.startsWith('bun_rig_')) return false;
   if (/^bun_(full|wave|sip|bust)_/.test(key)) return !BOOT_USED_BUN.has(key);
@@ -80,10 +81,12 @@ function assets(): Asset[] {
     ko: { face: 'ko', bob: 2, earL: 36, earR: 36, legBack: -34, legFront: 38, legLift: 2, armBack: -120 } }; // KO'd on the end cards (systems/koPup.ts): ears splayed, legs + arm flopped
   for (const name of Object.keys(paFrames)) list.push({ key: `pa_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...paFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
   // ---------- end Acorn Barrage Puppy ----------
-  // ---------- Trash-Can Drop Puppy (Iris): extra tail-less frames for the Tail Catch rig (systems/trashPups.ts). On demand, like pt_*. ----------
-  const piFrames: Record<string, Record<string, unknown>> = { lovey: { face: 'lovey', earL: 16, earR: 16, armBack: -20 }, ko: { ...pf.dizzy, face: 'xeyes', earL: 34, earR: -12 },
-    sit: { face: 'dizzy', legBack: 58, legFront: -58, legLift: 4, earL: 22, earR: 22, armBack: -60 } };
-  for (const name of Object.keys(piFrames)) list.push({ key: `pi_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...piFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
+  // ---------- Trash-Can Drop "Comic Rooftop Heist" (Iris): backdrop (bg_, on demand like every backdrop), drawn junk/umbrella/bins/burst
+  // and the bobble-head Puppy (tp_b_* body frames, feet origin; tp_h_* head faces, neck-pivot origin). On demand (ensureArt when Trash opens). ----------
+  list.push({ key: 'bg_heist', nominal: 1, res: 1.5, build: (k) => trashBgSVG(k), originX: 0, originY: 0 });
+  for (const key of Object.keys(TRASH_PROPS)) list.push({ key, nominal: 1, res: 2.5, build: (k) => trashPropSVG(key, k), originX: TRASH_PROPS[key].ox, originY: TRASH_PROPS[key].oy });
+  for (const [name, pose] of Object.entries(bobbleBodies())) list.push({ key: `tp_b_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => bobbleBodySVG(pose, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
+  for (const [name, pose] of Object.entries(bobbleHeads())) list.push({ key: `tp_h_${name}`, nominal: PUP_SCALE, boost: 1.5, build: (k) => bobbleHeadSVG(pose, k), originX: NECK.x / PUP_VB.w, originY: NECK.y / PUP_VB.h });
   // ---------- end Trash-Can Drop Puppy ----------
   list.push({ key: 'pt_tail', nominal: PUP_SCALE, boost: 1.6, build: (k) => puppyTailSVG(k), originX: PUP_TAIL_VB.bx / PUP_TAIL_VB.w, originY: PUP_TAIL_VB.by / PUP_TAIL_VB.h });
   const exprs: BunExpr[] = ['cool', 'unimpressed', 'smile', 'wink', 'laugh', 'stern', 'sneaky'];

@@ -50,12 +50,11 @@ await level(4, 'Midnight', 'midnight', 'Dive', async () => {
   await wait(30);
 }, () => window.__pr.st.catches);
 await hold(false);
-await level(5, 'Noir', 'noir', 'Pounce', async () => { // Box Bandit: MEOW when he heads for her box, POUNCE on a wrong-box peek, tap-tap-tap the tug
-  const s = await ev(() => window.__pr.st);
-  if (s.phase === 'tug') { await page.mouse.click(...P(360, 640)); await ev(() => { for (let i = 0; i < 3; i++) window.__pr.tap(360, 640); }); await wait(40); return; } // one real click + 3 in-page taps per pass: headless runs ~4-10 fps, too slow for real tap-fast clicks alone
-  if (s.phase === 'hunt' && s.pup === 'peek' && s.pbox !== s.noirBox) { await page.mouse.click(...P(530, 1180)); await wait(300); return; }
-  if (s.phase === 'hunt' && (s.pup === 'sniff' || s.pup === 'walk') && s.tgt === s.noirBox && s.meowCd <= 0 && s.meowRow < 2) { await page.mouse.click(...P(190, 1180)); await wait(200); return; }
-  await wait(40);
+await level(5, 'Noir', 'noir', 'Pounce', async () => { // Laser Lure: one real drag on the floor, then steer the dot just ahead of Puppy toward the lit trap (first crash needs no run-up)
+  if (!holding) { await page.mouse.move(...P(360, 1000)); await page.mouse.down(); await page.mouse.move(...P(380, 1010), { steps: 3 }); holding = true; }
+  await ev(() => { const pr = window.__pr, t = pr.trap(), u = pr.pup(); if (!t || pr.st.phase !== 'chase') { if (pr.st.phase === 'sniff') pr.nudge(80 * (Math.random() < 0.5 ? -1 : 1), 0); return; }
+    const a = Math.atan2(t.y - u.y, t.x - u.x), d = Math.min(260, Math.hypot(t.x - u.x, t.y - u.y) + 60); pr.move(u.x + Math.cos(a) * d, u.y + Math.sin(a) * d); });
+  await wait(60);
 }, () => window.__pr.st.boops);
 await hold(false);
 await level(6, 'Iris', 'iris', 'Trash', async () => {

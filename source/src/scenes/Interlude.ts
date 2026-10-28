@@ -36,7 +36,7 @@ export class InterludeScene extends Phaser.Scene {
     const g = this.add2(this.add.graphics()); g.fillStyle(0xffffff, 0.35);
     for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; g.fillTriangle(W / 2, 640, W / 2 + Math.cos(a) * 900, 640 + Math.sin(a) * 900, W / 2 + Math.cos(a + 0.2) * 900, 640 + Math.sin(a + 0.2) * 900); }
     this.add2(art(this, 0, 0, 'bg_vignette', 1).setAlpha(0.6));
-    const ko = this.add2(txt(this, W / 2, 150, points ? 'WIN ON\nPOINTS!' : name === 'Ruby' ? 'K.O.!' : name === 'Zoe' ? 'BONKED!' : name === 'Nana' ? 'BONKED!' : name === 'Midnight' ? 'SNATCHED!' : name === 'Noir' ? 'POUNCED!' : name === 'Iris' ? 'CLONKED!' : name === 'Linye' ? 'TAGGED!' : name === 'Glassia' ? 'WALLOPED!' : 'CHAMPION!', points ? 90 : 120, '#ffdf6b', '#e0243a', 16));
+    const ko = this.add2(txt(this, W / 2, 150, points ? 'WIN ON\nPOINTS!' : name === 'Ruby' ? 'K.O.!' : name === 'Zoe' ? 'BONKED!' : name === 'Nana' ? 'BONKED!' : name === 'Midnight' ? 'SNATCHED!' : name === 'Noir' ? 'CRASHED!' : name === 'Iris' ? 'CLONKED!' : name === 'Linye' ? 'TAGGED!' : name === 'Glassia' ? 'WALLOPED!' : 'CHAMPION!', points ? 90 : 120, '#ffdf6b', '#e0243a', 16));
     ko.setScale(0); this.tweens.add({ targets: ko, scale: 1, angle: -6, duration: 400, ease: 'Back.Out' });
     const hero = this.add2(art(this, 230, 1050, `full_${name}_happy`, 1.3));
     this.tweens.add({ targets: hero, y: 990, angle: { from: -8, to: 8 }, yoyo: true, repeat: -1, duration: 260, ease: 'Quad.Out' });
@@ -51,7 +51,7 @@ export class InterludeScene extends Phaser.Scene {
       this.tweens.addCounter({ from: 0, to: 360, duration: 900, repeat: -1, onUpdate: (tw) => { const a = Phaser.Math.DegToRad(tw.getValue()! + i * 120); s.setPosition(420 + Math.cos(a) * 60, 1020 + Math.sin(a) * 18); } }); }
     ['♪', '♫', '♪'].forEach((s, i) => { const n = this.add2(txt(this, 110 + i * 90, 660, s, 60, '#fff', '#22252b', 6));
       this.tweens.add({ targets: n, y: 600, yoyo: true, repeat: -1, duration: 400 + i * 100 }); });
-    this.add2(say(this, 230, 700, ({ Ruby: 'Baa-rilliant! Sorry Puppy!', Glassia: 'Hoof-ray! Sorry Puppy!', Zoe: 'Un-BEAR-lievable! Sorry Puppy!', Nana: 'Acorn-some! Sorry Puppy!', Midnight: 'Caw-some! Sorry Puppy!', Noir: 'Purr-fect pounce! Sorry Puppy!', Iris: 'Trash-tastic! Sorry Puppy!', Linye: '...tagged. Sorry Puppy.' } as Record<string, string>)[name] ?? 'Sorry Puppy!', 26, 2400));
+    this.add2(say(this, 230, 700, ({ Ruby: 'Baa-rilliant! Sorry Puppy!', Glassia: 'Hoof-ray! Sorry Puppy!', Zoe: 'Un-BEAR-lievable! Sorry Puppy!', Nana: 'Acorn-some! Sorry Puppy!', Midnight: 'Caw-some! Sorry Puppy!', Noir: 'Red means go! Sorry Puppy!', Iris: 'Trash-tastic! Sorry Puppy!', Linye: '...tagged. Sorry Puppy.' } as Record<string, string>)[name] ?? 'Sorry Puppy!', 26, 2400));
     this.time.delayedCall(700, () => this.layer && this.add2(say(this, 500, 820, pick(mix(LINES.puppyLose, CHEEKY.cardWinPup)), 22, 1800)));
     this.time.delayedCall(1250, () => this.layer && this.boop(pup)); // cheeky pass: Bunny hops in and boops his nose
     Fx.sting(true);
@@ -118,7 +118,7 @@ export class InterludeScene extends Phaser.Scene {
    *  sneaks him a smug kiss), Puppy blushes and wags faster.
    *  The carrot gag: when Puppy asks about the carrot in her pocket, it really is a carrot. */
   private walkFlirt(name: string, bun: Phaser.GameObjects.Image, pup: Phaser.GameObjects.Image, wob: Phaser.Tweens.Tween) {
-    const pair = pick(mix<[string, string]>(CHEEKY.walkBy[name], CHEEKY.walkAny, LINES.walk.map(l => [l, ''] as [string, string])));
+    const pair = pick(mix<[string, string]>(name === 'Noir' ? CHEEKY.laserWalkBy : CHEEKY.walkBy[name], CHEEKY.walkAny, LINES.walk.map(l => [l, ''] as [string, string])));
     const at = (who: string) => who.startsWith('Puppy:') ? { x: Phaser.Math.Clamp(pup.x, 220, W - 220), y: pup.y - 150 } : { x: 320, y: 600 }; /* Bunny's line sits left of her bust (bubble max 420 wide) */
     this.add2(say(this, at(pair[0]).x, at(pair[0]).y, pair[0], 22, 1250));
     if (pair[1]) this.time.delayedCall(1300, () => { if (!this.done) this.add2(say(this, at(pair[1]).x, at(pair[1]).y, pair[1], 22, 1300)); });

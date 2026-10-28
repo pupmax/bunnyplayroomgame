@@ -67,7 +67,7 @@ export function endCard(scene: Phaser.Scene, name: string, idx: number, win: boo
 function cardLines(name: string, win: boolean): [string, string] {
   const q = win ? mix(LINES.win, CHEEKY.cardWin) : mix(LINES.lose, CHEEKY.cardLose);
   const s = win ? mix(LINES.puppyLose, CHEEKY.cardWinPup) : mix(LINES.puppyWin, CHEEKY.cardLosePup);
-  const by = win ? CHEEKY.cardWinBy[name] : undefined;
+  const by = win ? (name === 'Noir' ? CHEEKY.laserCardWinBy /* Laser Lure replaced Box Bandit */ : CHEEKY.cardWinBy[name]) : undefined;
   if (by?.length && Math.random() < 0.5) { const l = pick(by); return /^Puppy:/.test(l) ? [pick(q), l] : [l, pick(s)]; }
   return [pick(q), pick(s)];
 }

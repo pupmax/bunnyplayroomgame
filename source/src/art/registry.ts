@@ -29,6 +29,7 @@ function bootDeferred(key: string): boolean {
   if (key.startsWith('full_')) return !BOOT_USED_FULL.has(key.split('_')[2]) && !BOOT_USED_FULL_KEYS.has(key);
   if (key.startsWith('pt_')) return true; // Tail Catch art: drawn when the level opens
   if (key.startsWith('pa_')) return true; // Acorn Puppy (Tail Catch rig) extra frames: drawn when Acorn opens (ensureArt)
+  if (key.startsWith('pl_')) return true; // Laser Lure (Noir) Puppy extra frames: drawn when the level opens (ensureArt)
   if (key.startsWith('pk_')) return true; // Penalty Pup keeper layers: drawn when Football opens (ensureArt)
   if (/^t[pibuclx]_/.test(key)) return true; // Trash-Can Drop (Comic Rooftop Heist) bobble Puppy + props: drawn when Trash opens (ensureArt)
   if (key === 'bun_rig_sneaky' || key.startsWith('bun_rig2_')) return true; // Tail Catch only (drawn when the level opens)
@@ -81,6 +82,11 @@ function assets(): Asset[] {
     ko: { face: 'ko', bob: 2, earL: 36, earR: 36, legBack: -34, legFront: 38, legLift: 2, armBack: -120 } }; // KO'd on the end cards (systems/koPup.ts): ears splayed, legs + arm flopped
   for (const name of Object.keys(paFrames)) list.push({ key: `pa_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...paFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
   // ---------- end Acorn Barrage Puppy ----------
+  // ---------- Laser Lure (Noir) Puppy: a few extra tail-less frames for the Tail Catch rig. On demand (ensureArt when Pounce opens). ----------
+  const plFrames: Record<string, Record<string, unknown>> = { xeyes: { ...pf.dizzy, face: 'xeyes', earL: 34, earR: -12 }, smush: { ...pf.panic, face: 'ouch', earL: 34, earR: 34 },
+    hang: { ...pf.fall_normal, face: 'worry', armBack: -175, legBack: -6, legFront: 8, earL: 26, earR: 26 }, sniff: { face: 'blink', lean: 14, earL: 20, earR: 20, bob: 4 },
+    cozy: { face: 'blink', earL: 10, earR: 10 } };
+  for (const name of Object.keys(plFrames)) list.push({ key: `pl_${name}`, nominal: PUP_SCALE, boost: 1.35, build: (k) => puppySVG({ ...plFrames[name], cup: false, noTail: true }, k), originX: 0.5, originY: PUP_VB.feetY / PUP_VB.h });
   // ---------- Trash-Can Drop "Comic Rooftop Heist" (Iris): backdrop (bg_, on demand like every backdrop), drawn junk/umbrella/bins/burst
   // and the bobble-head Puppy (tp_b_* body frames, feet origin; tp_h_* head faces, neck-pivot origin). On demand (ensureArt when Trash opens). ----------
   list.push({ key: 'bg_heist', nominal: 1, res: 1.5, build: (k) => trashBgSVG(k), originX: 0, originY: 0 });

@@ -71,6 +71,38 @@ export const LINES = {
   boxWin: ['Noir: Return to sender, darling.', 'Noir: Signed, sealed, delivered.', 'Noir: This parcel is going straight back.'],
   boxWinPup: ['Puppy: Hey! I am NOT a parcel!', 'Puppy: ...is this the post office?', 'Puppy: Can I at least have a window seat?'],
   boxLose: ['Puppy: Nyeh nyeh! Hide and seek champion: ME!', 'Puppy: Found you more than you booped me!', 'Puppy: Woof! Puppy wins!'],
+  // ================= EDIT ME, Marc: LASER LURE (Noir's level, replaces Box Bandit) =================
+  // Noir lounges with a laser pointer and steers Puppy into the playroom's traps. One line is picked at random (no repeats in a row).
+  // Keep Noir sneaky + smug; about 1 in 5 lines is sweet (marked). The box* pools above are kept for reference; the level no longer uses them.
+  laserStart: ['Noir: Fetch, darling.', 'Noir: Red means go.', 'Noir: Run, darling. I\'ll wait.', 'Noir: One little dot. One very silly dog.',
+    'Puppy: RED DOT! MINE MINE MINE!', 'Noir: Be gentle with him. ...Kidding.'], // last one sweet-ish
+  laserNoir: ['Noir: I didn\'t move a paw. Well. One claw.', 'Noir: Red means go.', 'Noir: Fetch, darling.', 'Noir: Gravity did that. Not me.',
+    'Noir: Run, darling. I\'ll wait.', 'Noir: Purr. Again.', 'Noir: Such a good boy. Such a bad idea.', 'Noir: You okay, sweetie? Good. Again.'], // last one sweet-ish
+  laserChase: ['Puppy: RED DOT! MINE MINE MINE!', 'Puppy: Almost! ALMOST!', 'Puppy: Come back, little dot!', 'Puppy: I am SO close!', 'Puppy: Stay STILL!'],
+  laserZoom: ['ZOOMIES!', 'Puppy: I am SPEED!', 'Puppy: Can\'t stop! Won\'t stop!', 'Puppy: WHEEEE!', 'Puppy: My legs are doing it on their OWN!'],
+  laserBoop: ['Puppy: Boop. Hello, trap.', 'Puppy: I was just... checking it.', 'Puppy: Not fast enough to be dumb yet.', 'Puppy: Sniff. Nope. Dot plz.', 'Puppy: You want me to go FASTER? Okay!'],
+  laserSniff: ['sniff sniff...', 'Puppy: Hmm... smells like dot.', 'Puppy: Where did it go?', 'snff?'],
+  laserLost: ['Puppy: THERE you are!', 'Puppy: It came from YOUR paw!', 'Puppy: Hey! The dot lives in your paw!', 'Puppy: Caught you, kitty!'],
+  laserLostNoir: ['Noir: ...What dot?', 'Noir: Never seen it before.', 'Noir: Slower, darling. Slower.', 'Noir: Oops.'],
+  laserWhy: ['Puppy: Why does the dot always WIN?!', 'Puppy: That dot cheats!', 'Puppy: I nearly had it!', 'Puppy: ...can we do that again?'], // last one sweet
+  // trap payoffs: Noir's line, then Puppy's reply
+  laserSockNoir: ['Noir: New hat. Very chic.', 'Noir: Bunny will want that back.', 'Noir: Fetch, darling. Not the laundry.'],
+  laserSockPup: ['Puppy: Smells like... Tuesday.', 'Puppy: Is this Bunny\'s?! ...Is it?', 'Puppy: I am a fancy boy now.', 'Puppy: Warm. Fluffy. Suspicious.'],
+  laserGlassNoir: ['Noir: Clean glass. Was.', 'Noir: Nose print. Signed, Puppy.', 'Noir: It was open. In my heart.'],
+  laserGlassPup: ['Puppy: Who put a WALL in the air?!', 'Puppy: Squeeeeak...', 'Puppy: I can see outside. I cannot GO outside.', 'Puppy: Ow. Ow. Window.'],
+  laserRugNoir: ['Noir: One Puppy burrito. Extra fluff.', 'Noir: All wrapped up. Cute.', 'Noir: Stay there. I\'ll get Bunny.'],
+  laserRugPup: ['Puppy: ...okay this is actually cozy.', 'Puppy: Help. ...No, wait. Five more minutes.', 'Puppy: I am a burrito now. Hmph.'], // first one sweet
+  laserPianoNoir: ['Noir: Bravo. Encore.', 'Noir: That was a B-flat Puppy.', 'Noir: Music to my ears.'],
+  laserPianoPup: ['Puppy: Ow. In C major.', 'Puppy: I hear... bells...', 'Puppy: Did I play it right?'],
+  laserBubbleNoir: ['Noir: Dance, darling.', 'Noir: Pop goes the Puppy.', 'Noir: I love this song.'],
+  laserBubblePup: ['Puppy: POP! POP! Why is the floor clapping?!', 'Puppy: The floor is shooting at me!', 'Puppy: Okay this is kinda fun.'],
+  laserFrameNoir: ['Noir: Hang in there, darling.', 'Noir: Bunny\'s portrait. Bold choice.', 'Noir: Now don\'t let go. Or do.'],
+  laserFramePup: ['Puppy: The dot went UP?!', 'Puppy: Bunny is watching me. Even here.', 'Puppy: Little help? ...Anyone?'],
+  laserTea: ['Bunny: My TEA! Three seconds of my LIFE!', 'Bunny: Not the good china, Noir.', 'Bunny: Wrong target, kitty.', 'Bunny: That was MY table, darlings.'],
+  laserCarrier: ['Noir: Delivered, darling.', 'Bunny: Signed, sealed, mine.', 'Noir: One Puppy. Gift-boxed. You\'re welcome.'],
+  laserWinPup: ['Puppy: I followed a DOT into a CAGE.', 'Puppy: The dot set me up!', 'Puppy: ...can we do that again?'], // last one sweet
+  laserLose: ['Puppy: Hah! I found the paw behind the dot!', 'Puppy: Nice try, kitty! I see your paw!', 'Puppy: Woof! The dot is MINE now!'],
+  // ================= end LASER LURE =================
   trashHit: ['CLONK! Perfect drop!', 'Special delivery!', 'Bin-go!', 'Garbage day, Puppy!', 'Puppy got recycled!', 'Banana-rama!', 'Shoe-per shot!'],
   trashMiss: ['Missed! The pigeon is grateful.', 'Puppy: Nyeh! Missed me!', 'Wait for the shadow, sweetie!', 'That can is now modern art.'],
   // EDIT ME, Marc: Trash, junk bounces off the umbrella (last 3 are new)
@@ -443,6 +475,13 @@ export const CHEEKY = {
   // ---- Noir (Box Bandit) win/lose outro (mixed with LINES.boxWinPup / boxLose) ----
   boxWinPup: ['Puppy: Do NOT deliver me to Bunny!', 'Puppy: Unwrap me? No! FREE me!', 'Puppy: Fragile! Handle with less rope!', "Puppy: Gift-wrapped?! Who's the gift for?!"],
   boxLose: ["Puppy: Found the kitty! Bunny's spy is caught!", "Puppy: Woof! Can't box this Puppy!", 'Puppy: Found you! Bunny next. Hehe.'],
+  // ---- EDIT ME, Marc: Noir (Laser Lure) end card + interlude walk. These replace the box-themed cardWinBy.Noir / walkBy.Noir for Noir
+  //      (the old ones are kept above, unused). Last one of each is sweet-ish. ----
+  laserCardWinBy: ['Bunny: Followed a dot into my carrier? Adorable.', 'Puppy: The dot led me here. The dot works for Bunny.', 'Bunny: Noir points. You run. I collect.',
+    'Bunny: Red dot, red cheeks. Caught.', 'Puppy: I would do it all again. That\'s the problem.', 'Bunny: Tired out? Good. Come here.'],
+  laserWalkBy: [['Bunny: Chased a dot all day, did we?', 'Puppy: It was RIGHT THERE!'], ['Bunny: Noir points, you run. Cute system.', 'Puppy: It\'s rigged!'],
+    ['Bunny: You owe me a teacup.', 'Puppy: The dot owes you a teacup!'], ['Bunny: Sock hat suits you.', 'Puppy: It smells like Tuesday.'],
+    ['Bunny: Next time I hold the laser.', 'Puppy: ...I would still run.'], ['Bunny: All tuckered out?', 'Puppy: Carry me? ...Please?']] as [string, string][],
   // ---- Glassia (Penalty Pup) loss card: Puppy's line (mixed with LINES.penLosePup) ----
   penLosePup: ['Puppy: Nothing gets past me. Except Bunny.', 'Puppy: Saved it! Bunny, stop taking notes!', "Puppy: I'm a keeper! Not KEPT. Big difference."],
 };
